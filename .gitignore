@@ -1,1 +1,16 @@
+# Visual Studio / .NET
+.vs/
+.vscode/
+bin/
+obj/
+
+# Playwright / test artifacts
+browser-session/
+Reports/
+Traces/
+test-results/
+FileDownloads/
+
+# Logs and environment files
+*.log
 .env

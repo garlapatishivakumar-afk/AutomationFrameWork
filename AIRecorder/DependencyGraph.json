@@ -1,0 +1,28 @@
+{
+    "PageActions\\AgencyCheckToBorrowerMethods.cs": [
+        "PageElements\\AgencyCheckToBorrowerObjects.cs",
+        "Helpers\\TestContext.cs"
+    ],
+    "PageActions\\BuildDataFileMethods.cs": [
+        "PageElements\\BuildDataFileObjects.cs",
+        "Helpers\\ConfigReader.cs",
+        "Helpers\\TestContext.cs"
+    ],
+    "PageActions\\DealsCompletionStatusMethods.cs": [
+        "PageElements\\DealsCompletionStatusObjects.cs",
+        "Helpers\\ConfigReader.cs",
+        "Helpers\\TestContext.cs"
+    ],
+    "PageActions\\LoanManagementWireMethods.cs": [
+        "PageElements\\LoanManagementWireObjects.cs",
+        "Helpers\\TestContext.cs"
+    ],
+    "PageActions\\LoginMethods.cs": [
+        "PageElements\\LoginObjects.cs",
+        "Helpers\\TestContext.cs"
+    ],
+    "PageActions\\TaxShortfallRequestMethods.cs": [
+        "PageElements\\TaxShortfallRequestObjects.cs",
+        "Helpers\\TestContext.cs"
+    ]
+}

@@ -1,0 +1,32 @@
+{
+  "summary": "Login flow artifacts generated successfully.",
+  "artifacts": [
+    {
+      "artifactType": "Method",
+      "targetFile": "PageActions/LoginMethods.cs",
+      "targetClass": "LoginMethods",
+      "name": "LoginAsync",
+      "content": "public async Task LoginAsync() { ... }"
+    },
+    {
+      "artifactType": "Locator",
+      "targetFile": "PageElements/LoginObjects.cs",
+      "targetClass": "LoginObjects",
+      "name": "UserNameTextbox",
+      "content": "public ILocator UserNameTextbox => _page.Locator(\"#username\");"
+    },
+    {
+      "artifactType": "Step",
+      "targetFile": "StepDefinitions/LoginSteps.cs",
+      "targetClass": "LoginSteps",
+      "name": "User logs in",
+      "content": "[When(\"the user logs in\")] public async Task WhenTheUserLogsIn() { ... }"
+    },
+    {
+      "artifactType": "Scenario",
+      "targetFile": "Features/Login.feature",
+      "name": "Login successfully",
+      "content": "Scenario: Login successfully\n  Given ...\n  When ...\n  Then ..."
+    }
+  ]
+}
