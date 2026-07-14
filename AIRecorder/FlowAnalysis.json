@@ -1,0 +1,21 @@
+{
+    "textboxLines": [],
+    "dropdownLines": [],
+    "clickLines": [],
+    "popupLines": [],
+    "gridLines": [],
+    "navigationLines": [
+        4
+    ],
+    "uploadLines": [],
+    "downloadLines": [],
+    "statusLines": [],
+    "textCaptureLines": [],
+    "actions": [
+        {
+            "line": 4,
+            "action": "Navigate",
+            "raw": "  await page.goto('https://login.microsoftonline.com/0b14651e-5110-47c7-b458-14565f1d46de/login');"
+        }
+    ]
+}

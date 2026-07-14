@@ -1,0 +1,38 @@
+{
+    "AgencyCheckToBorrower": {
+        "pageAction": "PageActions\\AgencyCheckToBorrowerMethods.cs",
+        "pageObject": "PageElements\\AgencyCheckToBorrowerObjects.cs",
+        "stepDefinition": "StepDefinitions\\AgencyCheckToBorrowerSteps.cs",
+        "feature": "Features\\AgencyCheckToBorrower.feature"
+    },
+    "BuildDataFile": {
+        "pageAction": "PageActions\\BuildDataFileMethods.cs",
+        "pageObject": "PageElements\\BuildDataFileObjects.cs",
+        "stepDefinition": "StepDefinitions\\BuildDataFileSteps.cs",
+        "feature": "Features\\BuildDataFile.feature"
+    },
+    "DealsCompletionStatus": {
+        "pageAction": "PageActions\\DealsCompletionStatusMethods.cs",
+        "pageObject": "PageElements\\DealsCompletionStatusObjects.cs",
+        "stepDefinition": "StepDefinitions\\DealsCompletionStatusSteps.cs",
+        "feature": "Features\\DealsCompletionStatus.feature"
+    },
+    "LoanManagementWire": {
+        "pageAction": "PageActions\\LoanManagementWireMethods.cs",
+        "pageObject": "PageElements\\LoanManagementWireObjects.cs",
+        "stepDefinition": "StepDefinitions\\LoanManagementWireSteps.cs",
+        "feature": "Features\\LoanManagementWire.feature"
+    },
+    "Login": {
+        "pageAction": "PageActions\\LoginMethods.cs",
+        "pageObject": "PageElements\\LoginObjects.cs",
+        "stepDefinition": "StepDefinitions\\LoginSteps.cs",
+        "feature": "Features\\Login.feature"
+    },
+    "TaxShortfallRequest": {
+        "pageAction": "PageActions\\TaxShortfallRequestMethods.cs",
+        "pageObject": "PageElements\\TaxShortfallRequestObjects.cs",
+        "stepDefinition": "StepDefinitions\\TaxShortfallRequestSteps.cs",
+        "feature": "Features\\TaxShortfallRequest.feature"
+    }
+}

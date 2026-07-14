@@ -1,0 +1,10 @@
+{
+  "bindingCulture": {
+    "language": "en-US"
+  },
+  "dependencies": {
+    "BoDi": {
+      "Automation_Project_Demo.Drivers.PlaywrightDriver": "Automation_Project_Demo.Drivers.PlaywrightDriver"
+    }
+  }
+}
