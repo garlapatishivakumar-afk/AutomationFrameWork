@@ -1,214 +1,107 @@
 import fs from "fs";
+import path from "path";
 import readline from "readline";
-import { PlanningResult } from "./PlanningEngine";
+import { QuestionEngine } from "./Runtime/Questions/QuestionEngine";
+import { RuntimeContext } from "./Runtime/Variables/RuntimeContext";
 
 export type PlanningSession = {
 
-	useHelpers:string[];
+    interactiveQuestions: string[];
 
-	retries:any[];
+    answers: Record<string, string>;
 
-	captures:any[];
-
-	validations:any[];
+    runtimeVariables: {
+        name: string;
+        value: string;
+        captureType: string;
+    }[];
 
 };
 
-function ask(question:string){
+function ask(question: string): Promise<string> {
 
-	const rl=readline.createInterface({
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
 
-		input:process.stdin,
-
-		output:process.stdout
-
-	});
-
-	return new Promise<string>(resolve=>{
-
-		rl.question(question+"\n",answer=>{
-
-			rl.close();
-
-			resolve(answer);
-
-		});
-
-	});
+    return new Promise(resolve => {
+        rl.question(`${question}\n`, answer => {
+            rl.close();
+            resolve(answer.trim());
+        });
+    });
 
 }
 
 export async function buildPlanningSession(
-	plan:PlanningResult
-){
+    projectRoot: string = process.cwd()
+): Promise<PlanningSession> {
 
-	const session:PlanningSession={
+    const questionEngine =
+        new QuestionEngine();
 
-		useHelpers:[],
+    const runtimeContext =
+        new RuntimeContext();
 
-		retries:[],
+    const analysis =
+        questionEngine.analyzeCodeFile(projectRoot);
 
-		captures:[],
+    const answers: Record<string, string> = {};
 
-		validations:[]
-	};
+    for (const question of analysis.session.questions) {
+        const response = await ask(question.text);
+        answers[question.id] = response;
+    }
 
-	for(const helper of plan.helpers){
+    if (answers.capture_values && answers.capture_values.length > 0) {
+        runtimeContext.capture("capturedValues", answers.capture_values, "InnerText");
+    }
 
-		const answer=await ask(
+    if (analysis.findings.statusField) {
+        runtimeContext.capture("status", analysis.findings.statusField, "InnerText");
+    }
 
-`Use helper ${helper} ? (Y/N)`
+    runtimeContext.persist(projectRoot);
 
-		);
-
-		if(answer.toLowerCase()=="y")
-
-			session.useHelpers.push(helper);
-	}
-
-	for(const line of plan.retryLines){
-
-		const retry=await ask(
-
-`Retry required for line ${line} ? (Y/N)`
-
-		);
-
-		if(retry.toLowerCase()!="y")
-			continue;
-
-		const status=await ask(
-
-"Expected Status:"
-
-		);
-
-		const seconds=await ask(
-
-"Retry every how many seconds?"
-
-		);
-
-		session.retries.push({
-
-			line,
-
-			status,
-
-			seconds
-		});
-	}
-
-	for(const line of plan.captureLines){
-
-		const capture=await ask(
-
-`Capture InnerText for line ${line}? (Y/N)`
-
-		);
-
-		if(capture.toLowerCase()!="y")
-			continue;
-
-		const variable=await ask(
-
-"Variable Name:"
-
-		);
-
-		const reuse=await ask(
-
-"Where should it be reused?"
-
-		);
-
-		session.captures.push({
-
-			line,
-
-			variable,
-
-			reuse
-		});
-
-	}
-
-	for(const line of plan.validationLines){
-
-		const validation=await ask(
-
-`Validation required for line ${line}? (Y/N)`
-
-		);
-
-		if(validation.toLowerCase()!="y")
-			continue;
-
-		const success=await ask(
-
-"Success validation:"
-
-		);
-
-		const failure=await ask(
-
-"Failure validation:"
-
-		);
-
-		session.validations.push({
-
-			line,
-
-			success,
-
-			failure
-		});
-
-	}
-
-	return session;
+    return {
+        interactiveQuestions: analysis.session.questions.map(x => x.text),
+        answers,
+        runtimeVariables: runtimeContext
+            .all()
+            .map(variable => ({
+                name: variable.name,
+                value: variable.value,
+                captureType: variable.captureType
+            }))
+    };
 
 }
 
 function saveSession(
-	session:PlanningSession
-){
+    session: PlanningSession,
+    projectRoot: string = process.cwd()
+): void {
 
-	fs.writeFileSync(
+    const filePath = path.join(projectRoot, "AIRecorder", "PlanningSession.json");
 
-		"AIRecorder/PlanningSession.json",
-
-		JSON.stringify(session,null,4)
-
-	);
+    fs.writeFileSync(
+        filePath,
+        JSON.stringify(session, null, 4)
+    );
 
 }
 
-if(require.main===module){
+if (require.main === module) {
 
-	const plan:PlanningResult=
-
-	JSON.parse(
-
-		fs.readFileSync(
-
-			"AIRecorder/PlanningResult.json",
-
-			"utf8"
-
-		)
-
-	);
-
-	buildPlanningSession(plan)
-
-	.then(session=>{
-
-		saveSession(session);
-
-		console.log(session);
-
-	});
+    buildPlanningSession()
+        .then(session => {
+            saveSession(session);
+            console.log(session);
+        })
+        .catch(error => {
+            console.error(error instanceof Error ? error.message : String(error));
+            process.exitCode = 1;
+        });
 
 }

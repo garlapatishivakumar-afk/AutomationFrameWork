@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { buildFinalPrompt } from './PromptBuilder';
+import { TokenUsageLogger } from './Services/TokenUsageLogger';
 
 type CliArgs = {
   task: string;
@@ -47,10 +48,22 @@ async function run(): Promise<void> {
   }
 
   const client = new OpenAI({ apiKey });
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const startedAt = Date.now();
+
   const response = await client.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    model,
     messages: [{ role: 'user', content: built.prompt }],
     temperature: 0.1
+  });
+
+  await TokenUsageLogger.logChatUsage({
+    operation: 'ExecutePrompt.run',
+    model,
+    usage: response.usage,
+    promptCharacters: built.prompt.length,
+    responseId: response.id,
+    latencyMs: Date.now() - startedAt
   });
 
   const content = response.choices?.[0]?.message?.content ?? '';

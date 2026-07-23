@@ -1,6 +1,10 @@
 export type WorkflowStage =
     | "Planning"
     | "KnowledgeRetrieval"
+    | "InteractiveQuestions"
+    | "VariableCapture"
+    | "BusinessRetry"
+    | "ValidationPlanning"
     | "PromptBuild"
     | "LLM"
     | "Review"

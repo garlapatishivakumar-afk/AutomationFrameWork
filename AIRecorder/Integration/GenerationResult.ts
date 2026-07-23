@@ -22,4 +22,11 @@ export interface GenerationResult {
 
     approval?: ApprovalResult | null;
 
+    phase9?: {
+        interactiveQuestions: string[];
+        runtimeVariables: string[];
+        businessRetryRules: string[];
+        validationTargets: string[];
+    };
+
 }

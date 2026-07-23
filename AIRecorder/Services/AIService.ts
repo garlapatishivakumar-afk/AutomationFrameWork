@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { TokenUsageLogger } from "./TokenUsageLogger";
 
 export class AIService {
 
@@ -21,10 +22,21 @@ export class AIService {
 
 	async generate(prompt: string): Promise<string> {
 
+		const startedAt = Date.now();
+
 		const response = await this.client.chat.completions.create({
 			model: this.model,
 			messages: [{ role: "user", content: prompt }],
 			temperature: 0.1
+		});
+
+		await TokenUsageLogger.logChatUsage({
+			operation: "AIService.generate",
+			model: this.model,
+			usage: response.usage,
+			promptCharacters: prompt.length,
+			responseId: response.id,
+			latencyMs: Date.now() - startedAt
 		});
 
 		return response.choices?.[0]?.message?.content ?? "";

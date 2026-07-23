@@ -2,6 +2,8 @@ import { LearningEntry } from "../Learning/LearningModels";
 import { LearningPipeline } from "../Learning/LearningPipeline";
 import { RAGEngine } from "../Learning/RAGEngine";
 import { PlanningResult } from "../Planner/PlannerModels";
+import { QuestionEngine } from "../Runtime/Questions/QuestionEngine";
+import { RuntimeVariable } from "../Runtime/Variables/RuntimeVariable";
 import { AutoFixEngine } from "../Review/AutoFixEngine";
 import { ArtifactGenerationPlan } from "./ArtifactGenerationPlan";
 import { ApprovalEngine } from "./ApprovalEngine";
@@ -14,6 +16,8 @@ import { WorkflowContext } from "./WorkflowContext";
 import { WorkflowEngine } from "./WorkflowEngine";
 import { WorkflowStep } from "./WorkflowStep";
 import { ReviewResult } from "../Review/ReviewResult";
+import fs from "fs";
+import path from "path";
 
 export interface GenerationPipelineInput {
 
@@ -61,6 +65,9 @@ export class GenerationPipeline {
     private readonly autoFix =
         new AutoFixEngine();
 
+    private readonly questionEngine =
+        new QuestionEngine();
+
     public async run(input: GenerationPipelineInput): Promise<GenerationResult> {
 
         const context: WorkflowContext = {
@@ -75,6 +82,12 @@ export class GenerationPipeline {
             plan: this.buildGenerationPlan(input),
             approval: null,
             generated: null,
+            interactiveQuestions: [],
+            questionFindings: [],
+            runtimeVariables: [],
+            businessRetryRules: [],
+            validationTargets: [],
+            phase9Constraints: [],
             errors: []
         };
 
@@ -108,7 +121,13 @@ export class GenerationPipeline {
             review,
             fixes: context.fixes,
             workflow,
-            approval: context.approval
+            approval: context.approval,
+            phase9: {
+                interactiveQuestions: context.interactiveQuestions.map(x => x.text),
+                runtimeVariables: context.runtimeVariables.map(x => x.name),
+                businessRetryRules: context.businessRetryRules,
+                validationTargets: context.validationTargets
+            }
         };
 
     }
@@ -143,9 +162,65 @@ export class GenerationPipeline {
                 }
             },
             {
+                stage: "InteractiveQuestions",
+                execute: async context => {
+                    const result =
+                        this.questionEngine.analyzeCodeFile(process.cwd());
+
+                    context.interactiveQuestions =
+                        result.session.questions;
+
+                    context.questionFindings = [
+                        result.findings.statusField ? `Detected status field: ${result.findings.statusField}` : "No status field detected",
+                        result.findings.hasCapture ? "Capture opportunities detected" : "No capture opportunities detected",
+                        result.findings.hasValidation ? "Validation opportunities detected" : "No validation opportunities detected"
+                    ];
+                }
+            },
+            {
+                stage: "VariableCapture",
+                execute: async context => {
+                    context.runtimeVariables =
+                        this.detectRuntimeVariables();
+                }
+            },
+            {
+                stage: "BusinessRetry",
+                execute: async context => {
+                    const hasStatusQuestion =
+                        context.interactiveQuestions.some(x => x.type === "status-change");
+
+                    context.businessRetryRules = hasStatusQuestion
+                        ? [
+                            "Pending -> Completed",
+                            "Running -> Success",
+                            "Processing -> Approved",
+                            "Submitted -> Completed",
+                            "Failed -> Retry"
+                        ]
+                        : [];
+                }
+            },
+            {
+                stage: "ValidationPlanning",
+                execute: async context => {
+                    const validationQuestion =
+                        context.interactiveQuestions.find(x => x.type === "validation");
+
+                    context.validationTargets =
+                        validationQuestion?.options ?? [];
+                }
+            },
+            {
                 stage: "PromptBuild",
-                execute: async () => {
-                    // Prompt is built in LLM stage via GenerationOrchestrator.
+                execute: async context => {
+                    context.phase9Constraints =
+                        this.buildPhase9Constraints(context.input.constraints, {
+                            findings: context.questionFindings,
+                            variables: context.runtimeVariables,
+                            retryRules: context.businessRetryRules,
+                            validations: context.validationTargets
+                        });
                 }
             },
             {
@@ -158,7 +233,7 @@ export class GenerationPipeline {
                             pageName: context.input.pageName,
                             application: context.input.application,
                             objective: context.input.objective,
-                            constraints: context.input.constraints,
+                            constraints: context.phase9Constraints,
                             retrievedCount: context.retrievedCount,
                             configuration: {
                                 provider: "OpenAI",
@@ -338,6 +413,81 @@ export class GenerationPipeline {
             100 - (high * 30) - (medium * 15) - (low * 5);
 
         return Math.max(0, Math.min(100, score));
+
+    }
+
+    private buildPhase9Constraints(
+        baseConstraints: string[],
+        phase9: {
+            findings: string[];
+            variables: RuntimeVariable[];
+            retryRules: string[];
+            validations: string[];
+        }
+    ): string[] {
+
+        const variableNames =
+            phase9.variables.map(x => x.name);
+
+        const constraints = [
+            ...baseConstraints,
+            "Use SmartFillEngine and SmartDropdownEngine when textbox/dropdown actions are detected.",
+            "Prefer SmartWaitEngine and WaitStrategy before interactions.",
+            ...phase9.findings,
+            variableNames.length > 0
+                ? `Capture and reuse runtime variables: ${variableNames.join(", ")}`
+                : "No mandatory runtime variable capture detected.",
+            phase9.retryRules.length > 0
+                ? `Generate business retry polling for transitions: ${phase9.retryRules.join(", ")}`
+                : "Generate retry logic only when dynamic status transitions are detected.",
+            phase9.validations.length > 0
+                ? `Generate validations for: ${phase9.validations.join(", ")}`
+                : "Generate validations only when explicitly requested by the user."
+        ];
+
+        return [...new Set(constraints)];
+
+    }
+
+    private detectRuntimeVariables(): RuntimeVariable[] {
+
+        const filePath = path.join(process.cwd(), "AIRecorder", "code.ts");
+
+        if (!fs.existsSync(filePath))
+            return [];
+
+        const code = fs.readFileSync(filePath, "utf8").toLowerCase();
+        const variables: RuntimeVariable[] = [];
+
+        const addVariable = (name: string, captureType: RuntimeVariable["captureType"]) => {
+            variables.push({
+                name,
+                value: `{{${name}}}`,
+                captureType,
+                scope: "session",
+                createdAt: new Date().toISOString()
+            });
+        };
+
+        if (code.includes("transaction") && code.includes("id"))
+            addVariable("transactionId", "TransactionId");
+
+        if (code.includes("workflow") && code.includes("id"))
+            addVariable("workflowId", "WorkflowId");
+
+        if (code.includes("deal") && code.includes("id"))
+            addVariable("dealId", "DealId");
+
+        if (code.includes("amount"))
+            addVariable("amount", "Amount");
+
+        if (code.includes("user") && code.includes("name"))
+            addVariable("userName", "UserName");
+
+        if (code.includes("status"))
+            addVariable("status", "InnerText");
+
+        return variables;
 
     }
 

@@ -8,8 +8,11 @@
 
   <ItemGroup>
     <Compile Remove="node_modules\**" />
+    <Compile Remove="AIAutomationGenerator\**" />
     <EmbeddedResource Remove="node_modules\**" />
+    <EmbeddedResource Remove="AIAutomationGenerator\**" />
     <None Remove="node_modules\**" />
+    <None Remove="AIAutomationGenerator\**" />
     <ReqnrollFeatureFile Remove="node_modules\**" />
   </ItemGroup>
 
