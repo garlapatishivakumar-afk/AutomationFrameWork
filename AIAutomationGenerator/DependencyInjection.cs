@@ -5,6 +5,7 @@ using AIAutomationGenerator.Generation;
 using AIAutomationGenerator.Intelligence;
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Recording;
+using AIAutomationGenerator.Shared;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AIAutomationGenerator;
@@ -21,6 +22,8 @@ public static class DependencyInjection
         services.AddSingleton<IPromptOptimizer, PromptOptimizer>();
 
         services.AddSingleton<IFrameworkScanner, SolutionScanner>();
+        services.AddSingleton<IRepositoryIndexService, RepositoryIndexService>();
+        services.AddSingleton<ILogger, ConsoleLogger>();
         services.AddSingleton<IContextBuilder, ContextBuilder>();
         services.AddSingleton<IContextFilter, ContextFilter>();
         services.AddSingleton<IMethodSimilarityEngine, MethodSimilarityEngine>();
