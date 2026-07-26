@@ -14,3 +14,11 @@ FileDownloads/
 # Logs and environment files
 *.log
 .env
+
+# Build diagnostics
+builddiag.txt
+*.binlog
+
+# Generated files (can be regenerated)
+GeneratedOutput/
+MetadataOutput/
