@@ -24,7 +24,7 @@ public class OpenAIResponseDeserializer : IAIResponseDeserializer
         return new AIResponse
         {
             Success = true,
-            Response = chatResponse.Choices[0].Message.Content
+            Content = chatResponse.Choices[0].Message.Content
         };
     }
 }

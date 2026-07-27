@@ -23,9 +23,17 @@ public static class DependencyInjection
 
         services.AddSingleton<IFrameworkScanner, SolutionScanner>();
         services.AddSingleton<IRepositoryIndexService, RepositoryIndexService>();
+        services.AddSingleton<IRepositoryKnowledgeBuilder, RepositoryKnowledgeBuilder>();
+        services.AddSingleton<IRepositoryGraphBuilder, RepositoryGraphBuilder>();
         services.AddSingleton<ILogger, ConsoleLogger>();
         services.AddSingleton<IContextBuilder, ContextBuilder>();
+        services.AddSingleton<IContextCacheService, ContextCacheService>();
+        services.AddSingleton<IContextRankingService, ContextRankingService>();
+        services.AddSingleton<IPromptOptimizationService, PromptOptimizationService>();
         services.AddSingleton<IContextFilter, ContextFilter>();
+        services.AddSingleton<IAIResponseParser, AIResponseParser>();
+        services.AddSingleton<IScriptValidator, ScriptValidator>();
+        services.AddSingleton<ILearningEngine, LearningEngine>();
         services.AddSingleton<IMethodSimilarityEngine, MethodSimilarityEngine>();
         services.AddSingleton<ILocatorSimilarityEngine, LocatorSimilarityEngine>();
         services.AddSingleton<IStepSimilarityEngine, StepSimilarityEngine>();
@@ -34,6 +42,7 @@ public static class DependencyInjection
         services.AddSingleton<IStepReuseEngine, StepReuseEngine>();
         services.AddSingleton<IRecordingParser, RecordingParser>();
         services.AddSingleton<IBusinessFlowBuilder, BusinessFlowBuilder>();
+        services.AddSingleton<IAIProvider, MockAIProvider>();
 
         return services;
     }

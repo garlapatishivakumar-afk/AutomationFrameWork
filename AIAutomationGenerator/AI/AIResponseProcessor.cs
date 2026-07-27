@@ -11,7 +11,7 @@ public class AIResponseProcessor : IAIResponseProcessor
         GeneratedScript script = new();
         if (!response.Success)
             return script;
-        string content = response.Response;
+        string content = response.Content;
         script.Feature = ExtractSection(content,"FEATURE","PAGEOBJECT");
         script.PageObjects = ExtractSection(content,"PAGEOBJECT","STEPDEFINITION");
         script.PageMethods = ExtractSection(content,"PAGEMETHODS","STEPDEFINITIONS");

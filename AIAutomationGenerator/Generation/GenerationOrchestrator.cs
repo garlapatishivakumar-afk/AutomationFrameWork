@@ -20,6 +20,13 @@ public class GenerationOrchestrator : IGenerationOrchestrator
     private readonly IRecordingParser recordingParser;
     private readonly IBusinessFlowBuilder businessFlowBuilder;
     private readonly IPromptBuilder promptBuilder;
+    private readonly IContextRankingService contextRankingService;
+    private readonly IContextCacheService contextCacheService;
+    private readonly IPromptOptimizationService promptOptimizationService;
+    private readonly IAIResponseParser aiResponseParser;
+    private readonly IScriptValidator scriptValidator;
+    private readonly ILearningEngine learningEngine;
+    private readonly IAIProvider aiProvider;
 
     public GenerationOrchestrator(
         IFrameworkScanner frameworkScanner,
@@ -29,10 +36,17 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         IMethodReuseEngine methodReuseEngine,
         ILocatorReuseEngine locatorReuseEngine,
         IStepReuseEngine stepReuseEngine,
+        IContextRankingService contextRankingService,
         IPromptOptimizer promptOptimizer,
         IRecordingParser recordingParser,
         IBusinessFlowBuilder businessFlowBuilder,
-        IPromptBuilder promptBuilder)
+        IPromptBuilder promptBuilder,
+        IContextCacheService contextCacheService,
+        IPromptOptimizationService promptOptimizationService,
+        IAIResponseParser aiResponseParser,
+        IScriptValidator scriptValidator,
+        ILearningEngine learningEngine,
+        IAIProvider aiProvider)
     {
         this.frameworkScanner = frameworkScanner;
         this.fileGenerator = fileGenerator;
@@ -45,6 +59,13 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         this.recordingParser = recordingParser;
         this.businessFlowBuilder = businessFlowBuilder;
         this.promptBuilder = promptBuilder;
+        this.contextCacheService = contextCacheService;
+        this.contextRankingService = contextRankingService;
+        this.promptOptimizationService = promptOptimizationService;
+        this.aiResponseParser = aiResponseParser;
+        this.scriptValidator = scriptValidator;
+        this.learningEngine = learningEngine;
+        this.aiProvider = aiProvider;
     }
 
     public async Task GenerateAsync(string repositoryPath, string recordingPath, string outputFolder)
@@ -52,6 +73,35 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         RepositoryMetadata metadata = await frameworkScanner.ScanAsync(repositoryPath);
         ContextModel context = contextBuilder.Build(metadata);
 
+        var repositoryKnowledgeBuilder = new RepositoryKnowledgeBuilder();
+        var repositoryGraphBuilder = new RepositoryGraphBuilder();
+        var repositoryKnowledge = repositoryKnowledgeBuilder.Build(metadata);
+        var repositoryGraph = repositoryGraphBuilder.Build(repositoryKnowledge);
+        var contextRequest = new ContextRequest
+        {
+            FeatureName = metadata.Features.FirstOrDefault()?.Name ?? string.Empty,
+            BusinessArea = metadata.Features.FirstOrDefault()?.BusinessArea ?? string.Empty
+        };
+        ContextPackage contextPackage;
+
+        if (contextCacheService.Exists(repositoryPath))
+        {
+            contextPackage = await contextCacheService.LoadAsync(repositoryPath)
+                             ?? contextBuilder.Build(repositoryGraph, contextRequest);
+        }
+        else
+        {
+            contextPackage = contextBuilder.Build(repositoryGraph, contextRequest);
+            await contextCacheService.SaveAsync(repositoryPath, contextPackage);
+        }
+
+        contextPackage = contextRankingService.RankContext(
+            contextPackage,
+            contextRequest);
+
+        contextPackage = promptOptimizationService.Optimize(contextPackage);
+
+        var statistics = promptOptimizationService.Analyze(contextPackage);
         List<RecordingActionModel> actions = recordingParser.Parse(recordingPath);
         List<BusinessFlowModel> flows = businessFlowBuilder.Build(actions);
 
@@ -63,12 +113,38 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         PromptContext promptContext = promptOptimizer.Optimize(filteredContext, methods, locators, steps);
         List<QuestionModel> questions = new QuestionEngine().Generate(actions);
         PromptModel prompt = promptBuilder.Build(filteredContext, flows, questions);
+        var request = new AIRequest
+            {
+                Prompt = prompt.Prompt
+            };
+        AIResponse aiResponse = await aiProvider.GenerateAsync(request);
+        AIResponseModel parsed = aiResponseParser.Parse(aiResponse.Content);
+        ValidationResult validation = scriptValidator.Validate(parsed.PageObjects);
+        if (!validation.IsValid)
+            {
+                parsed.PageObjects =
+                    scriptValidator.AutoFix(parsed.PageObjects);
 
+                validation =
+                    scriptValidator.Validate(parsed.PageObjects);
+            }
         Directory.CreateDirectory(outputFolder);
 
         await File.WriteAllTextAsync(
             Path.Combine(outputFolder, "Prompt.md"),
             BuildPromptMarkdown(prompt, promptContext, flows, questions));
+
+        await File.WriteAllTextAsync(
+            Path.Combine(outputFolder, "FixedPageObjects.cs"),
+            parsed.PageObjects);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(outputFolder, "AIResponse.txt"),
+            aiResponse.Content);    
+
+        await File.WriteAllTextAsync(
+            Path.Combine(outputFolder, "ValidationReport.txt"),
+            string.Join(Environment.NewLine, validation.Errors));
 
         await File.WriteAllTextAsync(
             Path.Combine(outputFolder, "FrameworkRules.md"),
@@ -113,9 +189,13 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         await File.WriteAllTextAsync(
             Path.Combine(outputFolder, "Recording.json"),
             JsonSerializer.Serialize(actions, new JsonSerializerOptions { WriteIndented = true }));
-
+        
+        await File.WriteAllTextAsync(
+            Path.Combine(outputFolder, "AIResponse.txt"),
+            aiResponse.Content);
+        
         await fileGenerator.GenerateAsync(new GeneratedScript(), outputFolder);
-    }
+       }
 
     private static string BuildPromptMarkdown(PromptModel prompt, PromptContext promptContext, List<BusinessFlowModel> flows, List<QuestionModel> questions)
     {
