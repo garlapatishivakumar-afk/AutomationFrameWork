@@ -10,4 +10,15 @@ public class RecordingActionModel
     public string InputValue { get; set; } = string.Empty;
     public string Assertion { get; set; } = string.Empty;
     public string RawCode { get; set; } = string.Empty;
+    public string PageName { get; set; } = string.Empty;
+    public string WindowName { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
+    public string FrameName { get; set; } = string.Empty;
+    public string VariableName { get; set; } = string.Empty;
+    public string ContextType { get; set; } = string.Empty;
+    public string LocatorChain { get; set; } = string.Empty;
+    public string LocatorExpression { get; set; } = string.Empty;
+    public string LocatorArgument { get; set; } = string.Empty;
+    public bool IsPopupAction { get; set; }
+    public bool IsFrameAction { get; set; }
 }

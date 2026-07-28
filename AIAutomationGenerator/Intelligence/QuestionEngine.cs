@@ -8,7 +8,7 @@ public class QuestionEngine : IQuestionEngine
     public List<QuestionModel> Generate(List<RecordingActionModel> actions)
     {
         List<QuestionModel> questions = [];
-        foreach (var action in actions)
+        foreach (RecordingActionModel action in actions.OrderBy(a => a.Sequence))
         {
             if (action.ActionType == "Fill")
             {
@@ -16,7 +16,9 @@ public class QuestionEngine : IQuestionEngine
                 {
                     Question = "Should this field use Excel data, Random data or Fixed data?",
                     ActionType = action.ActionType,
-                    Target = action.Target,
+                    Target = string.IsNullOrWhiteSpace(action.LocatorValue)
+                        ? action.Target
+                        : action.LocatorValue,
                     IsMandatory = true
                 });
             }
@@ -26,7 +28,9 @@ public class QuestionEngine : IQuestionEngine
                 {
                     Question = "Should a success message or navigation be verified after this action?",
                     ActionType = action.ActionType,
-                    Target = action.Target,
+                    Target = string.IsNullOrWhiteSpace(action.LocatorValue)
+                        ? action.Target
+                        : action.LocatorValue,
                     IsMandatory = false
                 });
             }

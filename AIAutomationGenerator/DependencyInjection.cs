@@ -6,6 +6,7 @@ using AIAutomationGenerator.Generation;
 using AIAutomationGenerator.Intelligence;
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Models;
+using AIAutomationGenerator.Naming;
 using AIAutomationGenerator.Recording;
 using AIAutomationGenerator.Services;
 using AIAutomationGenerator.Shared;
@@ -87,6 +88,7 @@ public static class DependencyInjection
         services.AddSingleton<IPromptOptimizer, PromptOptimizer>();
         services.AddSingleton<IPromptContextBuilder, PromptContextBuilder>();
         services.AddSingleton<IQuestionEngine, QuestionEngine>();
+        services.AddSingleton<IArtifactNamingService, ArtifactNamingService>();
 
         services.AddSingleton<IFrameworkScanner, SolutionScanner>();
         services.AddSingleton<IFeatureParser, FeatureParser>();
@@ -121,6 +123,7 @@ public static class DependencyInjection
         services.AddSingleton<ILocatorReuseEngine, LocatorReuseEngine>();
         services.AddSingleton<IStepReuseEngine, StepReuseEngine>();
         services.AddSingleton<IRecordingParser, RecordingParser>();
+        services.AddSingleton<IBusinessFlowDetector, BusinessFlowDetector>();
         services.AddSingleton<IBusinessFlowBuilder, BusinessFlowBuilder>();
 
         services.AddSingleton<OpenAIProvider>();

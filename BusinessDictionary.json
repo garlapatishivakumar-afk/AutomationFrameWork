@@ -1,0 +1,36 @@
+{
+  "Loan Reconciliation": [
+    "loan recon",
+    "recon",
+    "reconciliation",
+    "view recon",
+    "get recon"
+  ],
+  "External Wire": [
+    "external wire",
+    "pending wire",
+    "wire transfer"
+  ],
+  "Cash Management Account": [
+    "cash mgmt account",
+    "cash management account",
+    "cash account"
+  ],
+  "Work Queue": [
+    "work queue",
+    "dgworkqueue",
+    "workqueue"
+  ],
+  "Run As User": [
+    "whoiam",
+    "who i am",
+    "run as user",
+    "impersonation"
+  ],
+  "Report": [
+    "report",
+    "statement",
+    "viewer",
+    "powerbi"
+  ]
+}

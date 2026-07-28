@@ -1,4 +1,5 @@
 using AIAutomationGenerator.Business;
+using AIAutomationGenerator.AI;
 using AIAutomationGenerator.FrameworkScanner;
 using AIAutomationGenerator.Intelligence;
 using AIAutomationGenerator.Interfaces;
@@ -29,6 +30,7 @@ public class GenerationOrchestrator : IGenerationOrchestrator
     private readonly IContextCacheService contextCacheService;
     private readonly IPromptOptimizationService promptOptimizationService;
     private readonly IQuestionEngine questionEngine;
+    private readonly IArtifactNamingService artifactNamingService;
     private readonly IAIResponseParser aiResponseParser;
     private readonly IScriptValidator scriptValidator;
     private readonly ILearningEngine learningEngine;
@@ -53,6 +55,7 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         IContextCacheService contextCacheService,
         IPromptOptimizationService promptOptimizationService,
         IQuestionEngine questionEngine,
+        IArtifactNamingService artifactNamingService,
         IAIResponseParser aiResponseParser,
         IScriptValidator scriptValidator,
         ILearningEngine learningEngine,
@@ -76,6 +79,7 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         this.contextRankingService = contextRankingService;
         this.promptOptimizationService = promptOptimizationService;
         this.questionEngine = questionEngine;
+        this.artifactNamingService = artifactNamingService;
         this.aiResponseParser = aiResponseParser;
         this.scriptValidator = scriptValidator;
         this.learningEngine = learningEngine;
@@ -144,8 +148,31 @@ public class GenerationOrchestrator : IGenerationOrchestrator
             List<StepDefinitionModel> steps = stepReuseEngine.FindReusableSteps(filteredContext, flows);
 
             PromptContext promptContext = promptOptimizer.Optimize(filteredContext, methods, locators, steps);
-            List<QuestionModel> questions = questionEngine.Generate(actions);
-            PromptModel prompt = promptBuilder.Build(filteredContext, flows, questions);
+            BusinessFlowModel selectedFlow = flows.FirstOrDefault() ?? new BusinessFlowModel();
+            BusinessFlowDetectionResult detectedFlow = new()
+            {
+                FlowName = selectedFlow.Name,
+                Verb = selectedFlow.Verb,
+                Noun = selectedFlow.Noun,
+                Confidence = selectedFlow.Confidence,
+                Evidence = selectedFlow.Evidence.ToList(),
+                Actions = selectedFlow.Actions.ToList()
+            };
+
+            ArtifactNamingResult naming = artifactNamingService.Generate(detectedFlow);
+            List<QuestionModel> questions = questionEngine.Generate(detectedFlow.Actions);
+            PromptModel prompt = promptBuilder is PromptBuilder concretePromptBuilder
+                ? concretePromptBuilder.Build(filteredContext, detectedFlow, questions, naming)
+                : promptBuilder.Build(filteredContext, detectedFlow, questions);
+
+            prompt.FeatureFile = naming.FeatureFile;
+            prompt.ObjectsFile = naming.ObjectsFile;
+            prompt.MethodsFile = naming.MethodsFile;
+            prompt.StepsFile = naming.StepsFile;
+            prompt.FeatureClass = naming.FeatureName;
+            prompt.ObjectsClass = naming.ObjectsClass;
+            prompt.MethodsClass = naming.MethodsClass;
+            prompt.StepsClass = naming.StepsClass;
             var request = new AIRequest
                 {
                     Prompt = prompt.Prompt,

@@ -6,6 +6,6 @@ public interface IPromptBuilder
 {
     PromptModel Build(
         ContextModel context,
-        List<BusinessFlowModel> flows,
+    BusinessFlowDetectionResult flow,
         List<QuestionModel> questions);
 }
