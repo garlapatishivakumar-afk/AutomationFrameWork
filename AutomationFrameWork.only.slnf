@@ -1,0 +1,8 @@
+{
+  "solution": {
+    "path": "AutomationFrameWork.sln",
+    "projects": [
+      "AutomationFrameWork.csproj"
+    ]
+  }
+}
