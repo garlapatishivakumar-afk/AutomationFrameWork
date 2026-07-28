@@ -141,10 +141,27 @@ public class AIHttpClient : IAIClient
                 deserializerFactory.Create(configuration);
 
             AIResponse result = deserializer.Deserialize(content);
-            result.Usage = usageCalculator.Calculate(
+            AIUsageMetrics calculatedUsage = usageCalculator.Calculate(
                 configuration,
                 request.Prompt,
                 result.Content);
+
+            if (result.Usage.TotalTokens <= 0)
+            {
+                result.Usage = calculatedUsage;
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(result.Usage.Provider))
+                {
+                    result.Usage.Provider = configuration.Provider ?? string.Empty;
+                }
+
+                if (string.IsNullOrWhiteSpace(result.Usage.Model))
+                {
+                    result.Usage.Model = configuration.Model ?? string.Empty;
+                }
+            }
 
             return result;
         });

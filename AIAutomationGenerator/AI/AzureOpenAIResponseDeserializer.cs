@@ -25,7 +25,15 @@ public class AzureOpenAIResponseDeserializer : IAIResponseDeserializer
         return new AIResponse
         {
             Success = true,
-            Content = chatResponse.Choices[0].Message.Content
+            Content = chatResponse.Choices[0].Message.Content,
+            Usage = new AIUsageMetrics
+            {
+                Provider = "AzureOpenAI",
+                Model = chatResponse.Model,
+                PromptTokens = chatResponse.Usage?.PromptTokens ?? 0,
+                CompletionTokens = chatResponse.Usage?.CompletionTokens ?? 0,
+                TotalTokens = chatResponse.Usage?.TotalTokens ?? 0
+            }
         };
     }
 }
