@@ -1,5 +1,5 @@
 # Configure codegen start URL here.
-$StartUrl = "https://cashmanagement-sit.trimont.com/Whoiam.aspx"
+$StartUrl = "https://investorreporting-mb-sit.trimont.com/default.aspx"
 $ApplicationKey = "DocAdmin"
 $OutputFile = "Code.ts"
 

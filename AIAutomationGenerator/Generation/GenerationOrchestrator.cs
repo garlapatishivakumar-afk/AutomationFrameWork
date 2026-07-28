@@ -255,9 +255,17 @@ public class GenerationOrchestrator : IGenerationOrchestrator
 
             Directory.CreateDirectory(outputFolder);
 
-            await AppendTokenChargeLogAsync(outputFolder, recordingPath, aiResponse);
-
             await fileGenerator.GenerateAsync(parsed, outputFolder, metadata, repositoryPath);
+
+            await AppendTokenChargeLogAsync(
+                outputFolder,
+                recordingPath,
+                aiResponse,
+                prompt,
+                flows,
+                questions,
+                filteredContext,
+                parsed);
 
             await File.WriteAllTextAsync(
                 Path.Combine(outputFolder, "Prompt.md"),
@@ -335,10 +343,64 @@ public class GenerationOrchestrator : IGenerationOrchestrator
     private static async Task AppendTokenChargeLogAsync(
         string outputFolder,
         string recordingPath,
-        AIResponse aiResponse)
+        AIResponse aiResponse,
+        PromptModel prompt,
+        List<BusinessFlowModel> flows,
+        List<QuestionModel> questions,
+        ContextModel filteredContext,
+        AIResponseModel parsed)
     {
         string tokenChargePath = Path.Combine(outputFolder, "Token charge");
         string scriptName = Path.GetFileName(recordingPath);
+        string timestampUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+
+        int promptPromptTokensEstimated = EstimateTokenCount(prompt.Prompt);
+        int businessFlowTokensEstimated = EstimateTokenCount(JsonSerializer.Serialize(flows));
+        int questionsTokensEstimated = EstimateTokenCount(BuildQuestionsMarkdown(questions));
+        int frameworkScanTokensEstimated = EstimateTokenCount(JsonSerializer.Serialize(filteredContext));
+
+        int completionFeatureTokensEstimated = EstimateTokenCount(parsed.FeatureFile);
+        int completionObjectsTokensEstimated = EstimateTokenCount(parsed.PageObjects);
+        int completionMethodsTokensEstimated = EstimateTokenCount(parsed.Methods);
+        int completionStepsTokensEstimated = EstimateTokenCount(parsed.StepDefinitions);
+
+        int estimatedPromptTotal =
+            promptPromptTokensEstimated +
+            businessFlowTokensEstimated +
+            questionsTokensEstimated +
+            frameworkScanTokensEstimated;
+
+        int estimatedCompletionTotal =
+            completionFeatureTokensEstimated +
+            completionObjectsTokensEstimated +
+            completionMethodsTokensEstimated +
+            completionStepsTokensEstimated;
+
+        int estimatedTotal = estimatedPromptTotal + estimatedCompletionTotal;
+
+        string provider = string.IsNullOrWhiteSpace(aiResponse.Usage.Provider)
+            ? "Unknown"
+            : aiResponse.Usage.Provider;
+
+        string model = string.IsNullOrWhiteSpace(aiResponse.Usage.Model)
+            ? "Unknown"
+            : aiResponse.Usage.Model;
+
+        int promptTokens = aiResponse.Usage.PromptTokens > 0
+            ? aiResponse.Usage.PromptTokens
+            : estimatedPromptTotal;
+
+        int completionTokens = aiResponse.Usage.CompletionTokens > 0
+            ? aiResponse.Usage.CompletionTokens
+            : estimatedCompletionTotal;
+
+        int totalTokens = aiResponse.Usage.TotalTokens > 0
+            ? aiResponse.Usage.TotalTokens
+            : promptTokens + completionTokens;
+
+        decimal estimatedCost = aiResponse.Usage.EstimatedCost > 0
+            ? aiResponse.Usage.EstimatedCost
+            : 0m;
 
         if (!File.Exists(tokenChargePath))
         {
@@ -347,16 +409,177 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         }
 
         string entry = string.Join("|",
-            DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+            timestampUtc,
             scriptName,
-            aiResponse.Usage.Provider,
-            aiResponse.Usage.Model,
-            aiResponse.Usage.PromptTokens.ToString(CultureInfo.InvariantCulture),
-            aiResponse.Usage.CompletionTokens.ToString(CultureInfo.InvariantCulture),
-            aiResponse.Usage.TotalTokens.ToString(CultureInfo.InvariantCulture),
-            aiResponse.Usage.EstimatedCost.ToString(CultureInfo.InvariantCulture));
+            provider,
+            model,
+            promptTokens.ToString(CultureInfo.InvariantCulture),
+            completionTokens.ToString(CultureInfo.InvariantCulture),
+            totalTokens.ToString(CultureInfo.InvariantCulture),
+            estimatedCost.ToString(CultureInfo.InvariantCulture));
 
-        await File.AppendAllTextAsync(tokenChargePath, entry + Environment.NewLine);
+        string detailEntry = string.Join("|",
+            "DETAIL",
+            timestampUtc,
+            scriptName,
+            $"PromptMdTokensEst={promptPromptTokensEstimated}",
+            $"BusinessFlowTokensEst={businessFlowTokensEstimated}",
+            $"QuestionsTokensEst={questionsTokensEstimated}",
+            $"FrameworkScanTokensEst={frameworkScanTokensEstimated}",
+            $"FeatureTokensEst={completionFeatureTokensEstimated}",
+            $"ObjectsTokensEst={completionObjectsTokensEstimated}",
+            $"MethodsTokensEst={completionMethodsTokensEstimated}",
+            $"StepsTokensEst={completionStepsTokensEstimated}",
+            "Source=EstimatorFallbackWhenProviderUsageMissing");
+
+        await File.AppendAllTextAsync(tokenChargePath, entry + Environment.NewLine + detailEntry + Environment.NewLine);
+
+        string chargeSource = aiResponse.Usage.TotalTokens > 0
+            ? "ProviderExact"
+            : "EstimatedFallback";
+
+        await AppendTokenChargeTableCsvAsync(
+            outputFolder,
+            timestampUtc,
+            scriptName,
+            provider,
+            model,
+            promptPromptTokensEstimated,
+            businessFlowTokensEstimated,
+            questionsTokensEstimated,
+            frameworkScanTokensEstimated,
+            completionFeatureTokensEstimated,
+            completionObjectsTokensEstimated,
+            completionMethodsTokensEstimated,
+            completionStepsTokensEstimated,
+            promptTokens,
+            completionTokens,
+            totalTokens,
+            estimatedCost,
+            chargeSource,
+            prompt);
+    }
+
+    private static async Task AppendTokenChargeTableCsvAsync(
+        string outputFolder,
+        string timestampUtc,
+        string scriptName,
+        string provider,
+        string model,
+        int promptMdTokensEstimated,
+        int businessFlowTokensEstimated,
+        int questionsTokensEstimated,
+        int frameworkScanTokensEstimated,
+        int featureTokensEstimated,
+        int objectsTokensEstimated,
+        int methodsTokensEstimated,
+        int stepsTokensEstimated,
+        int promptTokens,
+        int completionTokens,
+        int totalTokens,
+        decimal estimatedCost,
+        string chargeSource,
+        PromptModel prompt)
+    {
+        string tableCsvPath = Path.Combine(outputFolder, "Token charge details.csv");
+        if (!File.Exists(tableCsvPath))
+        {
+            string csvHeader = "TimestampUtc,ScriptName,Category,Task,EstimatedTokens,Provider,Model,ChargeType,EstimatedCost";
+            await File.WriteAllTextAsync(tableCsvPath, csvHeader + Environment.NewLine);
+        }
+
+        string featureFileName = string.IsNullOrWhiteSpace(prompt.FeatureFile) ? "Generated.feature" : prompt.FeatureFile;
+        string objectsFileName = string.IsNullOrWhiteSpace(prompt.ObjectsFile) ? "GeneratedObjects.cs" : prompt.ObjectsFile;
+        string methodsFileName = string.IsNullOrWhiteSpace(prompt.MethodsFile) ? "GeneratedMethods.cs" : prompt.MethodsFile;
+        string stepsFileName = string.IsNullOrWhiteSpace(prompt.StepsFile) ? "GeneratedSteps.cs" : prompt.StepsFile;
+
+        int promptTotalEstimated =
+            promptMdTokensEstimated +
+            businessFlowTokensEstimated +
+            questionsTokensEstimated +
+            frameworkScanTokensEstimated;
+
+        int completionTotalEstimated =
+            featureTokensEstimated +
+            objectsTokensEstimated +
+            methodsTokensEstimated +
+            stepsTokensEstimated;
+
+        int grandTotalEstimated = promptTotalEstimated + completionTotalEstimated;
+
+        List<string> rows =
+        [
+            BuildCsvRow(timestampUtc, scriptName, "Prompt Tokens", "Reading/processing Prompt.md", promptMdTokensEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Prompt Tokens", "Analyzing BusinessFlow.json", businessFlowTokensEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Prompt Tokens", "Processing Questions.md", questionsTokensEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Prompt Tokens", "Scanning Existing Framework", frameworkScanTokensEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Total Prompt Tokens", string.Empty, promptTotalEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Completion Tokens", $"Generating {featureFileName}", featureTokensEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Completion Tokens", $"Generating {objectsFileName}", objectsTokensEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Completion Tokens", $"Generating {methodsFileName}", methodsTokensEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Completion Tokens", $"Generating {stepsFileName}", stepsTokensEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Total Completion Tokens", string.Empty, completionTotalEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Grand Total Tokens", "Prompt + Completion", grandTotalEstimated.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Provider Prompt Tokens", "Reported by provider", promptTokens.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Provider Completion Tokens", "Reported by provider", completionTokens.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Provider Total Tokens", "Reported by provider", totalTokens.ToString(CultureInfo.InvariantCulture), provider, model, chargeSource, string.Empty),
+            BuildCsvRow(timestampUtc, scriptName, "Estimated Cost", "Model Approximation", string.Empty, provider, model, chargeSource, estimatedCost.ToString(CultureInfo.InvariantCulture))
+        ];
+
+        await File.AppendAllTextAsync(tableCsvPath, string.Join(Environment.NewLine, rows) + Environment.NewLine);
+    }
+
+    private static string BuildCsvRow(
+        string timestampUtc,
+        string scriptName,
+        string category,
+        string task,
+        string estimatedTokens,
+        string provider,
+        string model,
+        string chargeType,
+        string estimatedCost)
+    {
+        string[] values =
+        [
+            timestampUtc,
+            scriptName,
+            category,
+            task,
+            estimatedTokens,
+            provider,
+            model,
+            chargeType,
+            estimatedCost
+        ];
+
+        return string.Join(",", values.Select(EscapeCsv));
+    }
+
+    private static string EscapeCsv(string? value)
+    {
+        string safeValue = value ?? string.Empty;
+        if (safeValue.Contains('"'))
+        {
+            safeValue = safeValue.Replace("\"", "\"\"");
+        }
+
+        if (safeValue.Contains(',') || safeValue.Contains('"') || safeValue.Contains('\n') || safeValue.Contains('\r'))
+        {
+            return $"\"{safeValue}\"";
+        }
+
+        return safeValue;
+    }
+
+    private static int EstimateTokenCount(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return 0;
+        }
+
+        return Math.Max(1, content.Length / 4);
     }
 
     private static string BuildPromptMarkdown(PromptModel prompt, PromptContext promptContext, List<BusinessFlowModel> flows, List<QuestionModel> questions)

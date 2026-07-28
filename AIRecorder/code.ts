@@ -1,16 +1,18 @@
 import { test, expect } from '@playwright/test';
 
 test('test', async ({ page }) => {
-  await page.goto('https://cashmanagement-sit.trimont.com/Whoiam.aspx');
-  await page.locator('#ctl00_WFC_ContentContainerCtrl_Main_ctl06_ContentPlaceHolder1_cboEmployee').selectOption('T10748');
-  await page.getByRole('button', { name: 'Run As User' }).click();
-  await page.goto('https://cashmanagement-sit.trimont.com/WebForms_MyWork/dgWorkQueue.aspx');
-  await page.getByRole('link', { name: 'Loan Mgmt.' }).click();
-  await page.getByRole('textbox', { name: 'Cash Mgmt. Acct.:' }).click();
-  await page.getByRole('textbox', { name: 'Cash Mgmt. Acct.:' }).fill('4113002786');
-  await page.getByRole('button', { name: 'Search [Alt-S]' }).click();
-  const page1Promise = page.waitForEvent('popup');
-  await page.getByRole('link', { name: 'View Recon' }).click();
-  const page1 = await page1Promise;
-  await page1.getByRole('button', { name: 'Get Recon' }).click();
+  await page.goto('https://investorreporting-mb-sit.trimont.com/default.aspx');
+  await page.getByRole('link', { name: 'Deals', exact: true }).click();
+  await page.getByRole('link', { name: 'Deals Completion Status' }).click();
+  await page.goto('https://investorreporting-mb-sit.trimont.com/IRDeals/DealsCompletionStatus.aspx');
+  await page.locator('input[name="ctl00$cp1$txtTID"]').click();
+  await page.locator('input[name="ctl00$cp1$txtTID"]').fill('1155aofa');
+  await page.locator('input[name="ctl00$cp1$txtTID"]').press('Enter');
+  await page.getByRole('link', { name: '1155AOFA' }).click();
+  await page.locator('#ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl05_chAction').check();
+  await page.locator('#ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl07_chAction').check();
+  await page.locator('#ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl05_lnkView').click();
+  await page.goto('https://investorreporting-mb-sit.trimont.com/IRDeals/DealReportDetailNew.aspx?rpt=NTORCashActionForm');
+  await page.getByRole('link', { name: 'complete', exact: true }).click();
+  await page.getByRole('button', { name: 'close screen' }).click();
 });
