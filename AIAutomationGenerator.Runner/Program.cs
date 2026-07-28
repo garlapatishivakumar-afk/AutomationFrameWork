@@ -23,7 +23,7 @@ internal class Program
 
         string recording = ResolvePath(
             runnerOptions.RecordingPath,
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Helpers", "CommonActionsPage.cs")));
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "AIRecorder", "code.ts")));
 
         string output = ResolvePath(
             runnerOptions.OutputPath,
