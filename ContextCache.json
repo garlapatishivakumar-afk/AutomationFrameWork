@@ -1,0 +1,104 @@
+{
+  "Items": [
+    {
+      "Type": "Feature",
+      "Name": "Login",
+      "File": "",
+      "Score": 1.3
+    },
+    {
+      "Type": "Page",
+      "Name": "LoginFeature",
+      "File": "",
+      "Score": 0.9
+    },
+    {
+      "Type": "Page",
+      "Name": "LoginMethods",
+      "File": "",
+      "Score": 0.9
+    },
+    {
+      "Type": "Page",
+      "Name": "LoginSteps",
+      "File": "",
+      "Score": 0.9
+    },
+    {
+      "Type": "Method",
+      "Name": "FeatureSetupAsync",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "FeatureTearDownAsync",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "TestInitializeAsync",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "TestTearDownAsync",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "ScenarioInitialize",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "ScenarioStartAsync",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "ScenarioCleanupAsync",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "InitializeCucumberMessages",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "InitializeAsync",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "DisposeAsync",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "Login",
+      "File": "",
+      "Score": 0.7
+    },
+    {
+      "Type": "Method",
+      "Name": "UserLogsIn",
+      "File": "",
+      "Score": 0.7
+    }
+  ],
+  "Confidence": 0.85,
+  "Fingerprint": "474048740584A5CAF8EAFCB8C5BFCE1DD0A15F1C799054ADE7520F80EDC1151B",
+  "GeneratorVersion": "2.0",
+  "CreatedOn": "2026-07-28T11:44:22.446841Z"
+}
