@@ -19,11 +19,11 @@ internal class Program
 
         string repository = ResolvePath(
             runnerOptions.RepositoryPath,
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")));
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..")));
 
         string recording = ResolvePath(
             runnerOptions.RecordingPath,
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "AIRecorder", "code.ts")));
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "AIRecorder", "code.ts")));
 
         string output = ResolvePath(
             runnerOptions.OutputPath,

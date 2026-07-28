@@ -5,11 +5,11 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutomationFrameWork", "AutomationFrameWork.csproj", "{68145D00-A49C-29FA-48B5-0A6AC4866456}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAutomationGenerator", "AIAutomationGenerator\AIAutomationGenerator.csproj", "{A47F2512-313A-4028-BE29-95F24F6CC605}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAutomationGenerator", "AISetup\AIAutomationGenerator\AIAutomationGenerator.csproj", "{A47F2512-313A-4028-BE29-95F24F6CC605}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAutomationGenerator.Tests", "AIAutomationGenerator.Tests\AIAutomationGenerator.Tests.csproj", "{2BFECEF6-9356-452C-A5BA-DE6614EDBCFB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAutomationGenerator.Tests", "AISetup\AIAutomationGenerator.Tests\AIAutomationGenerator.Tests.csproj", "{2BFECEF6-9356-452C-A5BA-DE6614EDBCFB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAutomationGenerator.Runner", "AIAutomationGenerator.Runner\AIAutomationGenerator.Runner.csproj", "{2AC0E14C-2994-400B-A3BB-AC3869A6F7E9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAutomationGenerator.Runner", "AISetup\AIAutomationGenerator.Runner\AIAutomationGenerator.Runner.csproj", "{2AC0E14C-2994-400B-A3BB-AC3869A6F7E9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

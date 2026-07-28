@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["AIRecorder/**/*.ts"]
+  "include": ["AIRecorder/**/*.ts", "AISetup/AIRecorder/**/*.ts"]
 }

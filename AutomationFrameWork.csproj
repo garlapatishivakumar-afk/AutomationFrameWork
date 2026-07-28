@@ -9,22 +9,22 @@
 
   <ItemGroup>
     <Compile Remove="node_modules\**" />
-    <Compile Remove="AIAutomationGenerator\**" />
-    <Compile Remove="AIAutomationGenerator.Tests\**" />
-    <Compile Remove="AIAutomationGenerator.Runner\**" />
-    <Compile Remove="GeneratedOutput\**" />
+    <Compile Remove="AISetup\AIAutomationGenerator\**" />
+    <Compile Remove="AISetup\AIAutomationGenerator.Tests\**" />
+    <Compile Remove="AISetup\AIAutomationGenerator.Runner\**" />
+    <Compile Remove="AISetup\GeneratedOutput\**" />
     <EmbeddedResource Remove="node_modules\**" />
-    <EmbeddedResource Remove="AIAutomationGenerator\**" />
-    <EmbeddedResource Remove="AIAutomationGenerator.Tests\**" />
-    <EmbeddedResource Remove="AIAutomationGenerator.Runner\**" />
-    <EmbeddedResource Remove="GeneratedOutput\**" />
+    <EmbeddedResource Remove="AISetup\AIAutomationGenerator\**" />
+    <EmbeddedResource Remove="AISetup\AIAutomationGenerator.Tests\**" />
+    <EmbeddedResource Remove="AISetup\AIAutomationGenerator.Runner\**" />
+    <EmbeddedResource Remove="AISetup\GeneratedOutput\**" />
     <None Remove="node_modules\**" />
-    <None Remove="AIAutomationGenerator\**" />
-    <None Remove="AIAutomationGenerator.Tests\**" />
-    <None Remove="AIAutomationGenerator.Runner\**" />
-    <None Remove="GeneratedOutput\**" />
+    <None Remove="AISetup\AIAutomationGenerator\**" />
+    <None Remove="AISetup\AIAutomationGenerator.Tests\**" />
+    <None Remove="AISetup\AIAutomationGenerator.Runner\**" />
+    <None Remove="AISetup\GeneratedOutput\**" />
     <ReqnrollFeatureFile Remove="node_modules\**" />
-    <ReqnrollFeatureFile Remove="GeneratedOutput\**" />
+    <ReqnrollFeatureFile Remove="AISetup\GeneratedOutput\**" />
   </ItemGroup>
 
   <ItemGroup>
