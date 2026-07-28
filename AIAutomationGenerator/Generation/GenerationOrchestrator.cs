@@ -3,6 +3,7 @@ using AIAutomationGenerator.FrameworkScanner;
 using AIAutomationGenerator.Intelligence;
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Models;
+using System.Globalization;
 using System.Text.Json;
 
 namespace AIAutomationGenerator.Generation;
@@ -118,6 +119,7 @@ public class GenerationOrchestrator : IGenerationOrchestrator
                 Prompt = prompt.Prompt
             };
         AIResponse aiResponse = await aiProvider.GenerateAsync(request);
+        await AppendTokenChargeLogAsync(outputFolder, recordingPath, request.Prompt, aiResponse.Content);
         AIResponseModel parsed = aiResponseParser.Parse(aiResponse.Content);
         ValidationResult validation = scriptValidator.Validate(parsed.PageObjects);
         if (!validation.IsValid)
@@ -196,6 +198,44 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         
         await fileGenerator.GenerateAsync(new GeneratedScript(), outputFolder);
        }
+
+    private static async Task AppendTokenChargeLogAsync(
+        string outputFolder,
+        string recordingPath,
+        string prompt,
+        string completion)
+    {
+        string tokenChargePath = Path.Combine(outputFolder, "Token charge");
+        string scriptName = Path.GetFileName(recordingPath);
+        int promptTokens = EstimateTokens(prompt);
+        int completionTokens = EstimateTokens(completion);
+        int totalTokens = promptTokens + completionTokens;
+
+        if (!File.Exists(tokenChargePath))
+        {
+            string header = "TimestampUtc|ScriptName|PromptTokens|CompletionTokens|TotalTokens";
+            await File.WriteAllTextAsync(tokenChargePath, header + Environment.NewLine);
+        }
+
+        string entry = string.Join("|",
+            DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+            scriptName,
+            promptTokens.ToString(CultureInfo.InvariantCulture),
+            completionTokens.ToString(CultureInfo.InvariantCulture),
+            totalTokens.ToString(CultureInfo.InvariantCulture));
+
+        await File.AppendAllTextAsync(tokenChargePath, entry + Environment.NewLine);
+    }
+
+    private static int EstimateTokens(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return 0;
+        }
+
+        return Math.Max(1, text.Length / 4);
+    }
 
     private static string BuildPromptMarkdown(PromptModel prompt, PromptContext promptContext, List<BusinessFlowModel> flows, List<QuestionModel> questions)
     {
