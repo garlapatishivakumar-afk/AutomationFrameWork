@@ -4,6 +4,7 @@ using AIAutomationGenerator.FrameworkScanner;
 using AIAutomationGenerator.Intelligence;
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Models;
+using System.Globalization;
 using System.Text.Json;
 
 namespace AIAutomationGenerator.Generation;
@@ -253,6 +254,9 @@ public class GenerationOrchestrator : IGenerationOrchestrator
             }
 
             Directory.CreateDirectory(outputFolder);
+
+            await AppendTokenChargeLogAsync(outputFolder, recordingPath, aiResponse);
+
             await fileGenerator.GenerateAsync(parsed, outputFolder, metadata, repositoryPath);
 
             await File.WriteAllTextAsync(
@@ -326,6 +330,33 @@ public class GenerationOrchestrator : IGenerationOrchestrator
                 "Unexpected error occurred during AI generation pipeline.",
                 ex);
         }
+    }
+
+    private static async Task AppendTokenChargeLogAsync(
+        string outputFolder,
+        string recordingPath,
+        AIResponse aiResponse)
+    {
+        string tokenChargePath = Path.Combine(outputFolder, "Token charge");
+        string scriptName = Path.GetFileName(recordingPath);
+
+        if (!File.Exists(tokenChargePath))
+        {
+            string header = "TimestampUtc|ScriptName|Provider|Model|PromptTokens|CompletionTokens|TotalTokens|EstimatedCost";
+            await File.WriteAllTextAsync(tokenChargePath, header + Environment.NewLine);
+        }
+
+        string entry = string.Join("|",
+            DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+            scriptName,
+            aiResponse.Usage.Provider,
+            aiResponse.Usage.Model,
+            aiResponse.Usage.PromptTokens.ToString(CultureInfo.InvariantCulture),
+            aiResponse.Usage.CompletionTokens.ToString(CultureInfo.InvariantCulture),
+            aiResponse.Usage.TotalTokens.ToString(CultureInfo.InvariantCulture),
+            aiResponse.Usage.EstimatedCost.ToString(CultureInfo.InvariantCulture));
+
+        await File.AppendAllTextAsync(tokenChargePath, entry + Environment.NewLine);
     }
 
     private static string BuildPromptMarkdown(PromptModel prompt, PromptContext promptContext, List<BusinessFlowModel> flows, List<QuestionModel> questions)
