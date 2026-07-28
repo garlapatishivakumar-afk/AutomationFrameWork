@@ -22,3 +22,13 @@ builddiag.txt
 # Generated files (can be regenerated)
 GeneratedOutput/
 MetadataOutput/
+
+# AI Generator
+ContextCache.json
+RepositoryIndex.json
+
+# Generated Output
+GeneratedOutput/
+
+# AI Metrics
+AI/Metrics.json

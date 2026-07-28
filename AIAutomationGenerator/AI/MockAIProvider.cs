@@ -14,17 +14,51 @@ public class MockAIProvider : IAIProvider
 Feature File:
 Feature: Login
 
+Scenario: Login
+    Given user logs in
+
 Page Objects:
-public class LoginPage { }
+using Microsoft.Playwright;
+
+namespace Demo.Pages;
+
+public class LoginPage
+{
+}
 
 Methods:
-public void ClickLogin() { }
+using Demo.Pages;
+
+namespace Demo.Methods;
+
+public class LoginMethods
+{
+    public void Login()
+    {
+    }
+}
 
 Step Definitions:
-[Given("user logs in")]
+using Reqnroll;
+
+namespace Demo.Steps;
+
+public class LoginSteps
+{
+    [Given("user logs in")]
+    public void UserLogsIn()
+    {
+    }
+}
 
 Utilities:
-public static class Helper { }
+using System;
+
+namespace Demo.Utilities;
+
+public static class Helper
+{
+}
 """
         });
     }

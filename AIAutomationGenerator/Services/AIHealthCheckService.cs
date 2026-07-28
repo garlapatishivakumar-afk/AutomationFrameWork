@@ -5,29 +5,24 @@ namespace AIAutomationGenerator.Services;
 
 public class AIHealthCheckService : IAIHealthCheckService
 {
-    private readonly IAIConfigurationProvider configurationProvider;
-    private readonly IAIClient client;
+    private readonly IAIProviderFactory providerFactory;
 
     public AIHealthCheckService(
-        IAIConfigurationProvider configurationProvider,
-        IAIClient client)
+        IAIProviderFactory providerFactory)
     {
-        this.configurationProvider = configurationProvider;
-        this.client = client;
+        this.providerFactory = providerFactory;
     }
 
     public async Task<bool> CheckAsync()
     {
-        AIConfiguration configuration =
-            configurationProvider.GetConfiguration();
-
-        AIRequest request = new()
-        {
-            Prompt = "Reply with OK."
-        };
+        IAIProvider provider =
+            providerFactory.Create();
 
         AIResponse response =
-            await client.SendAsync(configuration, request);
+            await provider.GenerateAsync(new AIRequest
+            {
+                Prompt = "Reply with OK."
+            });
 
         return response.Success;
     }

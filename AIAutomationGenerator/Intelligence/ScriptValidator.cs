@@ -8,10 +8,33 @@ public class ScriptValidator : IScriptValidator
     public ValidationResult Validate(string content)
     {
         var errors = new List<string>();
+
         if (string.IsNullOrWhiteSpace(content))
         {
             errors.Add("Script content is empty.");
-            return new ValidationResult { IsValid = false, Errors = errors };
+
+            return new ValidationResult
+            {
+                IsValid = false,
+                Errors = errors
+            };
+        }
+
+        bool isFeatureFile =
+            content.Contains("Feature:", StringComparison.OrdinalIgnoreCase);
+
+        if (isFeatureFile)
+        {
+            if (!content.Contains("Scenario", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Missing Scenario.");
+            }
+
+            return new ValidationResult
+            {
+                IsValid = errors.Count == 0,
+                Errors = errors
+            };
         }
 
         if (!content.Contains("namespace", StringComparison.OrdinalIgnoreCase))
