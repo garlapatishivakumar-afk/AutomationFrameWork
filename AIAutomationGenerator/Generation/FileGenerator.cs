@@ -5,14 +5,17 @@ namespace AIAutomationGenerator.Generation;
 
 public class FileGenerator : IFileGenerator
 {
-    public async Task GenerateAsync(GeneratedScript script, string outputFolder)
+    public async Task GenerateAsync(AIResponseModel responseModel, string outputFolder)
     {
         Directory.CreateDirectory(outputFolder);
 
-        await File.WriteAllTextAsync(Path.Combine(outputFolder, "Prompt.md"), string.Empty);
-        await File.WriteAllTextAsync(Path.Combine(outputFolder, "Context.json"), string.Empty);
-        await File.WriteAllTextAsync(Path.Combine(outputFolder, "BusinessFlow.json"), string.Empty);
-        await File.WriteAllTextAsync(Path.Combine(outputFolder, "RepositoryMetadata.json"), string.Empty);
-        await File.WriteAllTextAsync(Path.Combine(outputFolder, "Recording.json"), string.Empty);
+        responseModel ??= new AIResponseModel();
+
+        await File.WriteAllTextAsync(Path.Combine(outputFolder, "Generated.feature"), responseModel.FeatureFile ?? string.Empty);
+        await File.WriteAllTextAsync(Path.Combine(outputFolder, "PageObjects.cs"), responseModel.PageObjects ?? string.Empty);
+        await File.WriteAllTextAsync(Path.Combine(outputFolder, "Methods.cs"), responseModel.Methods ?? string.Empty);
+        await File.WriteAllTextAsync(Path.Combine(outputFolder, "StepDefinitions.cs"), responseModel.StepDefinitions ?? string.Empty);
+        await File.WriteAllTextAsync(Path.Combine(outputFolder, "Utilities.cs"), responseModel.Utilities ?? string.Empty);
+        await File.WriteAllTextAsync(Path.Combine(outputFolder, "ValidationMessages.cs"), responseModel.ValidationMessages ?? string.Empty);
     }
 }

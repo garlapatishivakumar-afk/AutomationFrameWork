@@ -4,5 +4,5 @@ namespace AIAutomationGenerator.Interfaces;
 
 public interface IFileGenerator
 {
-    Task GenerateAsync(GeneratedScript script,string outputFolder);
+    Task GenerateAsync(AIResponseModel responseModel, string outputFolder);
 }

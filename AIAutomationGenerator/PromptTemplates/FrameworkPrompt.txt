@@ -1,0 +1,2 @@
+Use the detected framework conventions and project structure.
+Respect naming patterns, coding style, and folder layout.

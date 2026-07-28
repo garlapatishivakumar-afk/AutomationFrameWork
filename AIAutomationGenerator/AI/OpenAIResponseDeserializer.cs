@@ -12,12 +12,13 @@ public class OpenAIResponseDeserializer : IAIResponseDeserializer
         OpenAIChatResponse? chatResponse =
             JsonSerializer.Deserialize<OpenAIChatResponse>(response);
 
-        if (chatResponse == null || chatResponse.Choices.Count == 0)
+        if (chatResponse == null ||
+            chatResponse.Choices.Count == 0)
         {
             return new AIResponse
             {
                 Success = false,
-                ErrorMessage = "Invalid AI response."
+                ErrorMessage = "Invalid OpenAI response."
             };
         }
 

@@ -23,15 +23,32 @@ public class PromptOptimizationService : IPromptOptimizationService
             Confidence = Math.Round(package.Confidence, 2)
         };
 
-        var originalCount = package.Items.Count;
-        var optimizedCount = package.Items.Count; 
-        if (originalCount > 0)
-        {
-            statistics.EstimatedTokens = Math.Max(200, optimizedCount * 35);
-            statistics.OptimizationPercentage = originalCount == 0 ? 0 : Math.Round((1 - ((double)optimizedCount / originalCount)) * 100, 2);
-        }
+        statistics.EstimatedTokens = EstimateTokenCount(package);
+        statistics.OptimizationPercentage = 0;
 
         return statistics;
+    }
+
+    public PromptOptimizationStatistics CalculateStatistics(ContextPackage originalPackage, ContextPackage optimizedPackage)
+    {
+        originalPackage ??= new ContextPackage();
+        optimizedPackage ??= new ContextPackage();
+
+        int originalTokens = EstimateTokenCount(originalPackage);
+        int optimizedTokens = EstimateTokenCount(optimizedPackage);
+        int removed = Math.Max(0, originalTokens - optimizedTokens);
+
+        double percentage = originalTokens == 0
+            ? 0
+            : Math.Round((double)removed / originalTokens * 100, 2);
+
+        return new PromptOptimizationStatistics
+        {
+            OriginalTokens = originalTokens,
+            OptimizedTokens = optimizedTokens,
+            TokensRemoved = removed,
+            OptimizationPercentage = percentage
+        };
     }
 
     public ContextPackage Optimize(ContextPackage package)
@@ -87,5 +104,19 @@ public class PromptOptimizationService : IPromptOptimizationService
         package.Confidence = package.Items.Count == 0 ? 0 : Math.Round(package.Items.Average(item => item.Score), 2);
 
         return package;
+    }
+
+    private static int EstimateTokenCount(ContextPackage package)
+    {
+        if (package.Items.Count == 0)
+        {
+            return 0;
+        }
+
+        string content = string.Join(
+            Environment.NewLine,
+            package.Items.Select(item => $"{item.Type}|{item.Name}|{item.File}|{item.Score}"));
+
+        return Math.Max(1, content.Length / 4);
     }
 }

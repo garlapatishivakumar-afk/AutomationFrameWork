@@ -1,0 +1,31 @@
+You are an expert Playwright C# Automation Engineer.
+
+Generate production-ready automation code.
+
+### Feature
+
+{{Feature}}
+
+### Business Flows
+
+{{BusinessFlows}}
+
+### Existing Methods
+
+{{Methods}}
+
+### Existing Locators
+
+{{Locators}}
+
+### Existing Step Definitions
+
+{{Steps}}
+
+### Utilities
+
+{{Utilities}}
+
+### Coding Rules
+
+{{Rules}}

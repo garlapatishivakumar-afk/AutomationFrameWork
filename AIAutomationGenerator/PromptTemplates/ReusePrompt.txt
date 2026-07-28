@@ -1,0 +1,2 @@
+Prioritize reusing existing repository assets before creating new ones.
+Prefer established methods, locators, and step definitions when suitable.

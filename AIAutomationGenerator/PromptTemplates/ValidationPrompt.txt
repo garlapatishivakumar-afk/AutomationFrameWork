@@ -1,0 +1,2 @@
+Validate generated content for correctness and consistency.
+Return actionable validation feedback when issues are found.

@@ -6,4 +6,5 @@ public interface IPromptOptimizationService
 {
     PromptStatistics Analyze(ContextPackage package);
     ContextPackage Optimize(ContextPackage package);
+    PromptOptimizationStatistics CalculateStatistics(ContextPackage originalPackage, ContextPackage optimizedPackage);
 }

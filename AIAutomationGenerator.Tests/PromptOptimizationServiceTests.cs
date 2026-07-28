@@ -29,4 +29,24 @@ public class PromptOptimizationServiceTests
         Assert.Equal(0.8, statistics.AverageScore);
         Assert.Equal(0.9, statistics.Confidence);
     }
+
+    [Fact]
+    public void CalculateStatistics_ReturnsTokenReductionMetrics()
+    {
+        var service = new PromptOptimizationService();
+
+        ContextPackage original = new();
+        original.Items.Add(new ContextItem { Type = "Method", Name = "A", File = "A.cs", Score = 1.0 });
+        original.Items.Add(new ContextItem { Type = "Method", Name = "B", File = "B.cs", Score = 0.9 });
+        original.Items.Add(new ContextItem { Type = "Method", Name = "C", File = "C.cs", Score = 0.8 });
+
+        ContextPackage optimized = new();
+        optimized.Items.Add(new ContextItem { Type = "Method", Name = "A", File = "A.cs", Score = 1.0 });
+
+        PromptOptimizationStatistics stats = service.CalculateStatistics(original, optimized);
+
+        Assert.True(stats.OriginalTokens >= stats.OptimizedTokens);
+        Assert.True(stats.TokensRemoved >= 0);
+        Assert.True(stats.OptimizationPercentage >= 0);
+    }
 }

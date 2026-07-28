@@ -8,5 +8,5 @@ public interface IContextCacheService
 
     Task<ContextPackage?> LoadAsync(string repositoryPath);
 
-    bool Exists(string repositoryPath);
+    bool IsCacheValid(string repositoryPath, string fingerprint);
 }

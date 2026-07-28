@@ -11,6 +11,22 @@ public class OpenAIRequestSerializer : IAIRequestSerializer
         AIConfiguration configuration,
         AIRequest request)
     {
+        switch (configuration.Provider)
+        {
+            case "Gemini":
+                return SerializeGemini(configuration, request);
+
+            case "AzureOpenAI":
+            case "OpenAI":
+            default:
+                return SerializeOpenAI(configuration, request);
+        }
+    }
+
+    private static string SerializeOpenAI(
+        AIConfiguration configuration,
+        AIRequest request)
+    {
         OpenAIChatRequest chatRequest = new()
         {
             Model = configuration.Model,
@@ -24,6 +40,45 @@ public class OpenAIRequestSerializer : IAIRequestSerializer
             Content = request.Prompt
         });
 
-        return JsonSerializer.Serialize(chatRequest);
+        return JsonSerializer.Serialize(
+            chatRequest,
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+    }
+
+    private static string SerializeGemini(
+        AIConfiguration configuration,
+        AIRequest request)
+    {
+        var geminiRequest = new
+        {
+            contents = new[]
+            {
+                new
+                {
+                    parts = new[]
+                    {
+                        new
+                        {
+                            text = request.Prompt
+                        }
+                    }
+                }
+            },
+            generationConfig = new
+            {
+                temperature = configuration.Temperature,
+                maxOutputTokens = configuration.MaxTokens
+            }
+        };
+
+        return JsonSerializer.Serialize(
+            geminiRequest,
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
     }
 }

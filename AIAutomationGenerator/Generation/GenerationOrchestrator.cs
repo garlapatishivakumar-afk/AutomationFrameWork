@@ -9,9 +9,14 @@ namespace AIAutomationGenerator.Generation;
 
 public class GenerationOrchestrator : IGenerationOrchestrator
 {
+    private const string GeneratorVersion = "2.0";
+
     private readonly IFrameworkScanner frameworkScanner;
     private readonly IFileGenerator fileGenerator;
     private readonly IContextBuilder contextBuilder;
+    private readonly IContextFingerprintService contextFingerprintService;
+    private readonly IRepositoryKnowledgeBuilder repositoryKnowledgeBuilder;
+    private readonly IRepositoryGraphBuilder repositoryGraphBuilder;
     private readonly IContextFilter contextFilter;
     private readonly IMethodReuseEngine methodReuseEngine;
     private readonly ILocatorReuseEngine locatorReuseEngine;
@@ -23,15 +28,19 @@ public class GenerationOrchestrator : IGenerationOrchestrator
     private readonly IContextRankingService contextRankingService;
     private readonly IContextCacheService contextCacheService;
     private readonly IPromptOptimizationService promptOptimizationService;
+    private readonly IQuestionEngine questionEngine;
     private readonly IAIResponseParser aiResponseParser;
     private readonly IScriptValidator scriptValidator;
     private readonly ILearningEngine learningEngine;
-    private readonly IAIProvider aiProvider;
+    private readonly IProviderFallbackService providerFallbackService;
 
     public GenerationOrchestrator(
         IFrameworkScanner frameworkScanner,
         IFileGenerator fileGenerator,
         IContextBuilder contextBuilder,
+        IContextFingerprintService contextFingerprintService,
+        IRepositoryKnowledgeBuilder repositoryKnowledgeBuilder,
+        IRepositoryGraphBuilder repositoryGraphBuilder,
         IContextFilter contextFilter,
         IMethodReuseEngine methodReuseEngine,
         ILocatorReuseEngine locatorReuseEngine,
@@ -43,14 +52,18 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         IPromptBuilder promptBuilder,
         IContextCacheService contextCacheService,
         IPromptOptimizationService promptOptimizationService,
+        IQuestionEngine questionEngine,
         IAIResponseParser aiResponseParser,
         IScriptValidator scriptValidator,
         ILearningEngine learningEngine,
-        IAIProvider aiProvider)
+        IProviderFallbackService providerFallbackService)
     {
         this.frameworkScanner = frameworkScanner;
         this.fileGenerator = fileGenerator;
         this.contextBuilder = contextBuilder;
+        this.contextFingerprintService = contextFingerprintService;
+        this.repositoryKnowledgeBuilder = repositoryKnowledgeBuilder;
+        this.repositoryGraphBuilder = repositoryGraphBuilder;
         this.contextFilter = contextFilter;
         this.methodReuseEngine = methodReuseEngine;
         this.locatorReuseEngine = locatorReuseEngine;
@@ -62,140 +75,231 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         this.contextCacheService = contextCacheService;
         this.contextRankingService = contextRankingService;
         this.promptOptimizationService = promptOptimizationService;
+        this.questionEngine = questionEngine;
         this.aiResponseParser = aiResponseParser;
         this.scriptValidator = scriptValidator;
         this.learningEngine = learningEngine;
-        this.aiProvider = aiProvider;
+        this.providerFallbackService = providerFallbackService;
     }
 
     public async Task GenerateAsync(string repositoryPath, string recordingPath, string outputFolder)
     {
-        RepositoryMetadata metadata = await frameworkScanner.ScanAsync(repositoryPath);
-        ContextModel context = contextBuilder.Build(metadata);
-
-        var repositoryKnowledgeBuilder = new RepositoryKnowledgeBuilder();
-        var repositoryGraphBuilder = new RepositoryGraphBuilder();
-        var repositoryKnowledge = repositoryKnowledgeBuilder.Build(metadata);
-        var repositoryGraph = repositoryGraphBuilder.Build(repositoryKnowledge);
-        var contextRequest = new ContextRequest
+        try
         {
-            FeatureName = metadata.Features.FirstOrDefault()?.Name ?? string.Empty,
-            BusinessArea = metadata.Features.FirstOrDefault()?.BusinessArea ?? string.Empty
-        };
-        ContextPackage contextPackage;
+            RepositoryMetadata metadata = await frameworkScanner.ScanAsync(repositoryPath);
+            ContextModel context = contextBuilder.Build(metadata);
 
-        if (contextCacheService.Exists(repositoryPath))
-        {
-            contextPackage = await contextCacheService.LoadAsync(repositoryPath)
-                             ?? contextBuilder.Build(repositoryGraph, contextRequest);
-        }
-        else
-        {
-            contextPackage = contextBuilder.Build(repositoryGraph, contextRequest);
-            await contextCacheService.SaveAsync(repositoryPath, contextPackage);
-        }
+            var repositoryKnowledge = repositoryKnowledgeBuilder.Build(metadata);
+            var repositoryGraph = repositoryGraphBuilder.Build(repositoryKnowledge);
+            string fingerprint = contextFingerprintService.GenerateFingerprint(
+                metadata,
+                repositoryPath,
+                GeneratorVersion);
 
-        contextPackage = contextRankingService.RankContext(
-            contextPackage,
-            contextRequest);
-
-        contextPackage = promptOptimizationService.Optimize(contextPackage);
-
-        var statistics = promptOptimizationService.Analyze(contextPackage);
-        List<RecordingActionModel> actions = recordingParser.Parse(recordingPath);
-        List<BusinessFlowModel> flows = businessFlowBuilder.Build(actions);
-
-        ContextModel filteredContext = contextFilter.Filter(context, flows);
-        List<MethodModel> methods = methodReuseEngine.FindReusableMethods(filteredContext, flows);
-        List<LocatorModel> locators = locatorReuseEngine.FindReusableLocators(filteredContext, flows);
-        List<StepDefinitionModel> steps = stepReuseEngine.FindReusableSteps(filteredContext, flows);
-
-        PromptContext promptContext = promptOptimizer.Optimize(filteredContext, methods, locators, steps);
-        List<QuestionModel> questions = new QuestionEngine().Generate(actions);
-        PromptModel prompt = promptBuilder.Build(filteredContext, flows, questions);
-        var request = new AIRequest
+            var contextRequest = new ContextRequest
             {
-                Prompt = prompt.Prompt
+                FeatureName = metadata.Features.FirstOrDefault()?.Name ?? string.Empty,
+                BusinessArea = metadata.Features.FirstOrDefault()?.BusinessArea ?? string.Empty
             };
-        AIResponse aiResponse = await aiProvider.GenerateAsync(request);
-        AIResponseModel parsed = aiResponseParser.Parse(aiResponse.Content);
-        ValidationResult validation = scriptValidator.Validate(parsed.PageObjects);
-        if (!validation.IsValid)
+            ContextPackage contextPackage;
+
+            if (contextCacheService.IsCacheValid(repositoryPath, fingerprint))
             {
-                parsed.PageObjects =
-                    scriptValidator.AutoFix(parsed.PageObjects);
-
-                validation =
-                    scriptValidator.Validate(parsed.PageObjects);
+                contextPackage = await contextCacheService.LoadAsync(repositoryPath)
+                                 ?? contextBuilder.Build(repositoryGraph, contextRequest);
             }
-        Directory.CreateDirectory(outputFolder);
+            else
+            {
+                contextPackage = contextBuilder.Build(repositoryGraph, contextRequest);
+                contextPackage.Fingerprint = fingerprint;
+                contextPackage.GeneratorVersion = GeneratorVersion;
+                contextPackage.CreatedOn = DateTime.UtcNow;
+                await contextCacheService.SaveAsync(repositoryPath, contextPackage);
+            }
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "Prompt.md"),
-            BuildPromptMarkdown(prompt, promptContext, flows, questions));
+            contextPackage.Fingerprint = fingerprint;
+            contextPackage.GeneratorVersion = GeneratorVersion;
+            if (contextPackage.CreatedOn == default)
+            {
+                contextPackage.CreatedOn = DateTime.UtcNow;
+            }
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "FixedPageObjects.cs"),
-            parsed.PageObjects);
+            contextPackage = contextRankingService.RankContext(
+                contextPackage,
+                contextRequest);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "AIResponse.txt"),
-            aiResponse.Content);    
+            ContextPackage originalContextPackage = CloneContextPackage(contextPackage);
+            contextPackage = promptOptimizationService.Optimize(contextPackage);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "ValidationReport.txt"),
-            string.Join(Environment.NewLine, validation.Errors));
+            PromptOptimizationStatistics optimizationStatistics =
+                promptOptimizationService.CalculateStatistics(originalContextPackage, contextPackage);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "FrameworkRules.md"),
-            BuildFrameworkRulesMarkdown());
+            var statistics = promptOptimizationService.Analyze(contextPackage);
+            List<RecordingActionModel> actions = recordingParser.Parse(recordingPath);
+            List<BusinessFlowModel> flows = businessFlowBuilder.Build(actions);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "BusinessFlow.md"),
-            BuildBusinessFlowMarkdown(flows));
+            ContextModel filteredContext = contextFilter.Filter(context, flows);
+            List<MethodModel> methods = methodReuseEngine.FindReusableMethods(filteredContext, flows);
+            List<LocatorModel> locators = locatorReuseEngine.FindReusableLocators(filteredContext, flows);
+            List<StepDefinitionModel> steps = stepReuseEngine.FindReusableSteps(filteredContext, flows);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "ReusableMethods.md"),
-            BuildReusableMethodsMarkdown(promptContext));
+            PromptContext promptContext = promptOptimizer.Optimize(filteredContext, methods, locators, steps);
+            List<QuestionModel> questions = questionEngine.Generate(actions);
+            PromptModel prompt = promptBuilder.Build(filteredContext, flows, questions);
+            var request = new AIRequest
+                {
+                    Prompt = prompt.Prompt,
+                    Context = promptContext,
+                    BusinessFlows = flows
+                };
+            AIResponse aiResponse = await providerFallbackService.GenerateAsync(request);
+            if (!aiResponse.Success)
+            {
+                throw new InvalidOperationException(
+                    $"AI generation failed: {aiResponse.ErrorMessage}");
+            }
+            AIResponseModel parsed = aiResponseParser.Parse(aiResponse.Content);
+            ValidationResult validation = scriptValidator.Validate(parsed.PageObjects);
+            if (!validation.IsValid)
+                {
+                    parsed.PageObjects =
+                        scriptValidator.AutoFix(parsed.PageObjects);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "ReusableLocators.md"),
-            BuildReusableLocatorsMarkdown(promptContext));
+                    validation =
+                        scriptValidator.Validate(parsed.PageObjects);
+                }
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "ReusableSteps.md"),
-            BuildReusableStepsMarkdown(promptContext));
+            ValidationResult featureValidation = scriptValidator.Validate(parsed.FeatureFile);
+            if (!featureValidation.IsValid)
+            {
+                parsed.FeatureFile = scriptValidator.AutoFix(parsed.FeatureFile);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "RepositorySummary.md"),
-            BuildRepositorySummaryMarkdown(metadata));
+                featureValidation = scriptValidator.Validate(parsed.FeatureFile);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "Questions.md"),
-            BuildQuestionsMarkdown(questions));
+                if (!featureValidation.IsValid)
+                {
+                    throw new InvalidOperationException(
+                        "Generated Generated.feature failed validation.");
+                }
+            }
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "Context.json"),
-            JsonSerializer.Serialize(filteredContext, new JsonSerializerOptions { WriteIndented = true }));
+            ValidationResult methodsValidation = scriptValidator.Validate(parsed.Methods);
+            if (!methodsValidation.IsValid)
+            {
+                parsed.Methods = scriptValidator.AutoFix(parsed.Methods);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "BusinessFlow.json"),
-            JsonSerializer.Serialize(flows, new JsonSerializerOptions { WriteIndented = true }));
+                methodsValidation = scriptValidator.Validate(parsed.Methods);
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "RepositoryMetadata.json"),
-            JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
+                if (!methodsValidation.IsValid)
+                {
+                    throw new InvalidOperationException(
+                        "Generated Methods.cs failed validation.");
+                }
+            }
 
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "Recording.json"),
-            JsonSerializer.Serialize(actions, new JsonSerializerOptions { WriteIndented = true }));
-        
-        await File.WriteAllTextAsync(
-            Path.Combine(outputFolder, "AIResponse.txt"),
-            aiResponse.Content);
-        
-        await fileGenerator.GenerateAsync(new GeneratedScript(), outputFolder);
-       }
+            ValidationResult stepDefinitionsValidation = scriptValidator.Validate(parsed.StepDefinitions);
+            if (!stepDefinitionsValidation.IsValid)
+            {
+                parsed.StepDefinitions = scriptValidator.AutoFix(parsed.StepDefinitions);
+
+                stepDefinitionsValidation = scriptValidator.Validate(parsed.StepDefinitions);
+
+                if (!stepDefinitionsValidation.IsValid)
+                {
+                    throw new InvalidOperationException(
+                        "Generated StepDefinitions.cs failed validation.");
+                }
+            }
+
+            ValidationResult utilitiesValidation = scriptValidator.Validate(parsed.Utilities);
+            if (!utilitiesValidation.IsValid)
+            {
+                parsed.Utilities = scriptValidator.AutoFix(parsed.Utilities);
+
+                utilitiesValidation = scriptValidator.Validate(parsed.Utilities);
+
+                if (!utilitiesValidation.IsValid)
+                {
+                    throw new InvalidOperationException(
+                        "Generated Utilities.cs failed validation.");
+                }
+            }
+
+            Directory.CreateDirectory(outputFolder);
+            await fileGenerator.GenerateAsync(parsed, outputFolder);
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "Prompt.md"),
+                BuildPromptMarkdown(prompt, promptContext, flows, questions));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "PromptOptimizationReport.md"),
+                BuildPromptOptimizationReportMarkdown(optimizationStatistics));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "AIResponse.txt"),
+                aiResponse.Content);    
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "ValidationReport.txt"),
+                string.Join(Environment.NewLine, validation.Errors));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "FrameworkRules.md"),
+                BuildFrameworkRulesMarkdown());
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "BusinessFlow.md"),
+                BuildBusinessFlowMarkdown(flows));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "ReusableMethods.md"),
+                BuildReusableMethodsMarkdown(promptContext));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "ReusableLocators.md"),
+                BuildReusableLocatorsMarkdown(promptContext));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "ReusableSteps.md"),
+                BuildReusableStepsMarkdown(promptContext));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "RepositorySummary.md"),
+                BuildRepositorySummaryMarkdown(metadata));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "Questions.md"),
+                BuildQuestionsMarkdown(questions));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "Context.json"),
+                JsonSerializer.Serialize(filteredContext, new JsonSerializerOptions { WriteIndented = true }));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "BusinessFlow.json"),
+                JsonSerializer.Serialize(flows, new JsonSerializerOptions { WriteIndented = true }));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "RepositoryMetadata.json"),
+                JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
+
+            await File.WriteAllTextAsync(
+                Path.Combine(outputFolder, "Recording.json"),
+                JsonSerializer.Serialize(actions, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidOperationException(
+                $"Generation failed: {ex.Message}", ex);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception(
+                "Unexpected error occurred during AI generation pipeline.",
+                ex);
+        }
+    }
 
     private static string BuildPromptMarkdown(PromptModel prompt, PromptContext promptContext, List<BusinessFlowModel> flows, List<QuestionModel> questions)
     {
@@ -316,5 +420,41 @@ Generate feature, page objects, methods, and step definitions for the following 
             builder.AppendLine($"- {question.Question} ({question.Target})");
         }
         return builder.ToString();
+    }
+
+    private static ContextPackage CloneContextPackage(ContextPackage source)
+    {
+        ContextPackage clone = new()
+        {
+            Confidence = source.Confidence,
+            Fingerprint = source.Fingerprint,
+            GeneratorVersion = source.GeneratorVersion,
+            CreatedOn = source.CreatedOn
+        };
+
+        foreach (ContextItem item in source.Items)
+        {
+            clone.Items.Add(new ContextItem
+            {
+                Type = item.Type,
+                Name = item.Name,
+                File = item.File,
+                Score = item.Score
+            });
+        }
+
+        return clone;
+    }
+
+    private static string BuildPromptOptimizationReportMarkdown(PromptOptimizationStatistics statistics)
+    {
+        return $"""
+# Prompt Optimization Report
+
+- Original Tokens: {statistics.OriginalTokens}
+- Optimized Tokens: {statistics.OptimizedTokens}
+- Tokens Removed: {statistics.TokensRemoved}
+- Reduction: {statistics.OptimizationPercentage}%
+""";
     }
 }

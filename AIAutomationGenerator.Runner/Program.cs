@@ -35,6 +35,18 @@ internal class Program
 
         ServiceProvider provider = services.BuildServiceProvider();
 
+        IAIHealthCheckService healthCheckService =
+            provider.GetRequiredService<IAIHealthCheckService>();
+
+        bool healthy =
+            await healthCheckService.CheckAsync();
+
+        if (!healthy)
+        {
+            Console.WriteLine("AI provider health check failed.");
+            return;
+        }
+
         IGenerationOrchestrator orchestrator =
             provider.GetRequiredService<IGenerationOrchestrator>();
 
