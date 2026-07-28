@@ -226,7 +226,7 @@ public class GenerationOrchestrator : IGenerationOrchestrator
             }
 
             Directory.CreateDirectory(outputFolder);
-            await fileGenerator.GenerateAsync(parsed, outputFolder);
+            await fileGenerator.GenerateAsync(parsed, outputFolder, metadata, repositoryPath);
 
             await File.WriteAllTextAsync(
                 Path.Combine(outputFolder, "Prompt.md"),

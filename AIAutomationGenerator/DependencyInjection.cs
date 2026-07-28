@@ -19,6 +19,18 @@ public static class DependencyInjection
     public static IServiceCollection AddAutomationGenerator(
         this IServiceCollection services)
     {
+        services.AddSingleton<GeneratorOutputSettings>(_ =>
+        {
+            IConfigurationRoot configuration = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true)
+                .Build();
+
+            GeneratorOutputSettings settings = new();
+            configuration.GetSection("GeneratorOutput").Bind(settings);
+            return settings;
+        });
+
         services.AddSingleton<IFileGenerator, FileGenerator>();
         services.AddSingleton<IGenerationOrchestrator, GenerationOrchestrator>();
 

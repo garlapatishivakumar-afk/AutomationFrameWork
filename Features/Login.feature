@@ -1,3 +1,4 @@
 Feature: Login
-  Scenario: Auto generated
-    Given generated content
+
+Scenario: Login
+    Given user logs in

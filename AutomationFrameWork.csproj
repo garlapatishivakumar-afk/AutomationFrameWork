@@ -12,15 +12,19 @@
     <Compile Remove="AIAutomationGenerator\**" />
     <Compile Remove="AIAutomationGenerator.Tests\**" />
     <Compile Remove="AIAutomationGenerator.Runner\**" />
+    <Compile Remove="GeneratedOutput\**" />
     <EmbeddedResource Remove="node_modules\**" />
     <EmbeddedResource Remove="AIAutomationGenerator\**" />
     <EmbeddedResource Remove="AIAutomationGenerator.Tests\**" />
     <EmbeddedResource Remove="AIAutomationGenerator.Runner\**" />
+    <EmbeddedResource Remove="GeneratedOutput\**" />
     <None Remove="node_modules\**" />
     <None Remove="AIAutomationGenerator\**" />
     <None Remove="AIAutomationGenerator.Tests\**" />
     <None Remove="AIAutomationGenerator.Runner\**" />
+    <None Remove="GeneratedOutput\**" />
     <ReqnrollFeatureFile Remove="node_modules\**" />
+    <ReqnrollFeatureFile Remove="GeneratedOutput\**" />
   </ItemGroup>
 
   <ItemGroup>
