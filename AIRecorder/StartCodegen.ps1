@@ -1,5 +1,5 @@
 # Configure codegen start URL here.
-$StartUrl = "https://investorreporting-mb-sit.trimont.com/default.aspx"
+$StartUrl = "https://documentadministration-uat.trimont.com/"
 $ApplicationKey = "DocAdmin"
 $OutputFile = "Code.ts"
 
