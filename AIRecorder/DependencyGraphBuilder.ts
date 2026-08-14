@@ -94,6 +94,9 @@ export function buildDependencyGraph(
     );
 }
 
-if (require.main === module) {
+// Direct-run check using process argv and __filename — compatible with CommonJS output
+const isDirectRun = typeof process !== "undefined" && process.argv && process.argv[1]
+    && path.resolve(process.argv[1]) === path.resolve((global as any).__filename || __filename);
+if (isDirectRun) {
     buildDependencyGraph();
 }
