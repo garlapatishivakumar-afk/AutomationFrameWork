@@ -1,0 +1,679 @@
+{
+  "Features": [
+    {
+      "Name": "Login",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\Features\\Login.feature",
+      "Scenarios": [
+        "Login"
+      ],
+      "Tags": [],
+      "Background": [],
+      "ScenarioOutlines": [],
+      "Examples": [],
+      "BusinessArea": "",
+      "Dependencies": [],
+      "UsedPageObjects": [],
+      "UsedStepDefinitions": [
+        "Given user logs in"
+      ]
+    },
+    {
+      "Name": "View Deal",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\Features\\ViewDeal.feature",
+      "Scenarios": [
+        "View deal details from deals completion status"
+      ],
+      "Tags": [],
+      "Background": [],
+      "ScenarioOutlines": [],
+      "Examples": [],
+      "BusinessArea": "",
+      "Dependencies": [],
+      "UsedPageObjects": [
+        "Given user navigates to deals page"
+      ],
+      "UsedStepDefinitions": [
+        "Given user navigates to deals page",
+        "When user clicks on Deals Completion Status",
+        "And user enters deal TID \u00221155aofa\u0022",
+        "And user presses Enter to search",
+        "And user clicks on deal \u00221155AOFA\u0022",
+        "And user checks report action checkboxes",
+        "And user clicks view report link",
+        "Then user verifies deal report is displayed",
+        "And user clicks complete action",
+        "And user closes the screen"
+      ]
+    },
+    {
+      "Name": "View Loan Reconciliation",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\Features\\ViewLoanReconciliation.feature",
+      "Scenarios": [
+        "View loan reconciliation from work queue"
+      ],
+      "Tags": [],
+      "Background": [],
+      "ScenarioOutlines": [],
+      "Examples": [],
+      "BusinessArea": "",
+      "Dependencies": [],
+      "UsedPageObjects": [
+        "Given user navigates to WhoIam page",
+        "And user navigates to work queue page"
+      ],
+      "UsedStepDefinitions": [
+        "Given user navigates to WhoIam page",
+        "When user selects employee code \u0022T10748\u0022",
+        "And user runs as selected user",
+        "And user navigates to work queue page",
+        "And user opens Loan Mgmt and searches cash management account \u00224113002786\u0022",
+        "And user opens View Recon popup",
+        "Then user gets reconciliation from popup"
+      ]
+    }
+  ],
+  "Methods": [
+    {
+      "Name": "RunAsync",
+      "ClassName": "RecordedFlow",
+      "Namespace": "",
+      "ReturnType": "Task",
+      "IsAsync": true,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\Code.cs",
+      "Parameters": [
+        {
+          "Name": "page",
+          "Type": "IPage",
+          "IsOptional": false,
+          "DefaultValue": ""
+        }
+      ],
+      "XmlSummary": "",
+      "CalledMethods": [
+        "page.GetByRole(AriaRole.Button, new() { Name = \u0022Login\u0022 }).ClickAsync",
+        "page.GetByRole",
+        "page.GetByLabel(\u0022Email\u0022).FillAsync",
+        "page.GetByLabel",
+        "page.GetByRole(AriaRole.Button, new() { Name = \u0022Submit\u0022 }).ClickAsync",
+        "page.GetByRole"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "Main",
+      "ClassName": "Program",
+      "Namespace": "",
+      "ReturnType": "Task",
+      "IsAsync": true,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AIAutomationGenerator.Runner\\Program.cs",
+      "Parameters": [
+        {
+          "Name": "args",
+          "Type": "string[]",
+          "IsOptional": false,
+          "DefaultValue": ""
+        }
+      ],
+      "XmlSummary": "",
+      "CalledMethods": [
+        "new ConfigurationBuilder()\r\n            .SetBasePath(AppContext.BaseDirectory)\r\n            .AddJsonFile(\u0022appsettings.json\u0022, optional: true, reloadOnChange: false)\r\n            .Build",
+        "new ConfigurationBuilder()\r\n            .SetBasePath(AppContext.BaseDirectory)\r\n            .AddJsonFile",
+        "new ConfigurationBuilder()\r\n            .SetBasePath",
+        "configuration\r\n            .GetSection(\u0022Runner\u0022)\r\n            .Get\u003CRunnerOptions\u003E",
+        "configuration\r\n            .GetSection",
+        "ResolvePath",
+        "Path.GetFullPath",
+        "Path.Combine",
+        "ResolvePath",
+        "Path.GetFullPath",
+        "Path.Combine",
+        "ResolvePath",
+        "Path.GetFullPath",
+        "Path.Combine",
+        "services.AddAutomationGenerator",
+        "services.BuildServiceProvider",
+        "provider.GetRequiredService\u003CIAIHealthCheckService\u003E",
+        "healthCheckService.CheckAsync",
+        "Console.WriteLine",
+        "provider.GetRequiredService\u003CIGenerationOrchestrator\u003E",
+        "orchestrator.GenerateAsync",
+        "Console.WriteLine"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "ResolvePath",
+      "ClassName": "Program",
+      "Namespace": "",
+      "ReturnType": "string",
+      "IsAsync": false,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AIAutomationGenerator.Runner\\Program.cs",
+      "Parameters": [
+        {
+          "Name": "configuredPath",
+          "Type": "string?",
+          "IsOptional": false,
+          "DefaultValue": ""
+        },
+        {
+          "Name": "fallbackPath",
+          "Type": "string",
+          "IsOptional": false,
+          "DefaultValue": ""
+        }
+      ],
+      "XmlSummary": "",
+      "CalledMethods": [
+        "string.IsNullOrWhiteSpace",
+        "Path.IsPathRooted",
+        "Path.GetFullPath",
+        "Path.Combine"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "AddAutomationGenerator",
+      "ClassName": "DependencyInjection",
+      "Namespace": "",
+      "ReturnType": "IServiceCollection",
+      "IsAsync": false,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\DependencyInjection.cs",
+      "Parameters": [
+        {
+          "Name": "services",
+          "Type": "IServiceCollection",
+          "IsOptional": false,
+          "DefaultValue": ""
+        }
+      ],
+      "XmlSummary": "",
+      "CalledMethods": [
+        "services.AddSingleton\u003CGeneratorOutputSettings\u003E",
+        "new ConfigurationBuilder()\r\n                .SetBasePath(AppContext.BaseDirectory)\r\n                .AddJsonFile(\u0022appsettings.json\u0022, optional: true)\r\n                .Build",
+        "new ConfigurationBuilder()\r\n                .SetBasePath(AppContext.BaseDirectory)\r\n                .AddJsonFile",
+        "new ConfigurationBuilder()\r\n                .SetBasePath",
+        "configuration.GetSection(\u0022GeneratorOutput\u0022).Bind",
+        "configuration.GetSection",
+        "services.AddSingleton\u003CIFileGenerator, FileGenerator\u003E",
+        "services.AddSingleton\u003CIGenerationOrchestrator, GenerationOrchestrator\u003E",
+        "services.AddSingleton\u003CAIProviderSettings\u003E",
+        "new ConfigurationBuilder()\r\n                .SetBasePath(AppContext.BaseDirectory)\r\n                .AddJsonFile(\u0022appsettings.json\u0022, optional: true)\r\n                .Build",
+        "new ConfigurationBuilder()\r\n                .SetBasePath(AppContext.BaseDirectory)\r\n                .AddJsonFile",
+        "new ConfigurationBuilder()\r\n                .SetBasePath",
+        "configuration.GetSection(\u0022AIProvider\u0022).Bind",
+        "configuration.GetSection",
+        "string.IsNullOrWhiteSpace",
+        "configuration.GetSection(\u0022AI\u0022).Bind",
+        "configuration.GetSection",
+        "string.IsNullOrWhiteSpace",
+        "services.AddSingleton\u003CIAIConfigurationValidator, AIConfigurationValidator\u003E",
+        "services.AddSingleton\u003CIAIConfigurationProvider, AIConfigurationProvider\u003E",
+        "services.AddSingleton\u003CIAIHealthCheckService, AIHealthCheckService\u003E",
+        "services.AddSingleton\u003COpenAIRequestSerializer\u003E",
+        "services.AddSingleton\u003CGeminiRequestSerializer\u003E",
+        "services.AddSingleton\u003CAzureOpenAIRequestSerializer\u003E",
+        "services.AddSingleton\u003CIAIRequestSerializerFactory, AIRequestSerializerFactory\u003E",
+        "services.AddSingleton\u003COpenAIResponseDeserializer\u003E",
+        "services.AddSingleton\u003CGeminiResponseDeserializer\u003E",
+        "services.AddSingleton\u003CAzureOpenAIResponseDeserializer\u003E",
+        "services.AddSingleton\u003CIAIResponseDeserializerFactory, AIResponseDeserializerFactory\u003E",
+        "services.AddSingleton\u003CIRetryPolicy, RetryPolicy\u003E",
+        "services.AddSingleton\u003CIAIMetricsService, AIMetricsService\u003E",
+        "services.AddSingleton\u003CIAIMetricsPersistence, JsonMetricsPersistence\u003E",
+        "services.AddSingleton\u003CIAIReportService, AIReportService\u003E",
+        "services.AddSingleton\u003CIAIResponseCache, AIResponseCache\u003E",
+        "services.AddSingleton\u003CICacheKeyGenerator, CacheKeyGenerator\u003E",
+        "services.AddSingleton\u003CITokenUsageCalculator, TokenUsageCalculator\u003E",
+        "services.AddSingleton\u003CIProviderFallbackService, ProviderFallbackService\u003E",
+        "services.AddHttpClient\u003CIAIClient, AIHttpClient\u003E",
+        "services.AddSingleton\u003CIAIRequestBuilder, AIRequestBuilder\u003E",
+        "services.AddSingleton\u003CIAIResponseProcessor, AIResponseProcessor\u003E",
+        "services.AddSingleton\u003CIPromptBuilder, PromptBuilder\u003E",
+        "services.AddSingleton\u003CIPromptTemplateService, PromptTemplateService\u003E",
+        "services.AddSingleton\u003CIPromptOptimizer, PromptOptimizer\u003E",
+        "services.AddSingleton\u003CIPromptContextBuilder, PromptContextBuilder\u003E",
+        "services.AddSingleton\u003CIQuestionEngine, QuestionEngine\u003E",
+        "services.AddSingleton\u003CIArtifactNamingService, ArtifactNamingService\u003E",
+        "services.AddSingleton\u003CIFrameworkScanner, SolutionScanner\u003E",
+        "services.AddSingleton\u003CIFeatureParser, FeatureParser\u003E",
+        "services.AddSingleton\u003CIMethodParser, MethodParser\u003E",
+        "services.AddSingleton\u003CILocatorParser, LocatorParser\u003E",
+        "services.AddSingleton\u003CIStepDefinitionParser, StepDefinitionParser\u003E",
+        "services.AddSingleton\u003CIUtilityParser, UtilityParser\u003E",
+        "services.AddSingleton\u003CIMetadataExporter, MetadataExporter\u003E",
+        "services.AddSingleton\u003CIRelationshipBuilder, RelationshipBuilder\u003E",
+        "services.AddSingleton\u003CIRepositoryScanner, FeatureScanner\u003E",
+        "services.AddSingleton\u003CIRepositoryScanner, MethodScanner\u003E",
+        "services.AddSingleton\u003CIRepositoryScanner, LocatorScanner\u003E",
+        "services.AddSingleton\u003CIRepositoryScanner, StepDefinitionScanner\u003E",
+        "services.AddSingleton\u003CIRepositoryScanner, UtilityScanner\u003E",
+        "services.AddSingleton\u003CIRepositoryIndexService, RepositoryIndexService\u003E",
+        "services.AddSingleton\u003CIRepositoryKnowledgeBuilder, RepositoryKnowledgeBuilder\u003E",
+        "services.AddSingleton\u003CIRepositoryGraphBuilder, RepositoryGraphBuilder\u003E",
+        "services.AddSingleton\u003CILogger, ConsoleLogger\u003E",
+        "services.AddSingleton\u003CIContextBuilder, ContextBuilder\u003E",
+        "services.AddSingleton\u003CIContextFingerprintService, ContextFingerprintService\u003E",
+        "services.AddSingleton\u003CIContextCacheService, ContextCacheService\u003E",
+        "services.AddSingleton\u003CIContextRankingService, ContextRankingService\u003E",
+        "services.AddSingleton\u003CIPromptOptimizationService, PromptOptimizationService\u003E",
+        "services.AddSingleton\u003CIContextFilter, ContextFilter\u003E",
+        "services.AddSingleton\u003CIAIResponseParser, AIResponseParser\u003E",
+        "services.AddSingleton\u003CIScriptValidator, ScriptValidator\u003E",
+        "services.AddSingleton\u003CILearningEngine, LearningEngine\u003E",
+        "services.AddSingleton\u003CIMethodSimilarityEngine, MethodSimilarityEngine\u003E",
+        "services.AddSingleton\u003CILocatorSimilarityEngine, LocatorSimilarityEngine\u003E",
+        "services.AddSingleton\u003CIStepSimilarityEngine, StepSimilarityEngine\u003E",
+        "services.AddSingleton\u003CIMethodReuseEngine, MethodReuseEngine\u003E",
+        "services.AddSingleton\u003CILocatorReuseEngine, LocatorReuseEngine\u003E",
+        "services.AddSingleton\u003CIStepReuseEngine, StepReuseEngine\u003E",
+        "services.AddSingleton\u003CIRecordingParser, RecordingParser\u003E",
+        "services.AddSingleton\u003CIBusinessFlowDetector, BusinessFlowDetector\u003E",
+        "services.AddSingleton\u003CIBusinessFlowBuilder, BusinessFlowBuilder\u003E",
+        "services.AddSingleton\u003COpenAIProvider\u003E",
+        "services.AddSingleton\u003CGeminiProvider\u003E",
+        "services.AddSingleton\u003CAzureOpenAIProvider\u003E",
+        "services.AddSingleton\u003CMockAIProvider\u003E",
+        "services.AddSingleton\u003CIAIProviderFactory, AIProviderFactory\u003E",
+        "services.AddSingleton\u003CIAIProvider\u003E",
+        "sp.GetRequiredService\u003CIAIProviderFactory\u003E().Create",
+        "sp.GetRequiredService\u003CIAIProviderFactory\u003E"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "GetConfiguration",
+      "ClassName": "AIConfigurationProvider",
+      "Namespace": "",
+      "ReturnType": "AIConfiguration",
+      "IsAsync": false,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\AIConfigurationProvider.cs",
+      "Parameters": [],
+      "XmlSummary": "",
+      "CalledMethods": [],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "SendAsync",
+      "ClassName": "AIHttpClient",
+      "Namespace": "",
+      "ReturnType": "Task\u003CAIResponse\u003E",
+      "IsAsync": true,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\AIHttpClient.cs",
+      "Parameters": [
+        {
+          "Name": "configuration",
+          "Type": "AIConfiguration",
+          "IsOptional": false,
+          "DefaultValue": ""
+        },
+        {
+          "Name": "request",
+          "Type": "AIRequest",
+          "IsOptional": false,
+          "DefaultValue": ""
+        }
+      ],
+      "XmlSummary": "",
+      "CalledMethods": [
+        "Stopwatch.StartNew",
+        "string.IsNullOrWhiteSpace",
+        "stopwatch.Stop",
+        "RecordMetrics",
+        "serializerFactory.Create",
+        "serializer.Serialize",
+        "cacheKeyGenerator.Generate",
+        "responseCache.TryGet",
+        "retryPolicy.ExecuteAsync",
+        ".Trim",
+        "httpRequest.Headers.TryAddWithoutValidation",
+        "AppendGeminiApiKey",
+        "httpClient.SendAsync",
+        "response.Content.ReadAsStringAsync",
+        "deserializerFactory.Create",
+        "deserializer.Deserialize",
+        "usageCalculator.Calculate",
+        "string.IsNullOrWhiteSpace",
+        "string.IsNullOrWhiteSpace",
+        "stopwatch.Stop",
+        "RecordMetrics",
+        "responseCache.Store"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "RecordMetrics",
+      "ClassName": "AIHttpClient",
+      "Namespace": "",
+      "ReturnType": "void",
+      "IsAsync": false,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\AIHttpClient.cs",
+      "Parameters": [
+        {
+          "Name": "configuration",
+          "Type": "AIConfiguration",
+          "IsOptional": false,
+          "DefaultValue": ""
+        },
+        {
+          "Name": "result",
+          "Type": "AIResponse",
+          "IsOptional": false,
+          "DefaultValue": ""
+        },
+        {
+          "Name": "duration",
+          "Type": "TimeSpan",
+          "IsOptional": false,
+          "DefaultValue": ""
+        }
+      ],
+      "XmlSummary": "",
+      "CalledMethods": [
+        "metricsService.Record"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "AppendGeminiApiKey",
+      "ClassName": "AIHttpClient",
+      "Namespace": "",
+      "ReturnType": "string",
+      "IsAsync": false,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\AIHttpClient.cs",
+      "Parameters": [
+        {
+          "Name": "baseUrl",
+          "Type": "string",
+          "IsOptional": false,
+          "DefaultValue": ""
+        },
+        {
+          "Name": "apiKey",
+          "Type": "string",
+          "IsOptional": false,
+          "DefaultValue": ""
+        }
+      ],
+      "XmlSummary": "",
+      "CalledMethods": [
+        "baseUrl.Contains",
+        "baseUrl.Contains",
+        "Uri.EscapeDataString"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "Create",
+      "ClassName": "AIProviderFactory",
+      "Namespace": "",
+      "ReturnType": "IAIProvider",
+      "IsAsync": false,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\AIProviderFactory.cs",
+      "Parameters": [],
+      "XmlSummary": "",
+      "CalledMethods": [
+        ".Trim",
+        "provider.ToLowerInvariant",
+        "serviceProvider.GetRequiredService\u003COpenAIProvider\u003E",
+        "serviceProvider.GetRequiredService\u003CGeminiProvider\u003E",
+        "serviceProvider.GetRequiredService\u003CAzureOpenAIProvider\u003E",
+        "serviceProvider.GetRequiredService\u003CMockAIProvider\u003E"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    },
+    {
+      "Name": "Create",
+      "ClassName": "AIRequestSerializerFactory",
+      "Namespace": "",
+      "ReturnType": "IAIRequestSerializer",
+      "IsAsync": false,
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\AIRequestSerializerFactory.cs",
+      "Parameters": [
+        {
+          "Name": "configuration",
+          "Type": "AIConfiguration",
+          "IsOptional": false,
+          "DefaultValue": ""
+        }
+      ],
+      "XmlSummary": "",
+      "CalledMethods": [
+        ".Trim",
+        "provider.ToLowerInvariant"
+      ],
+      "Dependencies": [],
+      "BusinessCategory": "",
+      "Tags": [],
+      "Score": 0
+    }
+  ],
+  "Locators": [
+    {
+      "Name": "RepositoryPath",
+      "PageName": "Program",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AIAutomationGenerator.Runner\\Program.cs",
+      "LocatorType": "string?",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "RecordingPath",
+      "PageName": "Program",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AIAutomationGenerator.Runner\\Program.cs",
+      "LocatorType": "string?",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "OutputPath",
+      "PageName": "Program",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AIAutomationGenerator.Runner\\Program.cs",
+      "LocatorType": "string?",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "Candidates",
+      "PageName": "GeminiChatResponse",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\Contracts\\GeminiChatResponse.cs",
+      "LocatorType": "List\u003CGeminiCandidate\u003E",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "Content",
+      "PageName": "GeminiChatResponse",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\Contracts\\GeminiChatResponse.cs",
+      "LocatorType": "GeminiContent",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "Parts",
+      "PageName": "GeminiChatResponse",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\Contracts\\GeminiChatResponse.cs",
+      "LocatorType": "List\u003CGeminiPart\u003E",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "Text",
+      "PageName": "GeminiChatResponse",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\Contracts\\GeminiChatResponse.cs",
+      "LocatorType": "string",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "Model",
+      "PageName": "OpenAIChatRequest",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\Contracts\\OpenAIChatRequest.cs",
+      "LocatorType": "string",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "Messages",
+      "PageName": "OpenAIChatRequest",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\Contracts\\OpenAIChatRequest.cs",
+      "LocatorType": "List\u003COpenAIMessage\u003E",
+      "Selector": "",
+      "Score": 60
+    },
+    {
+      "Name": "Temperature",
+      "PageName": "OpenAIChatRequest",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\Contracts\\OpenAIChatRequest.cs",
+      "LocatorType": "double",
+      "Selector": "",
+      "Score": 60
+    }
+  ],
+  "Steps": [
+    {
+      "StepText": "user logs in",
+      "MethodName": "UserLogsIn",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\LoginSteps.cs",
+      "Score": 60
+    },
+    {
+      "StepText": "user navigates to deals page",
+      "MethodName": "GivenUserNavigatesToDealsPage",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "Score": 90
+    },
+    {
+      "StepText": "user clicks on Deals Completion Status",
+      "MethodName": "WhenUserClicksOnDealsCompletionStatus",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "Score": 110
+    },
+    {
+      "StepText": "user enters deal TID {string}",
+      "MethodName": "WhenUserEntersDealTid",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "Score": 60
+    },
+    {
+      "StepText": "user presses Enter to search",
+      "MethodName": "WhenUserPressesEnterToSearch",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "Score": 60
+    }
+  ],
+  "Utilities": [
+    {
+      "Name": "RecordedFlow",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\Code.cs",
+      "Methods": [
+        "RunAsync"
+      ]
+    },
+    {
+      "Name": "Program",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AIAutomationGenerator.Runner\\Program.cs",
+      "Methods": [
+        "Main",
+        "ResolvePath"
+      ]
+    },
+    {
+      "Name": "RunnerOptions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AIAutomationGenerator.Runner\\Program.cs",
+      "Methods": []
+    },
+    {
+      "Name": "DependencyInjection",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\DependencyInjection.cs",
+      "Methods": [
+        "AddAutomationGenerator"
+      ]
+    },
+    {
+      "Name": "AIConfigurationProvider",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\AISetup\\AIAutomationGenerator\\AI\\AIConfigurationProvider.cs",
+      "Methods": [
+        "GetConfiguration"
+      ]
+    }
+  ],
+  "Relationships": [
+    {
+      "Source": "UserLogsIn",
+      "Target": "UserLogsIn",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "GivenUserNavigatesToDealsPage",
+      "Target": "GivenUserNavigatesToDealsPage",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "WhenUserClicksOnDealsCompletionStatus",
+      "Target": "WhenUserClicksOnDealsCompletionStatus",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "WhenUserEntersDealTid",
+      "Target": "WhenUserEntersDealTid",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "WhenUserPressesEnterToSearch",
+      "Target": "WhenUserPressesEnterToSearch",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "WhenUserClicksOnDeal",
+      "Target": "WhenUserClicksOnDeal",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "WhenUserChecksReportActionCheckboxes",
+      "Target": "WhenUserChecksReportActionCheckboxes",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "WhenUserClicksViewReportLink",
+      "Target": "WhenUserClicksViewReportLink",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "ThenUserVerifiesDealReportIsDisplayed",
+      "Target": "ThenUserVerifiesDealReportIsDisplayed",
+      "RelationshipType": "StepCallsMethod"
+    },
+    {
+      "Source": "ThenUserClicksCompleteAction",
+      "Target": "ThenUserClicksCompleteAction",
+      "RelationshipType": "StepCallsMethod"
+    }
+  ]
+}

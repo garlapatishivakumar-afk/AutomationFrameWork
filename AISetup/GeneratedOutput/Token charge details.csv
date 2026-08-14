@@ -1,0 +1,5 @@
+ScriptName,TokenType,Tokens,PricePer1MTokensUSD,CostUSD,Provider,Model,ChargeType,Notes
+ViewDashboard,Input,8782,1.75,0.0153685,GitHub Copilot Agent,GPT-5.3-Codex,ManualAgentAttribution,Prompt tokens charged at official input price
+ViewDashboard,Cached input,0,0.175,0,GitHub Copilot Agent,GPT-5.3-Codex,ManualAgentAttribution,No cached input tokens recorded for this run
+ViewDashboard,Output,100,14.00,0.0014,GitHub Copilot Agent,GPT-5.3-Codex,ManualAgentAttribution,Completion tokens charged at official output price
+ViewDashboard,Total,8882,,0.0167685,GitHub Copilot Agent,GPT-5.3-Codex,ManualAgentAttribution,Total estimated cost using official GPT-5.3-Codex pricing

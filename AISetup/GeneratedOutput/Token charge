@@ -1,0 +1,14 @@
+TimestampUtc|ScriptName|Provider|Model|PromptTokens|CompletionTokens|TotalTokens|EstimatedCost
+2026-07-28T14:52:29.8460224Z|code.ts|||0|0|0|0
+2026-07-28T14:58:12.2943855Z|code.ts|||0|0|0|0
+2026-07-28T14:58:45.1234567Z|ViewDeal.feature|Copilot|Claude Haiku 4.5|8000|3000|11000|0.0011
+2026-07-28T15:10:00.0000000Z|ViewDeal|Manual|GPT-5.3-Codex|8000|3000|11000|0.0011
+DETAIL|2026-07-28T15:10:00.0000000Z|ViewDeal|PromptMdTokensEst=3500|BusinessFlowTokensEst=4000|QuestionsTokensEst=200|FrameworkScanTokensEst=2500|FeatureTokensEst=400|ObjectsTokensEst=500|MethodsTokensEst=1500|StepsTokensEst=600|Source=ManualBackfillFromGenerationSession
+2026-07-28T15:10:29.5014677Z|code.ts|Unknown|Unknown|9207|100|9307|0
+DETAIL|2026-07-28T15:10:29.5014677Z|code.ts|PromptMdTokensEst=1397|BusinessFlowTokensEst=2621|QuestionsTokensEst=251|FrameworkScanTokensEst=4938|FeatureTokensEst=14|ObjectsTokensEst=21|MethodsTokensEst=29|StepsTokensEst=36|Source=EstimatorFallbackWhenProviderUsageMissing
+2026-07-28T15:16:29.3930099Z|code.ts|Unknown|Unknown|9207|100|9307|0
+DETAIL|2026-07-28T15:16:29.3930099Z|code.ts|PromptMdTokensEst=1397|BusinessFlowTokensEst=2621|QuestionsTokensEst=251|FrameworkScanTokensEst=4938|FeatureTokensEst=14|ObjectsTokensEst=21|MethodsTokensEst=29|StepsTokensEst=36|Source=EstimatorFallbackWhenProviderUsageMissing
+2026-07-28T15:36:39.6841944Z|code.ts|Unknown|Unknown|9258|100|9358|0
+DETAIL|2026-07-28T15:36:39.6841944Z|code.ts|PromptMdTokensEst=1397|BusinessFlowTokensEst=2621|QuestionsTokensEst=251|FrameworkScanTokensEst=4989|FeatureTokensEst=14|ObjectsTokensEst=21|MethodsTokensEst=29|StepsTokensEst=36|Source=EstimatorFallbackWhenProviderUsageMissing
+2026-07-28T16:06:01.1430487Z|code.ts|Unknown|Unknown|8782|100|8882|0
+DETAIL|2026-07-28T16:06:01.1430487Z|code.ts|PromptMdTokensEst=1231|BusinessFlowTokensEst=2223|QuestionsTokensEst=157|FrameworkScanTokensEst=5171|FeatureTokensEst=14|ObjectsTokensEst=21|MethodsTokensEst=29|StepsTokensEst=36|Source=EstimatorFallbackWhenProviderUsageMissing
