@@ -262,8 +262,8 @@ namespace AutomationFrameWork.Helpers
 
                 if (excess > 0m)
                 {
-                    // Split of S across NON-IOA is RANDOM — read actual S from ideal file to update state.
-                    // Only the sum constraint is validated: sum of all NON-IOA S = excess.
+                    // Rule: excess first clears full J (S) and full M (T) for each non-IOA type.
+                    // Whatever remains after all non-IOA J+M cleared → Y (IOAOverpaymentBalance).
                     var activeNonIoa = NonIoaPriorityOrder
                         .Where(t => states.ContainsKey(t) && dayResults.ContainsKey(t) && idealForDate.ContainsKey(t))
                         .Select(t => (State: states[t], DayResult: dayResults[t], IdealRow: idealForDate[t]))
@@ -271,17 +271,16 @@ namespace AutomationFrameWork.Helpers
 
                     foreach (var item in activeNonIoa)
                     {
-                        var sFromIdeal = item.IdealRow.InterestOnOriginalRepayment;
-                        if (sFromIdeal > 0m)
+                        // S = full accumulated interest (J) of this non-IOA type
+                        var sRepay = item.State.AccumulatedInterest;
+                        if (sRepay > 0m)
                         {
-                            // Use ideal file S to update accumulated interest state for subsequent days
-                            item.State.AccumulatedInterest -= Math.Min(sFromIdeal, item.State.AccumulatedInterest);
-                            item.DayResult.InterestRepayment += sFromIdeal;
+                            item.State.AccumulatedInterest = 0m;
+                            item.DayResult.InterestRepayment += sRepay;
                             item.DayResult.IsIoaExcessRecipient = true;
                         }
 
-                        // T = compound interest repayment = Round(AccumulatedCompounded, 2) for non-IOA
-                        // When M is cleared on repayment day, K (CompoundBasis) is also cleared to 0
+                        // T = Round(AccumulatedCompounded, 2); K and M reset to 0
                         var tRepay = Math.Round(item.State.AccumulatedCompounded, 2, MidpointRounding.AwayFromZero);
                         if (tRepay > 0m)
                         {
@@ -293,15 +292,13 @@ namespace AutomationFrameWork.Helpers
                         }
                     }
 
-                    // Remaining excess after NON-IOA S and T absorbed → Y
-                    // Y is broadcast to IOA and all non-IOA rows (same value shown on every row)
-                    var sumNonIoaS = activeNonIoa.Sum(x => x.IdealRow.InterestOnOriginalRepayment);
+                    // Remaining excess after all non-IOA J+M cleared → Y (broadcast to all rows)
+                    var sumNonIoaS = activeNonIoa.Sum(x => x.DayResult.InterestRepayment);
                     var sumNonIoaT = activeNonIoa.Sum(x => x.DayResult.InterestOnCompoundedRepayment);
                     var remainingExcess = excess - sumNonIoaS - sumNonIoaT;
                     if (remainingExcess > 0m)
                     {
                         ioaState.IOAOverpaymentBalance += remainingExcess;
-                        // Non-IOA rows also display the same Y balance
                         foreach (var item in activeNonIoa)
                             item.State.IOAOverpaymentBalance = ioaState.IOAOverpaymentBalance;
                     }
