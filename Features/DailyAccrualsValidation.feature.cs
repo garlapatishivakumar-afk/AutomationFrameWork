@@ -138,7 +138,7 @@ namespace AutomationFrameWork.Features
         [global::Xunit.SkippableTheoryAttribute(DisplayName="Validate daily accruals match source transactions for the loan")]
         [global::Xunit.TraitAttribute("FeatureTitle", "Daily Accruals Interest Validation")]
         [global::Xunit.TraitAttribute("Description", "Validate daily accruals match source transactions for the loan")]
-        [global::Xunit.InlineDataAttribute("UAT Import All Adv_14July2026 (2).xlsx", "daily-accruals-detail_2025-03-01_to_2026-08-19_20540_10005.xlsx", "0", new string[0])]
+        [global::Xunit.InlineDataAttribute("UAT Import All Adv - Client Given Complete Dat File 1.xlsx", "daily-accruals-detail_2025-03-01_to_2026-08-19_20540_10005.xlsx", "0", new string[0])]
         public async global::System.Threading.Tasks.Task ValidateDailyAccrualsMatchSourceTransactionsForTheLoan(string sourceFile, string idealFile, string @__pickleIndex, string[] exampleTags)
         {
             string[] tagsOfScenario = exampleTags;

@@ -16,4 +16,4 @@ Feature: Daily Accruals Interest Validation
 
   Examples:
     | sourceFile                             | idealFile                                                       | 
-    |UAT Import All Adv_14July2026 (2).xlsx  | daily-accruals-detail_2025-03-01_to_2026-08-19_20540_10005.xlsx |
+    |UAT Import All Adv - Client Given Complete Dat File 1.xlsx  | daily-accruals-detail_2025-03-01_to_2026-08-19_20540_10005.xlsx |

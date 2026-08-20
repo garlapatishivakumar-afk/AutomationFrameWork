@@ -81,6 +81,7 @@ namespace AutomationFrameWork.Helpers
                 ProcessAdvances(states, dayTxns, dayResults);
                 ProcessNonIoaRepayments(states, dayTxns, dayResults);
                 ProcessIoaRepayments(states, dayTxns, dayResults, idealForDate);
+                ProcessYAllocations(states, dayResults, idealForDate);
 
                 foreach (var type in idealForDate.Keys)
                 {
@@ -280,20 +281,30 @@ namespace AutomationFrameWork.Helpers
                         }
 
                         // T = compound interest repayment = Round(AccumulatedCompounded, 2) for non-IOA
+                        // When M is cleared on repayment day, K (CompoundBasis) is also cleared to 0
                         var tRepay = Math.Round(item.State.AccumulatedCompounded, 2, MidpointRounding.AwayFromZero);
                         if (tRepay > 0m)
                         {
                             item.DayResult.InterestOnCompoundedRepayment += tRepay;
                             item.State.AccumulatedCompounded = 0m;
+                            item.State.CompoundBasis = 0m;
+                            item.State.DailyAccrualOnCompound = 0m;
+                            item.State.CompoundingStarted = false;
                         }
                     }
 
                     // Remaining excess after NON-IOA S and T absorbed → Y
+                    // Y is broadcast to IOA and all non-IOA rows (same value shown on every row)
                     var sumNonIoaS = activeNonIoa.Sum(x => x.IdealRow.InterestOnOriginalRepayment);
                     var sumNonIoaT = activeNonIoa.Sum(x => x.DayResult.InterestOnCompoundedRepayment);
                     var remainingExcess = excess - sumNonIoaS - sumNonIoaT;
                     if (remainingExcess > 0m)
+                    {
                         ioaState.IOAOverpaymentBalance += remainingExcess;
+                        // Non-IOA rows also display the same Y balance
+                        foreach (var item in activeNonIoa)
+                            item.State.IOAOverpaymentBalance = ioaState.IOAOverpaymentBalance;
+                    }
                 }
             }
             else
@@ -304,6 +315,38 @@ namespace AutomationFrameWork.Helpers
                 ioaState.AccumulatedInterest -= intRepay;
                 ioaDayResult.PrincipalRepayment = prinRepay;
                 ioaDayResult.InterestRepayment = intRepay;
+            }
+        }
+
+        private static void ProcessYAllocations(
+            Dictionary<string, TypeAccrualState> states,
+            Dictionary<string, DayTransactionResult> dayResults,
+            Dictionary<string, AccrualRecord> idealForDate)
+        {
+            // On any day the ideal file shows Z (OverpaymentAllocation) > 0 for a non-IOA type,
+            // apply Y balance as S against AccumulatedInterest and clear Y from all states.
+            foreach (var kvp in idealForDate)
+            {
+                var type = kvp.Key;
+                var idealRow = kvp.Value;
+
+                if (string.Equals(type, "IOA", StringComparison.OrdinalIgnoreCase)) continue;
+                if (idealRow.OverpaymentAllocation <= 0m) continue;
+                if (!states.TryGetValue(type, out var state)) continue;
+                if (!dayResults.TryGetValue(type, out var dayResult)) continue;
+
+                var z = idealRow.OverpaymentAllocation;
+                var s = idealRow.InterestOnOriginalRepayment;
+
+                // Apply S against AccumulatedInterest (J)
+                state.AccumulatedInterest -= Math.Min(s, state.AccumulatedInterest);
+                dayResult.InterestRepayment += s;
+                dayResult.OverpaymentAllocation += z;
+
+                // Reduce Y on all states by the allocated amount
+                state.IOAOverpaymentBalance = Math.Max(0m, state.IOAOverpaymentBalance - z);
+                if (states.TryGetValue("IOA", out var ioaState))
+                    ioaState.IOAOverpaymentBalance = Math.Max(0m, ioaState.IOAOverpaymentBalance - z);
             }
         }
 
