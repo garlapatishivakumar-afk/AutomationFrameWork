@@ -39,6 +39,25 @@ function extractLocator(raw: string): string | undefined {
 
 }
 
+/**
+ * V2.1: Returns the full canonical locator expression used as the matching key
+ * in LiveObservations. Must match exactly what LiveObserver.extractLocator() produces.
+ *
+ * getBy* calls → full expression, e.g. "getByRole('button', { name: 'Search Queue' })"
+ * CSS/XPath    → the selector string, e.g. "#ctl00_ContentPlaceHolder1_ddlSearchUser"
+ */
+function extractCanonicalLocator(raw: string): string | undefined {
+    // Full getBy* expression
+    const getByMatch = raw.match(/getBy(?:Role|Label|Text|Placeholder|TestId)\([^)]+\)/i);
+    if (getByMatch) return getByMatch[0];
+
+    // CSS / XPath selector value
+    const cssMatch = raw.match(/locator\(\s*['"`]([^'"`]+)['"`]/i);
+    if (cssMatch) return cssMatch[1];
+
+    return undefined;
+}
+
 function extractPage(raw: string): string | undefined {
 
     const pageMatch = raw.match(/goto\(\s*['"`]([^'"`]+)['"`]/i);
@@ -75,6 +94,8 @@ function addAction(
         type,
 
         locator,
+
+        canonicalLocator: extractCanonicalLocator(raw),
 
         value,
 

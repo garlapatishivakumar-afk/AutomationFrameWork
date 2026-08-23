@@ -4,6 +4,11 @@
 
 import fs from "fs";
 import path from "path";
+import { execSync } from "child_process";
+import { buildObservations } from "../LiveObserver";
+import { buildBusinessFlow } from "../BusinessFlowBuilder";
+import { analyzeFlow } from "../FlowAnalyzer";
+import { OutputValidator } from "../Validation/OutputValidator";
 
 export interface ArtifactSummary {
     type: string;
@@ -50,11 +55,20 @@ export interface GenerationReportData {
     knownLimitations: string[];
 }
 
+/** Resolve current git branch dynamically. Returns empty string if unavailable. */
+function resolveCurrentBranch(): string {
+    try {
+        return execSync("git branch --show-current", { encoding: "utf8", stdio: ["pipe","pipe","pipe"] }).trim();
+    } catch {
+        return "";
+    }
+}
+
 export class GenerationReportBuilder {
 
     private data: GenerationReportData = {
         generatedAt: new Date().toISOString(),
-        branch: "feature/v2.1-intelligence-enhancements",
+        branch: resolveCurrentBranch(),
         artifacts: [],
         semanticControls: [],
         validation: { passed: true, errors: [], warnings: [] },
@@ -124,16 +138,73 @@ export class GenerationReportBuilder {
     }
 }
 
-/** Build and save a default report from available artifacts */
-export function buildDefaultReport(projectRoot: string = process.cwd()): string {
+/**
+ * Build and save a report from the actual V2.1 pipeline:
+ *   LiveObserver → observations → business flow → validation → report
+ */
+export function buildPipelineReport(projectRoot: string = process.cwd()): string {
     const builder = new GenerationReportBuilder();
 
-    builder
-        .loadSemanticControlsFromObservations(projectRoot)
-        .addLimitation(
-            "Live-browser DOM inspection is not performed. " +
-            "Static analysis is used instead (requires authenticated session for live DOM)."
-        );
+    // 1. Load semantic controls from LiveObservations
+    builder.loadSemanticControlsFromObservations(projectRoot);
+
+    // 2. Build business flow (uses canonicalLocator resolution)
+    try {
+        const flow = analyzeFlow(projectRoot);
+        const steps = buildBusinessFlow(flow, projectRoot);
+        for (const step of steps) {
+            builder.addArtifact({
+                type: "BusinessStep",
+                name: step.businessAction,
+                action: step.semanticLabel ? "reused" : "created"
+            });
+        }
+    } catch {
+        builder.addLimitation("Business flow could not be analyzed (code.ts may be missing).");
+    }
+
+    // 3. Validate generated code samples found in LiveObservations context
+    const validator = new OutputValidator();
+    const obsPath = path.join(projectRoot, "AIRecorder", "LiveObservations.json");
+    let validationPassed = true;
+    const validationErrors: string[] = [];
+    const validationWarnings: string[] = [];
+
+    try {
+        if (fs.existsSync(obsPath)) {
+            const obs = JSON.parse(fs.readFileSync(obsPath, "utf8"));
+            // Validate each observation's playwright action for locator quality
+            const sampleCode = (obs.observations ?? [])
+                .map((o: { playwrightAction?: string }) => o.playwrightAction ?? "")
+                .join("\n");
+
+            if (sampleCode.trim()) {
+                const result = validator.validate(sampleCode);
+                validationPassed = result.success;
+                validationErrors.push(...result.errors.map((e) => e.message));
+                validationWarnings.push(...(result.warnings ?? []).map((w) => w.message));
+            }
+        }
+    } catch {
+        builder.addLimitation("Validation could not run against observations.");
+    }
+
+    builder.setValidation({
+        passed: validationPassed,
+        errors: validationErrors,
+        warnings: validationWarnings
+    });
+
+    // 4. Known limitations
+    builder.addLimitation(
+        "Live-browser DOM inspection is not performed. " +
+        "Static analysis is used (requires authenticated session for live DOM)."
+    );
 
     return builder.save(projectRoot);
+}
+
+/** @deprecated Use buildPipelineReport instead */
+export function buildDefaultReport(projectRoot: string = process.cwd()): string {
+    return buildPipelineReport(projectRoot);
 }

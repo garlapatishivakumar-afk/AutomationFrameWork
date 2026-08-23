@@ -37,7 +37,9 @@ function loadResolvedNames(projectRoot: string = process.cwd()): Map<string, str
 function convertAction(action: FlowAction, resolvedNames: Map<string, string>): string {
 
     // V2.1: prefer semantic name when available
-    const semantic = action.locator ? resolvedNames.get(action.locator) : undefined;
+    // Look up by canonicalLocator first (full expression), then fall back to display locator
+    const semantic = (action.canonicalLocator ? resolvedNames.get(action.canonicalLocator) : undefined)
+        ?? (action.locator ? resolvedNames.get(action.locator) : undefined);
     const displayName = semantic ?? action.locator;
 
     switch(action.type){
@@ -87,7 +89,8 @@ export function buildBusinessFlow(
 
     return analysis.actions.map((a,index) => {
 
-        const semantic = a.locator ? resolvedNames.get(a.locator) : undefined;
+        const semantic = (a.canonicalLocator ? resolvedNames.get(a.canonicalLocator) : undefined)
+            ?? (a.locator ? resolvedNames.get(a.locator) : undefined);
 
         return {
             step: index + 1,

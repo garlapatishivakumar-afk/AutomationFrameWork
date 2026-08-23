@@ -137,4 +137,16 @@ if (Test-Path $liveObserverPath) {
 	Write-Host "LiveObserver not found at $liveObserverPath — skipping DOM analysis."
 }
 
+# V2.1 Enhancement #9: generate pipeline report
+$reportScriptPath = Join-Path $projectRoot "AISetup\AIRecorder\Integration\GenerationReport.ts"
+if (Test-Path $reportScriptPath) {
+	Write-Host "Generating pipeline report..."
+	npx ts-node --eval "require('./AISetup/AIRecorder/Integration/GenerationReport').buildPipelineReport()" 2>$null
+	if ($LASTEXITCODE -ne 0) {
+		Write-Host "Pipeline report generation skipped (ts-node eval not supported in this context)."
+	}
+} else {
+	Write-Host "GenerationReport not found — skipping report generation."
+}
+
 Write-Host "Codegen Closed"

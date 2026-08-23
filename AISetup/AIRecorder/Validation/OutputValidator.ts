@@ -4,6 +4,8 @@ type ValidationError = {
 
     message: string;
 
+    severity: "error" | "warning";
+
 };
 
 type ValidationResult = {
@@ -11,6 +13,8 @@ type ValidationResult = {
     success: boolean;
 
     errors: ValidationError[];
+
+    warnings: ValidationError[];
 
 };
 
@@ -47,6 +51,7 @@ export class OutputValidator {
     ): ValidationResult {
 
         const errors: ValidationError[] = [];
+        const warnings: ValidationError[] = [];
 
         const trimmed = code.trim();
 
@@ -56,8 +61,9 @@ export class OutputValidator {
 
                 rule: "EmptyCode",
 
-                message:
-                    "Generated content is empty."
+                message: "Generated content is empty.",
+
+                severity: "error"
 
             });
 
@@ -65,7 +71,9 @@ export class OutputValidator {
 
                 success: false,
 
-                errors
+                errors,
+
+                warnings
 
             };
 
@@ -77,8 +85,9 @@ export class OutputValidator {
 
                 rule: "Braces",
 
-                message:
-                    "Unbalanced curly braces detected."
+                message: "Unbalanced curly braces detected.",
+
+                severity: "error"
 
             });
 
@@ -90,8 +99,9 @@ export class OutputValidator {
 
                 rule: "Parentheses",
 
-                message:
-                    "Unbalanced parentheses detected."
+                message: "Unbalanced parentheses detected.",
+
+                severity: "error"
 
             });
 
@@ -114,8 +124,9 @@ export class OutputValidator {
 
                     rule: "DuplicateMethod",
 
-                    message:
-                        `Duplicate method signature found: ${match[2]}.`
+                    message: `Duplicate method signature found: ${match[2]}.`,
+
+                    severity: "error"
 
                 });
 
@@ -135,8 +146,9 @@ export class OutputValidator {
 
                     rule: "ScenarioSteps",
 
-                    message:
-                        "Scenario block must include at least one Given/When/Then/And/But line."
+                    message: "Scenario block must include at least one Given/When/Then/And/But line.",
+
+                    severity: "error"
 
                 });
 
@@ -155,8 +167,9 @@ export class OutputValidator {
 
                     rule: "Syntax",
 
-                    message:
-                        "Code appears truncated or missing a statement/block terminator."
+                    message: "Code appears truncated or missing a statement/block terminator.",
+
+                    severity: "error"
 
                 });
 
@@ -164,59 +177,64 @@ export class OutputValidator {
 
         }
 
-        if (
-            code.includes("Thread.Sleep")
-        ) {
+        if (code.includes("Thread.Sleep")) {
 
             errors.push({
 
                 rule: "ThreadSleep",
 
-                message:
-                    "Thread.Sleep is not allowed."
+                message: "Thread.Sleep is not allowed.",
+
+                severity: "error"
 
             });
 
         }
 
-        if (
-            code.includes("async") &&
-            !code.includes("await")
-        ) {
+        if (code.includes("async") && !code.includes("await")) {
 
             errors.push({
 
                 rule: "Await",
 
-                message:
-                    "Async method without await."
+                message: "Async method without await.",
+
+                severity: "error"
 
             });
 
         }
 
-        if (
-            code.includes("fill(") &&
-            !code.includes("Excel")
-        ) {
+        if (code.includes("fill(") && !code.includes("Excel")) {
 
             errors.push({
 
                 rule: "Excel",
 
-                message:
-                    "Input values should come from Excel."
+                message: "Input values should come from Excel.",
+
+                severity: "error"
 
             });
 
         }
 
+        // V2.1 Enhancement #8: locator-quality validation — integrated into main pipeline
+        const locatorQuality = this.validateLocatorQuality(code);
+        for (const w of locatorQuality.warnings) {
+            warnings.push({ rule: "LocatorQuality", message: w, severity: "warning" });
+        }
+        for (const e of locatorQuality.errors) {
+            errors.push({ rule: "LocatorQualityError", message: e, severity: "error" });
+        }
+
         return {
 
-            success:
-                errors.length === 0,
+            success: errors.length === 0,
 
-            errors
+            errors,
+
+            warnings
 
         };
 

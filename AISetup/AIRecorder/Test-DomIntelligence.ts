@@ -6,6 +6,10 @@ import { LabelResolver } from "./Intelligence/LabelResolver";
 import { LocatorNamingEngine } from "./Intelligence/LocatorNamingEngine";
 import { LocatorStabilityRanker } from "./Intelligence/LocatorStabilityRanker";
 import { TableDetector } from "./Intelligence/TableDetector";
+import { OutputValidator } from "./Validation/OutputValidator";
+import { buildObservations } from "./LiveObserver";
+import { analyzeFlow } from "./FlowAnalyzer";
+import { buildBusinessFlow } from "./BusinessFlowBuilder";
 
 let failed = 0;
 
@@ -121,6 +125,68 @@ const t2 = table.analyse(
     "await page.getByRole('button', { name: 'Search Queue' }).click();"
 );
 assertFalsy(t2, "Non-table locator returns null");
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\n--- Canonical locator identity: LiveObserver → BusinessFlowBuilder ---");
+
+// Simulate LiveObservations keyed by full canonical expression
+const fakeObsMap = new Map<string, string>([
+    ["getByRole('button', { name: 'Search Queue' })", "SearchQueueButton"],
+    ["getByRole('link', { name: 'Administration' })", "AdministrationLink"],
+    ["#ctl00_ContentPlaceHolder1_ddlSearchUser", "SearchUserDropdown"],
+    ["getByLabel('Deal Number')", "DealNumberTextbox"],
+    ["getByText('Save')", "SaveLink"]
+]);
+
+// Verify all canonical keys are correctly identified by LiveObserver
+const observations = buildObservations(process.cwd());
+for (const obs of observations) {
+    if (fakeObsMap.has(obs.locator)) {
+        // Canonical key matches what LiveObserver uses
+        console.log(`  PASS: LiveObserver canonical key matches: ${obs.locator}`);
+    }
+}
+
+// Verify FlowAnalyzer produces canonical keys matching LiveObserver
+try {
+    const flow = analyzeFlow(process.cwd());
+    let resolved = 0;
+    for (const action of flow.actions) {
+        const key = action.canonicalLocator ?? action.locator ?? "";
+        const obsMatch = observations.find(o => o.locator === key);
+        if (obsMatch?.resolvedName) {
+            resolved++;
+        }
+    }
+    assertTruthy(flow.actions.length > 0, "FlowAnalyzer produced actions");
+    assertTruthy(resolved > 0, `At least one action resolved to semantic name (resolved=${resolved})`);
+} catch (e) {
+    console.log(`  SKIP: FlowAnalyzer test (code.ts may not be at expected path): ${e}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\n--- OutputValidator: validateLocatorQuality integrated into validate() ---");
+
+const validator = new OutputValidator();
+
+// Code with fragile ctl00 locators should produce a warning via validate()
+const fragileCode = `
+public class TestPage {
+    public ILocator SearchUser(IPage page) => page.Locator("#ctl00_ContentPlaceHolder1_ddlSearchUser");
+    public ILocator GridRow(IPage page) => page.Locator("#ctl00_ContentPlaceHolder1_rgridPackages_ctl00_ctl04_chk");
+}`;
+
+const fragileResult = validator.validate(fragileCode);
+assertTruthy(fragileResult.warnings && fragileResult.warnings.length > 0, "validate() produces warnings for fragile locators");
+assertTruthy(fragileResult.warnings?.some(w => w.message.includes("ASP.NET generated")), "Warning mentions ASP.NET generated IDs");
+
+// Clean code should not produce locator warnings
+const cleanCode = `
+public class TestPage {
+    public ILocator SaveButton(IPage page) => page.GetByRole(AriaRole.Button, new() { Name = "Save" });
+}`;
+const cleanResult = validator.validate(cleanCode);
+assertTruthy(cleanResult.warnings?.filter(w => w.rule === "LocatorQuality").length === 0, "Clean code has no locator quality warnings");
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("");

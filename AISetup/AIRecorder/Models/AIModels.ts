@@ -19,7 +19,16 @@ export interface FlowAction {
 
     type: ActionType;
 
+    /** Human-readable display name extracted from the locator (e.g. "Search Queue") */
     locator?: string;
+
+    /**
+     * V2.1: Full canonical locator expression as it appears in code.ts.
+     * Used as the matching key against LiveObservations.
+     * For getBy* calls: the full expression, e.g. "getByRole('button', { name: 'Search Queue' })"
+     * For CSS/XPath: same as locator.
+     */
+    canonicalLocator?: string;
 
     value?: string;
 
