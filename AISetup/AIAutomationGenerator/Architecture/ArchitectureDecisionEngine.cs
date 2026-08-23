@@ -116,6 +116,12 @@ public class ArchitectureDecisionEngine : IArchitectureDecisionEngine
         if (methods.Count == 0)
             return (string.Empty, string.Empty, string.Empty, 0);
 
+        // Extract the 'name:' option from the raw line (e.g. getByRole('button', { name: 'Search Queue' }))
+        // RecordingParser.LocatorArgument captures the ROLE TYPE ('button'), not the name option.
+        // We need the name value for matching method names like "ClickSearchQueueAsync".
+        string roleNameRaw = ExtractGetByRoleName(action.Target ?? string.Empty);
+        string roleNameNoSpaces = roleNameRaw.Replace(" ", "");
+
         double bestScore = 0;
         MethodModel? best = null;
 
@@ -123,10 +129,24 @@ public class ArchitectureDecisionEngine : IArchitectureDecisionEngine
         {
             double score = 0;
 
+            // Signal 1: ActionType match (e.g. "Click" → "ClickSearchQueueAsync")
             if (Contains(method.Name, action.ActionType))         score += 0.30;
+
+            // Signal 2: getByRole name option (space-stripped) in method name
+            // e.g. "SearchQueue" found in "ClickSearchQueueAsync" → strong match
+            if (!string.IsNullOrWhiteSpace(roleNameNoSpaces) &&
+                Contains(method.Name, roleNameNoSpaces))          score += 0.40;
+
+            // Signal 3: Original LocatorArgument in method name (preserved weight)
             if (Contains(method.Name, action.LocatorArgument))    score += 0.35;
+
+            // Signal 4: LocatorValue in method name
             if (Contains(method.Name, action.LocatorValue))       score += 0.25;
+
+            // Signal 5: Page name match on class name
             if (Contains(method.ClassName, action.PageName))      score += 0.20;
+
+            // Signal 6: Business category
             if (Contains(method.BusinessCategory, action.ActionType)) score += 0.15;
 
             // Cap at 1.0
@@ -141,6 +161,20 @@ public class ArchitectureDecisionEngine : IArchitectureDecisionEngine
 
         if (best == null) return (string.Empty, string.Empty, string.Empty, 0);
         return (best.Name, best.ClassName, best.FilePath, bestScore);
+    }
+
+    /// <summary>
+    /// Extracts the 'name:' option value from a getByRole expression in the raw line.
+    /// e.g. "getByRole('button', { name: 'Search Queue' })" → "Search Queue"
+    /// </summary>
+    private static string ExtractGetByRoleName(string rawLine)
+    {
+        if (string.IsNullOrWhiteSpace(rawLine)) return string.Empty;
+        var match = System.Text.RegularExpressions.Regex.Match(
+            rawLine,
+            @"name\s*:\s*['""]([^'""]+)['""]",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups[1].Value.Trim() : string.Empty;
     }
 
     private static (string name, double confidence)

@@ -32,6 +32,8 @@ public class ImplementationPlanner : IImplementationPlanner
 
         // Deduplicate decisions (same component referenced multiple times)
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Track CREATE file paths to prevent duplicate CREATE for the same target file
+        var createFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var decision in decisions)
         {
@@ -84,6 +86,10 @@ public class ImplementationPlanner : IImplementationPlanner
 
                     string fileName  = BuildFileName(decision.TargetComponent, layerMapping);
                     string fullPath  = Path.Combine(frameworkRoot, layerMapping.FolderPath, fileName);
+
+                    // Skip if we already have a CREATE planned for this exact file
+                    if (!createFiles.Add(fullPath))
+                        break;
 
                     plan.Changes.Add(new ImplementationChange
                     {
