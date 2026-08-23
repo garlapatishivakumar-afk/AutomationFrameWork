@@ -43,18 +43,19 @@ Given user logs in
 """;
 
         string pageCode = """
+using Microsoft.Playwright;
 using Reqnroll;
 
 namespace Sample;
 
 public class LoginPage
 {
-    public string LoginButton => "#login";
+    public ILocator LoginButton(IPage page) => page.Locator("#login");
 
     [Given("user logs in")]
-    public void UserLogsIn()
+    public void UserLogsIn(IPage page)
     {
-        LoginButton.ToString();
+        LoginButton(page).ClickAsync();
     }
 }
 """;

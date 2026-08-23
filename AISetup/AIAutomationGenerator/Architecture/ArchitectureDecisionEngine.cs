@@ -37,26 +37,31 @@ public class ArchitectureDecisionEngine : IArchitectureDecisionEngine
         {
             foreach (var action in flow.Actions)
             {
-                // ── Layer 1: PageActions (existing — unchanged) ──────────────
-                decisions.Add(EvaluateAction(action, knowledge, metadata));
+                // L1 (V3.2): Infer a meaningful page context when RecordingParser produced
+                // only the generic Codegen variable name (e.g. "page").
+                // A resolved copy is used locally — the original flow action is not mutated.
+                var resolvedAction = InferPageContext(action, metadata);
 
-                // ── Layer 2: PageElements — V3.1 ────────────────────────────
+                // ── Layer 1: PageActions ─────────────────────────────────────
+                decisions.Add(EvaluateAction(resolvedAction, knowledge, metadata));
+
+                // ── Layer 2: PageElements ────────────────────────────────────
                 // Only when the action has a locator signal and locator data exists.
-                bool hasLocatorSignal = !string.IsNullOrWhiteSpace(action.LocatorType)
-                    || !string.IsNullOrWhiteSpace(action.LocatorArgument)
-                    || !string.IsNullOrWhiteSpace(action.LocatorValue);
+                bool hasLocatorSignal = !string.IsNullOrWhiteSpace(resolvedAction.LocatorType)
+                    || !string.IsNullOrWhiteSpace(resolvedAction.LocatorArgument)
+                    || !string.IsNullOrWhiteSpace(resolvedAction.LocatorValue);
                 if (metadata.Locators.Count > 0 && hasLocatorSignal)
                 {
-                    var locatorDecision = EvaluateLocatorLayer(action, metadata);
+                    var locatorDecision = EvaluateLocatorLayer(resolvedAction, metadata);
                     if (locatorDecision != null)
                         decisions.Add(locatorDecision);
                 }
 
-                // ── Layer 3: StepDefinitions — V3.1 ─────────────────────────
+                // ── Layer 3: StepDefinitions ─────────────────────────────────
                 // Only when step definition data exists in the repository.
                 if (metadata.Steps.Count > 0)
                 {
-                    var stepDecision = EvaluateStepLayer(action, metadata);
+                    var stepDecision = EvaluateStepLayer(resolvedAction, metadata);
                     if (stepDecision != null)
                         decisions.Add(stepDecision);
                 }
@@ -71,8 +76,15 @@ public class ArchitectureDecisionEngine : IArchitectureDecisionEngine
         RepositoryKnowledge knowledge,
         RepositoryMetadata metadata)
     {
-        // 1. Search for exact/high-confidence method match
-        var methodMatch = FindBestMethodMatch(action, metadata.Methods);
+        // L3 (V3.2): restrict PageActions matching to genuine PageActions methods.
+        // StepDefinitions methods (identifiable by file path containing step-definition
+        // markers, or by the [Given]/[When]/[Then] tag pattern) must not be PageActions candidates.
+        var pageActionMethods = metadata.Methods
+            .Where(IsPageActionsMethod)
+            .ToList();
+
+        // 1. Search for exact/high-confidence method match (PageActions only)
+        var methodMatch = FindBestMethodMatch(action, pageActionMethods);
         if (methodMatch.confidence >= reuseThreshold)
         {
             return new ReuseDecision
@@ -131,6 +143,169 @@ public class ArchitectureDecisionEngine : IArchitectureDecisionEngine
     // ──────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ──────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// V3.2 — L3: Returns true when a method belongs to the PageActions layer.
+    /// Excludes methods from StepDefinitions files (identified by folder name,
+    /// namespace, or Reqnroll binding attribute tags — no hardcoded class names).
+    /// </summary>
+    private static bool IsPageActionsMethod(MethodModel method)
+    {
+        // Exclude methods whose file resides in a StepDefinitions folder
+        if (!string.IsNullOrWhiteSpace(method.FilePath))
+        {
+            string path = method.FilePath.Replace('\\', '/');
+            if (path.Contains("/StepDefinitions/",  StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("/Steps/",             StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        // Exclude methods in a StepDefinitions namespace
+        if (!string.IsNullOrWhiteSpace(method.Namespace) &&
+            method.Namespace.Contains("StepDefinition", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Exclude methods tagged with Reqnroll/SpecFlow step binding attributes
+        if (method.Tags.Any(t =>
+            t.Equals("Given",    StringComparison.OrdinalIgnoreCase) ||
+            t.Equals("When",     StringComparison.OrdinalIgnoreCase) ||
+            t.Equals("Then",     StringComparison.OrdinalIgnoreCase) ||
+            t.Equals("And",      StringComparison.OrdinalIgnoreCase) ||
+            t.Equals("But",      StringComparison.OrdinalIgnoreCase) ||
+            t.Equals("Binding",  StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// V3.2 — L1: Infers a meaningful page context for a recorded action that
+    /// only carries the Playwright Codegen default variable name ("page").
+    ///
+    /// Strategy (in priority order):
+    ///   1. If PageName is already meaningful (contains uppercase letters), return as-is.
+    ///   2. Match the action's locator signals against scanned PageElements locators.
+    ///      Derive the page name from the owning PageElements class (e.g. "ViewDashboardObjects"
+    ///      → "ViewDashboard").
+    ///   3. Match the action's role name / locator argument against scanned step definitions
+    ///      to derive the page file they belong to (e.g. "ViewDashboardSteps" → "ViewDashboard").
+    ///   4. If nothing can be inferred safely, return the action unchanged.
+    ///
+    /// A shallow copy is returned so the original action is never mutated.
+    /// </summary>
+    private static RecordingActionModel InferPageContext(
+        RecordingActionModel action,
+        RepositoryMetadata metadata)
+    {
+        // Already has meaningful PageName (has uppercase → not "page" / "page2" etc.)
+        if (!string.IsNullOrWhiteSpace(action.PageName) &&
+            action.PageName.Any(char.IsUpper))
+            return action;
+
+        string roleNameRaw      = ExtractGetByRoleName(action.Target ?? string.Empty);
+        string roleNameNoSpaces = roleNameRaw.Replace(" ", "");
+
+        // ── Strategy A: match via PageElements locators ─────────────────────
+        if (metadata.Locators.Count > 0)
+        {
+            LocatorModel? matched = null;
+            double bestScore = 0;
+
+            foreach (var loc in metadata.Locators)
+            {
+                double score = 0;
+
+                if (!string.IsNullOrWhiteSpace(roleNameNoSpaces) && Contains(loc.Name, roleNameNoSpaces))
+                    score += 0.70;
+                if (!string.IsNullOrWhiteSpace(action.LocatorValue) &&
+                    !string.IsNullOrWhiteSpace(loc.Selector) &&
+                    string.Equals(loc.Selector.Trim(), action.LocatorValue.Trim(), StringComparison.OrdinalIgnoreCase))
+                    score += 0.80;
+                if (Contains(loc.Name, action.LocatorArgument))
+                    score += 0.20;
+
+                score = Math.Min(score, 1.0);
+                if (score > bestScore) { bestScore = score; matched = loc; }
+            }
+
+            // Require a confident match (≥ 0.60) before inferring page context
+            if (bestScore >= 0.60 && matched != null && !string.IsNullOrWhiteSpace(matched.PageName))
+            {
+                // Strip common suffixes to get the canonical page name
+                // e.g. "ViewDashboardObjects" → "ViewDashboard"
+                string page = StripPageElementsSuffix(matched.PageName);
+                if (!string.IsNullOrWhiteSpace(page) && page.Any(char.IsUpper))
+                    return ShallowCopyWithPageName(action, page);
+            }
+        }
+
+        // ── Strategy B: match via StepDefinitions file names ────────────────
+        if (metadata.Steps.Count > 0 && !string.IsNullOrWhiteSpace(roleNameNoSpaces))
+        {
+            var matchedStep = metadata.Steps.FirstOrDefault(s =>
+                Contains(s.MethodName, roleNameNoSpaces) ||
+                Contains(s.StepText,   roleNameRaw));
+
+            if (matchedStep != null && !string.IsNullOrWhiteSpace(matchedStep.FilePath))
+            {
+                string page = StripStepDefinitionsSuffix(Path.GetFileNameWithoutExtension(matchedStep.FilePath));
+                if (!string.IsNullOrWhiteSpace(page) && page.Any(char.IsUpper))
+                    return ShallowCopyWithPageName(action, page);
+            }
+        }
+
+        // Cannot infer safely — return original
+        return action;
+    }
+
+    /// Creates a shallow copy of the action with a new PageName value.
+    private static RecordingActionModel ShallowCopyWithPageName(RecordingActionModel src, string pageName) =>
+        new RecordingActionModel
+        {
+            ActionType       = src.ActionType,
+            Target           = src.Target,
+            Sequence         = src.Sequence,
+            LocatorType      = src.LocatorType,
+            LocatorValue     = src.LocatorValue,
+            InputValue       = src.InputValue,
+            Assertion        = src.Assertion,
+            RawCode          = src.RawCode,
+            PageName         = pageName,
+            WindowName       = src.WindowName,
+            Url              = src.Url,
+            FrameName        = src.FrameName,
+            VariableName     = src.VariableName,
+            ContextType      = src.ContextType,
+            LocatorChain     = src.LocatorChain,
+            LocatorExpression = src.LocatorExpression,
+            LocatorArgument  = src.LocatorArgument,
+            IsPopupAction    = src.IsPopupAction,
+            IsFrameAction    = src.IsFrameAction
+        };
+
+    /// Removes common PageElements class suffixes to yield a canonical page name.
+    private static string StripPageElementsSuffix(string className)
+    {
+        foreach (var suffix in new[] { "Objects", "Elements", "Locators", "Page" })
+        {
+            if (className.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) &&
+                className.Length > suffix.Length)
+                return className[..^suffix.Length];
+        }
+        return className;
+    }
+
+    /// Removes common StepDefinitions class suffixes to yield a canonical page name.
+    private static string StripStepDefinitionsSuffix(string className)
+    {
+        foreach (var suffix in new[] { "Steps", "StepDefinitions", "Bindings" })
+        {
+            if (className.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) &&
+                className.Length > suffix.Length)
+                return className[..^suffix.Length];
+        }
+        return className;
+    }
 
     private static (string name, string className, string filePath, double confidence)
         FindBestMethodMatch(RecordingActionModel action, List<MethodModel> methods)
