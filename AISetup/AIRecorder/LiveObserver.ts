@@ -21,17 +21,6 @@ const namingEngine   = new LocatorNamingEngine();
 const stabilityRanker = new LocatorStabilityRanker();
 const tableDetector  = new TableDetector();
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Regex patterns to extract locator strings from a code.ts line
-// ─────────────────────────────────────────────────────────────────────────────
-const LOCATOR_EXTRACTION_PATTERNS = [
-    /locator\(\s*['"`]([^'"`]+)['"`]/i,
-    /getByRole\(\s*['"`]\w+['"`][^)]*\)/i,
-    /getByLabel\(\s*['"`]([^'"`]+)['"`]/i,
-    /getByText\(\s*['"`]([^'"`]+)['"`]/i,
-    /getByPlaceholder\(\s*['"`]([^'"`]+)['"`]/i
-];
-
 function extractLocator(line: string): string | null {
     // Full getBy* calls — return the whole match as the locator descriptor
     const getByMatch = line.match(/getBy(?:Role|Label|Text|Placeholder|TestId)\([^)]+\)/i);

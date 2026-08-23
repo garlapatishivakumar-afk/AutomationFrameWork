@@ -5,7 +5,6 @@
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
-import { buildObservations } from "../LiveObserver";
 import { buildBusinessFlow } from "../BusinessFlowBuilder";
 import { analyzeFlow } from "../FlowAnalyzer";
 import { OutputValidator } from "../Validation/OutputValidator";
@@ -145,7 +144,8 @@ export class GenerationReportBuilder {
 export function buildPipelineReport(projectRoot: string = process.cwd()): string {
     const builder = new GenerationReportBuilder();
 
-    // 1. Load semantic controls from LiveObservations
+    // 1. Load semantic controls from persisted LiveObservations.json
+    // (written by LiveObserver / StartCodegen.ps1 — no need to re-run static analysis)
     builder.loadSemanticControlsFromObservations(projectRoot);
 
     // 2. Build business flow (uses canonicalLocator resolution)
