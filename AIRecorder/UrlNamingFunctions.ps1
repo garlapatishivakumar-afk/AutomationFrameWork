@@ -6,11 +6,15 @@ function Get-AppNameFromUrl {
 	param([Parameter(Mandatory = $true)][string]$Url)
 
 	try {
-		$hostname = ([System.Uri]$Url).Host.ToLowerInvariant()
+		$uri = [System.Uri]$Url
+		$domainName = $uri.GetComponents(
+			[System.UriComponents]::Host,
+			[System.UriFormat]::SafeUnescaped
+		).ToLowerInvariant()
 
-		if ($hostname -like 'cashmanagement*')          { return 'CashManagement' }
-		if ($hostname -like 'investorreporting*')       { return 'InvestorReporting' }
-		if ($hostname -like 'documentadministration*')  { return 'DocumentAdministration' }
+		if ($domainName -like 'cashmanagement*')          { return 'CashManagement' }
+		if ($domainName -like 'investorreporting*')       { return 'InvestorReporting' }
+		if ($domainName -like 'documentadministration*')  { return 'DocumentAdministration' }
 
 		# login.microsoftonline.com and all unknown hosts -> no mapping
 		return $null
