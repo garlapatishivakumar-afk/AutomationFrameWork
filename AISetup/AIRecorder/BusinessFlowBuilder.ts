@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import { FlowAction, FlowAnalysis } from "./Models/AIModels";
 
 export type BusinessStep = {
@@ -10,9 +11,34 @@ export type BusinessStep = {
     businessAction:string;
 
     line:number;
+
+    // V2.1 Enhancement #5: semantic label when available from LiveObservations
+    semanticLabel?: string;
 };
 
-function convertAction(action: FlowAction): string {
+// V2.1 Enhancement #5: load resolved names from LiveObservations.json if available
+function loadResolvedNames(projectRoot: string = process.cwd()): Map<string, string> {
+    const obsPath = path.join(projectRoot, "AIRecorder", "LiveObservations.json");
+    const names = new Map<string, string>();
+    try {
+        if (!fs.existsSync(obsPath)) return names;
+        const obs = JSON.parse(fs.readFileSync(obsPath, "utf8"));
+        for (const o of (obs.observations ?? [])) {
+            if (o.locator && o.resolvedName) {
+                names.set(o.locator, o.resolvedName);
+            }
+        }
+    } catch {
+        // observations not available — degrade gracefully
+    }
+    return names;
+}
+
+function convertAction(action: FlowAction, resolvedNames: Map<string, string>): string {
+
+    // V2.1: prefer semantic name when available
+    const semantic = action.locator ? resolvedNames.get(action.locator) : undefined;
+    const displayName = semantic ?? action.locator;
 
     switch(action.type){
 
@@ -20,13 +46,13 @@ function convertAction(action: FlowAction): string {
             return "Open Application";
 
         case "Textbox":
-            return `Enter ${action.locator ?? "Value"}`;
+            return `Enter ${displayName ?? "Value"}`;
 
         case "Dropdown":
-            return `Select ${action.locator ?? "Option"}`;
+            return `Select ${displayName ?? "Option"}`;
 
         case "Click":
-            return `Click ${action.locator ?? "Button"}`;
+            return `Click ${displayName ?? "Button"}`;
 
         case "Popup":
             return "Handle Popup";
@@ -44,7 +70,7 @@ function convertAction(action: FlowAction): string {
             return "Validate Page";
 
         case "CaptureText":
-            return `Capture ${action.locator ?? "Text"}`;
+            return `Capture ${displayName ?? "Text"}`;
 
         default:
             return action.type;
@@ -53,20 +79,24 @@ function convertAction(action: FlowAction): string {
 }
 
 export function buildBusinessFlow(
-    analysis:FlowAnalysis
+    analysis:FlowAnalysis,
+    projectRoot: string = process.cwd()
 ):BusinessStep[]{
 
-    return analysis.actions.map((a,index)=>({
+    const resolvedNames = loadResolvedNames(projectRoot);
 
-        step:index+1,
+    return analysis.actions.map((a,index) => {
 
-        type:a.type,
+        const semantic = a.locator ? resolvedNames.get(a.locator) : undefined;
 
-        businessAction:convertAction(a),
-
-        line:a.line
-
-    }));
+        return {
+            step: index + 1,
+            type: a.type,
+            businessAction: convertAction(a, resolvedNames),
+            line: a.line,
+            semanticLabel: semantic
+        };
+    });
 
 }
 

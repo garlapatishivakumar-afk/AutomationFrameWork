@@ -128,4 +128,13 @@ foreach ($prop in @($config.Urls.Applications.PSObject.Properties)) {
 
 $config | ConvertTo-Json -Depth 20 | Set-Content -Path $appSettingsPath -Encoding UTF8
 
+# V2.1 Enhancement #2: run static DOM analysis to populate LiveObservations.json
+$liveObserverPath = Join-Path $projectRoot "AISetup\AIRecorder\LiveObserver.ts"
+if (Test-Path $liveObserverPath) {
+	Write-Host "Running LiveObserver (static DOM analysis)..."
+	npx ts-node $liveObserverPath
+} else {
+	Write-Host "LiveObserver not found at $liveObserverPath — skipping DOM analysis."
+}
+
 Write-Host "Codegen Closed"

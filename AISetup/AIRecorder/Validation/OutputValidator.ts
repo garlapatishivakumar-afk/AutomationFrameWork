@@ -222,4 +222,47 @@ export class OutputValidator {
 
     }
 
+    // V2.1 Enhancement #8: locator quality validation
+    // Validates that generated C# code does not use hardcoded raw technical locators
+    // when better semantic names should be used.
+    public validateLocatorQuality(code: string): { warnings: string[]; errors: string[] } {
+
+        const warnings: string[] = [];
+        const errors: string[] = [];
+
+        // Warn: raw ASP.NET generated IDs directly in Playwright locator calls
+        const rawCtlPattern = /Locator\(\s*["']#ctl\d{2,}/gi;
+        const rawCtlMatches = code.match(rawCtlPattern);
+        if (rawCtlMatches && rawCtlMatches.length > 0) {
+            warnings.push(
+                `${rawCtlMatches.length} locator(s) use raw ASP.NET generated IDs (ctl00...). ` +
+                `Consider using semantic names from LiveObservations.`
+            );
+        }
+
+        // Warn: hardcoded numeric table row indexes
+        const fragileRowPattern = /ctl\d{2,}_ctl\d{2,}/gi;
+        const fragileMatches = code.match(fragileRowPattern);
+        if (fragileMatches && fragileMatches.length > 0) {
+            warnings.push(
+                `${fragileMatches.length} locator(s) contain fragile double-indexed table row selectors. ` +
+                `Use a stable business-key row strategy instead.`
+            );
+        }
+
+        // Error: duplicate locator variable names
+        const locatorNamePattern = /ILocator\s+(\w+)\s*\(/g;
+        const locatorNames = new Set<string>();
+        let locMatch: RegExpExecArray | null;
+        while ((locMatch = locatorNamePattern.exec(code)) !== null) {
+            const name = locMatch[1].toLowerCase();
+            if (locatorNames.has(name)) {
+                errors.push(`Duplicate locator definition: ${locMatch[1]}.`);
+            }
+            locatorNames.add(name);
+        }
+
+        return { warnings, errors };
+    }
+
 }
