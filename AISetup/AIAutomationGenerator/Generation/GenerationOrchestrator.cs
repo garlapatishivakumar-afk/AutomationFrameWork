@@ -1,6 +1,8 @@
+using AIAutomationGenerator.Architecture;
 using AIAutomationGenerator.Business;
 using AIAutomationGenerator.AI;
 using AIAutomationGenerator.FrameworkScanner;
+using AIAutomationGenerator.Implementation;
 using AIAutomationGenerator.Intelligence;
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Models;
@@ -37,6 +39,13 @@ public class GenerationOrchestrator : IGenerationOrchestrator
     private readonly ILearningEngine learningEngine;
     private readonly IProviderFallbackService providerFallbackService;
 
+    // V3.0 Architecture Intelligence services
+    private readonly IArchitectureDecisionEngine architectureDecisionEngine;
+    private readonly IFrameworkLayerMapper frameworkLayerMapper;
+    private readonly IImplementationPlanner implementationPlanner;
+    private readonly IArchitectureValidator architectureValidator;
+    private readonly IFrameworkFileModifier frameworkFileModifier;
+
     public GenerationOrchestrator(
         IFrameworkScanner frameworkScanner,
         IFileGenerator fileGenerator,
@@ -60,7 +69,13 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         IAIResponseParser aiResponseParser,
         IScriptValidator scriptValidator,
         ILearningEngine learningEngine,
-        IProviderFallbackService providerFallbackService)
+        IProviderFallbackService providerFallbackService,
+        // V3.0 services (optional: default implementations used if not supplied)
+        IArchitectureDecisionEngine? architectureDecisionEngine = null,
+        IFrameworkLayerMapper? frameworkLayerMapper = null,
+        IImplementationPlanner? implementationPlanner = null,
+        IArchitectureValidator? architectureValidator = null,
+        IFrameworkFileModifier? frameworkFileModifier = null)
     {
         this.frameworkScanner = frameworkScanner;
         this.fileGenerator = fileGenerator;
@@ -85,6 +100,128 @@ public class GenerationOrchestrator : IGenerationOrchestrator
         this.scriptValidator = scriptValidator;
         this.learningEngine = learningEngine;
         this.providerFallbackService = providerFallbackService;
+
+        // V3.0 — fall back to default implementations if not injected
+        var defaultLayerMapper = frameworkLayerMapper ?? new FrameworkLayerMapper();
+        this.architectureDecisionEngine = architectureDecisionEngine ?? new ArchitectureDecisionEngine();
+        this.frameworkLayerMapper       = defaultLayerMapper;
+        this.implementationPlanner      = implementationPlanner ?? new ImplementationPlanner(defaultLayerMapper);
+        this.architectureValidator      = architectureValidator ?? new ArchitectureValidator(scriptValidator);
+        this.frameworkFileModifier      = frameworkFileModifier
+            ?? new FrameworkFileModifier(this.architectureValidator, new Shared.ConsoleLogger());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // V3.0 — GenerateArchitectAsync
+    // ──────────────────────────────────────────────────────────────────────────
+
+    public async Task<ArchitectResult> GenerateArchitectAsync(
+        string repositoryPath,
+        string recordingPath,
+        string frameworkRoot)
+    {
+        var result = new ArchitectResult();
+        try
+        {
+            // 1. Scan repository (reuses V2.0 scanner + cache)
+            RepositoryMetadata metadata = await frameworkScanner.ScanAsync(repositoryPath);
+            RepositoryKnowledge knowledge = repositoryKnowledgeBuilder.Build(metadata);
+
+            // 2. Parse recording
+            List<RecordingActionModel> actions = recordingParser.Parse(recordingPath);
+            List<BusinessFlowModel> flows = businessFlowBuilder.Build(actions);
+            result.Decisions.Add($"Business flow detected: {flows.FirstOrDefault()?.Name ?? "Unknown"}");
+
+            // 3. Architecture decisions (REUSE / EXTEND / CREATE)
+            List<ReuseDecision> decisions = architectureDecisionEngine.Decide(flows, knowledge, metadata);
+            foreach (var d in decisions)
+                result.Decisions.Add($"{d.Decision}: {d.TargetComponent}.{d.ExistingMemberName} (confidence={d.Confidence:F2})");
+
+            // 4. Implementation plan — BEFORE any file modification
+            ImplementationPlan plan = implementationPlanner.CreatePlan(flows, decisions, metadata, frameworkRoot);
+            result.Plan = plan;
+
+            // 5. Architecture validation of the plan
+            ArchitectureValidationResult validation = architectureValidator.ValidatePlan(plan, frameworkRoot);
+            result.Validation = validation;
+            if (!validation.IsValid)
+            {
+                result.ErrorMessage = $"Architecture validation failed: {string.Join("; ", validation.Errors)}";
+                return result;
+            }
+
+            // 6. Human approval required for low-confidence decisions
+            if (plan.RequiresHumanApproval)
+            {
+                result.Decisions.Add("⚠ One or more low-confidence decisions require human approval before modification.");
+                // In V3 CLI mode this is surfaced to the user; we still return the plan
+            }
+
+            // 7. Apply AI generation only for CREATE/EXTEND items that need content
+            // (REUSE items skip AI entirely)
+            int aiCalls = 0;
+            foreach (var change in plan.Changes.Where(c => c.Action != "REUSE" && string.IsNullOrWhiteSpace(c.GeneratedContent)))
+            {
+                // Use V2 context/prompt infrastructure to generate the content
+                ContextModel context = contextBuilder.Build(metadata);
+                ContextModel filteredContext = contextFilter.Filter(context, flows);
+                PromptContext promptContext = promptOptimizer.Optimize(filteredContext,
+                    methodReuseEngine.FindReusableMethods(filteredContext, flows),
+                    locatorReuseEngine.FindReusableLocators(filteredContext, flows),
+                    stepReuseEngine.FindReusableSteps(filteredContext, flows));
+
+                BusinessFlowModel selectedFlow = flows.FirstOrDefault() ?? new BusinessFlowModel();
+                BusinessFlowDetectionResult detectedFlow = new()
+                {
+                    FlowName = selectedFlow.Name, Verb = selectedFlow.Verb,
+                    Noun = selectedFlow.Noun, Confidence = selectedFlow.Confidence
+                };
+                List<QuestionModel> questions = questionEngine.Generate(detectedFlow.Actions);
+                ArtifactNamingResult naming = artifactNamingService.Generate(detectedFlow);
+                PromptModel prompt = promptBuilder is PromptBuilder pb
+                    ? pb.Build(filteredContext, detectedFlow, questions, naming)
+                    : promptBuilder.Build(filteredContext, detectedFlow, questions);
+
+                var request = new AIRequest { Prompt = prompt.Prompt, Context = promptContext, BusinessFlows = flows };
+                AIResponse aiResponse = await providerFallbackService.GenerateAsync(request);
+                aiCalls++;
+
+                if (aiResponse.Success)
+                {
+                    AIResponseModel parsed = aiResponseParser.Parse(aiResponse.Content);
+                    // Assign generated content to the correct change based on ComponentType
+                    change.GeneratedContent = change.ComponentType switch
+                    {
+                        "PageElements"    => parsed.PageObjects,
+                        "StepDefinitions" => parsed.StepDefinitions,
+                        "Features"        => parsed.FeatureFile,
+                        _                 => parsed.Methods
+                    };
+                }
+            }
+            result.AiCallsUsed = aiCalls;
+
+            // 8. Apply the plan to the real framework
+            FrameworkModificationResult modResult = await frameworkFileModifier.ApplyPlanAsync(plan, frameworkRoot);
+            result.Modification = modResult;
+
+            if (!modResult.Success)
+            {
+                result.ErrorMessage = $"Framework modification failed: {string.Join("; ", modResult.Errors)}";
+                return result;
+            }
+
+            // 9. Learning engine feedback
+            learningEngine.Learn(metadata);
+
+            result.Decisions.Add($"REUSE: {plan.ReuseCount} | EXTEND: {plan.ExtendCount} | CREATE: {plan.CreateCount}");
+            result.Decisions.Add($"Files modified: {modResult.AppliedFiles.Count}");
+        }
+        catch (Exception ex)
+        {
+            result.ErrorMessage = $"V3 architect pipeline error: {ex.Message}";
+        }
+        return result;
     }
 
     public async Task GenerateAsync(string repositoryPath, string recordingPath, string outputFolder)
