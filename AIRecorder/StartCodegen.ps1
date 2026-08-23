@@ -3,6 +3,9 @@ $StartUrl = "https://documentadministration-uat.trimont.com/"
 $ApplicationKey = "DocAdmin"
 $OutputFile = "Code.ts"
 
+# V2.1 Enhancement #1: load pure URL naming functions
+. "$PSScriptRoot\UrlNamingFunctions.ps1"
+
 function Ensure-UrlsApplicationsNode {
 	param([Parameter(Mandatory = $true)]$Config)
 
@@ -105,6 +108,24 @@ npx playwright codegen $StartUrl -o $outputPath
 $config = Get-Content -Path $appSettingsPath -Raw | ConvertFrom-Json
 Ensure-UrlsApplicationsNode -Config $config
 Add-RecordedUrlsToConfig -Config $config -RecordedCodePath $outputPath
+
+# V2.1 Enhancement #1: single authoritative semantic mapping pass over all RecordedUrlN entries
+# Processes both pre-existing and newly added entries. Idempotent - safe to run repeatedly.
+foreach ($prop in @($config.Urls.Applications.PSObject.Properties)) {
+	if ($prop.Name -match '^RecordedUrl\d+$' -and $prop.Value -is [string] -and
+	    -not [string]::IsNullOrWhiteSpace($prop.Value)) {
+		$appName  = Get-AppNameFromUrl  -Url $prop.Value
+		$pageName = Get-PageNameFromUrl -Url $prop.Value
+		if (-not [string]::IsNullOrWhiteSpace($appName) -and
+		    -not [string]::IsNullOrWhiteSpace($pageName)) {
+			Set-RecordedApplication -Config $config -AppName $appName -PageName $pageName -Url $prop.Value
+		}
+		else {
+			Write-Host "Skipped semantic mapping (app/page undetermined): $($prop.Value)"
+		}
+	}
+}
+
 $config | ConvertTo-Json -Depth 20 | Set-Content -Path $appSettingsPath -Encoding UTF8
 
 Write-Host "Codegen Closed"
