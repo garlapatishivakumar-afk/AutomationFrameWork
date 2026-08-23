@@ -1,8 +1,10 @@
 using AIAutomationGenerator.AI;
+using AIAutomationGenerator.Architecture;
 using AIAutomationGenerator.Business;
 using AIAutomationGenerator.Exporters;
 using AIAutomationGenerator.FrameworkScanner;
 using AIAutomationGenerator.Generation;
+using AIAutomationGenerator.Implementation;
 using AIAutomationGenerator.Intelligence;
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Models;
@@ -133,6 +135,13 @@ public static class DependencyInjection
         services.AddSingleton<IAIProviderFactory, AIProviderFactory>();
         services.AddSingleton<IAIProvider>(sp =>
             sp.GetRequiredService<IAIProviderFactory>().Create());
+
+        // V3.0 Architecture Intelligence services
+        services.AddSingleton<IArchitectureDecisionEngine, ArchitectureDecisionEngine>();
+        services.AddSingleton<IFrameworkLayerMapper, FrameworkLayerMapper>();
+        services.AddSingleton<IImplementationPlanner, ImplementationPlanner>();
+        services.AddSingleton<IArchitectureValidator, ArchitectureValidator>();
+        services.AddSingleton<IFrameworkFileModifier, FrameworkFileModifier>();
 
         return services;
     }
