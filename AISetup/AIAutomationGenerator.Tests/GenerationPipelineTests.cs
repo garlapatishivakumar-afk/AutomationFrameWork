@@ -36,11 +36,11 @@ public class GenerationPipelineTests : IDisposable
 
         await orchestrator.GenerateAsync(repositoryPath, recordingPath, outputPath);
 
-        AssertGeneratedFile("Generated.feature");
-        AssertGeneratedFile("PageObjects.cs");
-        AssertGeneratedFile("Methods.cs");
-        AssertGeneratedFile("StepDefinitions.cs");
-        AssertGeneratedFile("Utilities.cs");
+        AssertGeneratedFile("Login.feature");
+        AssertGeneratedFile("LoginObjects.cs");
+        AssertGeneratedFile("LoginMethods.cs");
+        AssertGeneratedFile("LoginSteps.cs");
+        AssertGeneratedFile("LoginUtilities.cs");
         AssertGeneratedFile("PromptOptimizationReport.md");
 
         string cacheFile = Path.Combine(repositoryPath, "ContextCache.json");
@@ -57,9 +57,16 @@ public class GenerationPipelineTests : IDisposable
 
     private void AssertGeneratedFile(string fileName)
     {
-        string fullPath = Path.Combine(outputPath, fileName);
-        Assert.True(File.Exists(fullPath));
-        Assert.False(string.IsNullOrWhiteSpace(File.ReadAllText(fullPath)));
+        // Search recursively: FileGenerator may place artifacts in sub-folders
+        // depending on GeneratorOutputSettings.AutoDetectFoldersFromMetadata
+        string[] found = Directory.Exists(outputPath)
+            ? Directory.GetFiles(outputPath, fileName, SearchOption.AllDirectories)
+            : Array.Empty<string>();
+
+        Assert.True(found.Length > 0,
+            $"File '{fileName}' not found anywhere under outputPath '{outputPath}'.");
+        Assert.False(string.IsNullOrWhiteSpace(File.ReadAllText(found[0])),
+            $"File '{found[0]}' exists but is empty.");
     }
 
     private static void SeedRepository(string path)
@@ -120,10 +127,7 @@ await page.Locator("#username").FillAsync("user1");
                 Success = true,
                 Content = """
 Feature File:
-using System;
-namespace Generated;
-public class GeneratedFeature { }
-Feature: Generated login flow
+Feature: Generated
 Scenario: Generated scenario
 
 Page Objects:
