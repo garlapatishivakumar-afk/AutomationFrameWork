@@ -1,0 +1,1016 @@
+{
+  "RepositoryRoot": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork",
+  "LastScanTime": "2026-08-24T13:43:04.7270705Z",
+  "RepositorySignature": "-1829234441",
+  "FrameworkStructure": {
+    "PageElementsDirectory": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements",
+    "PageActionsDirectory": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions",
+    "StepDefinitionsDirectory": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions",
+    "FeaturesDirectory": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\Features",
+    "HelpersDirectory": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\Helpers",
+    "UtilitiesDirectory": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\Utilities",
+    "ConfigurationLocations": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\appsettings.json"
+  },
+  "PageElements": [
+    {
+      "Name": "AdministrationLink",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = \u0022Administration\u0022 })",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ReassignPackagesLink",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = \u0022Reassign Packages\u0022 })",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SearchUserDropdown",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Css",
+      "Selector": "page.Locator(\u0022#ctl00_ContentPlaceHolder1_ddlSearchUser\u0022)",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SearchQueueButton",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Button, new() { Name = \u0022Search Queue\u0022 })",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "FirstPackageCheckbox",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Css",
+      "Selector": "page.Locator(\u0022#ctl00_ContentPlaceHolder1_rgridPackages_ctl00_ctl04_ReassignCheckSelectCheckBox\u0022)",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "AssignUserDropdown",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Css",
+      "Selector": "page.Locator(\u0022#ctl00_ContentPlaceHolder1_ddlUsers\u0022)",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "AssignToSelectedUserButton",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Button, new() { Name = \u0022Assign to Selected User\u0022 })",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "DashboardLink",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = \u0022Dashboard\u0022 })",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "PackageSourceDropdown",
+      "ClassName": "ViewDashboardObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs",
+      "LocatorType": "Css",
+      "Selector": "page.Locator(\u0022#ctl00_ContentPlaceHolder1_ddlPackageSource\u0022)",
+      "PageOwnership": "ViewDashboard",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "DealsLink",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = \u0022Deals\u0022, NameRegex = new System.Text.RegularExpressions.Regex(\u0022^Deals$\u0022) })",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "DealsCompletionStatusLink",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = \u0022Deals Completion Status\u0022 })",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "TidInputField",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Css",
+      "Selector": "page.Locator(\u0022input[name=\\\u0022ctl00$cp1$txtTID\\\u0022]\u0022)",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "DealLink",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = dealId })",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "FirstReportCheckbox",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Css",
+      "Selector": "page.Locator(\u0022#ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl05_chAction\u0022)",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SecondReportCheckbox",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Css",
+      "Selector": "page.Locator(\u0022#ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl07_chAction\u0022)",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ViewReportLink",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Css",
+      "Selector": "page.Locator(\u0022#ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl05_lnkView\u0022)",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "CompleteLink",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = \u0022complete\u0022, NameRegex = new System.Text.RegularExpressions.Regex(\u0022^complete$\u0022) })",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "CloseScreenButton",
+      "ClassName": "ViewDealObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Button, new() { Name = \u0022close screen\u0022 })",
+      "PageOwnership": "ViewDeal",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "RunAsUserButton",
+      "ClassName": "ViewLoanReconciliationObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewLoanReconciliationObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Button, new() { Name = \u0022Run As User\u0022 })",
+      "PageOwnership": "ViewLoanReconciliation",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "LoanMgmtLink",
+      "ClassName": "ViewLoanReconciliationObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewLoanReconciliationObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = \u0022Loan Mgmt.\u0022 })",
+      "PageOwnership": "ViewLoanReconciliation",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "CashMgmtAccountTextbox",
+      "ClassName": "ViewLoanReconciliationObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewLoanReconciliationObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Textbox, new() { Name = \u0022Cash Mgmt. Acct.:\u0022 })",
+      "PageOwnership": "ViewLoanReconciliation",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SearchButton",
+      "ClassName": "ViewLoanReconciliationObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewLoanReconciliationObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Button, new() { Name = \u0022Search [Alt-S]\u0022 })",
+      "PageOwnership": "ViewLoanReconciliation",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ViewReconLink",
+      "ClassName": "ViewLoanReconciliationObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewLoanReconciliationObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Link, new() { Name = \u0022View Recon\u0022 })",
+      "PageOwnership": "ViewLoanReconciliation",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "GetReconButton",
+      "ClassName": "ViewLoanReconciliationObjects",
+      "Namespace": "AutomationFrameWork.PageElements",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewLoanReconciliationObjects.cs",
+      "LocatorType": "Role",
+      "Selector": "page.GetByRole(AriaRole.Button, new() { Name = \u0022Get Recon\u0022 })",
+      "PageOwnership": "ViewLoanReconciliation",
+      "IsMethod": true,
+      "ConfidenceScore": 0
+    }
+  ],
+  "PageActions": [
+    {
+      "Name": "Login",
+      "ClassName": "LoginMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\LoginMethods.cs",
+      "Parameters": "",
+      "IsAsync": false,
+      "PageOwnership": "Login",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "NavigateToDocumentAdministrationAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickAdministrationLinkAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickReassignPackagesLinkAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SelectSearchUserAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "userCode",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickSearchQueueAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SelectFirstPackageAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SelectAssignUserAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "userCode",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickAssignToSelectedUserAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickDashboardLinkAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "NavigateToDefaultDashboardAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SelectPackageSourceAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "packageSource",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "WaitForExpectedUrlAfterPotentialLoginAsync",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "expectedUrlPattern",
+      "IsAsync": true,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "GetRequiredAppSetting",
+      "ClassName": "ViewDashboardMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs",
+      "Parameters": "key",
+      "IsAsync": false,
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "NavigateToDealsPageAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickDealsCompletionStatusAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "EnterDealTidAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "dealTid",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "PressEnterToSearchAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickDealAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "dealId",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "CheckReportActionCheckboxesAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickViewReportLinkAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "VerifyDealReportIsDisplayedAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickCompleteActionAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "CloseScreenAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "WaitForPageLoadAsync",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "expectedUrlPattern",
+      "IsAsync": true,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "BuildAppUrl",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "relativePath",
+      "IsAsync": false,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "GetRequiredAppSetting",
+      "ClassName": "ViewDealMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs",
+      "Parameters": "key",
+      "IsAsync": false,
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "NavigateToWhoIamAsync",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "SelectEmployeeCodeAsync",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "employeeCode",
+      "IsAsync": true,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "RunAsUserAsync",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "NavigateToWorkQueueAsync",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "OpenLoanMgmtAndSearchAccountAsync",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "accountNumber",
+      "IsAsync": true,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "OpenViewReconPopupAsync",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "",
+      "IsAsync": true,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "ClickGetReconAsync",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "popupPage",
+      "IsAsync": true,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "WaitForExpectedPageAfterPotentialLoginAsync",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "expectedUrlPattern",
+      "IsAsync": true,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "BuildAppUrl",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "relativePath",
+      "IsAsync": false,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    },
+    {
+      "Name": "GetRequiredAppSetting",
+      "ClassName": "ViewLoanReconciliationMethods",
+      "Namespace": "",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs",
+      "Parameters": "key",
+      "IsAsync": false,
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0
+    }
+  ],
+  "StepDefinitions": [
+    {
+      "StepText": "user logs in",
+      "MethodName": "UserLogsIn",
+      "ClassName": "LoginSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\LoginSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "Login",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user navigates to document administration page",
+      "MethodName": "GivenUserNavigatesToDocumentAdministrationPage",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks on Administration link",
+      "MethodName": "WhenUserClicksOnAdministrationLink",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks on Reassign Packages link",
+      "MethodName": "WhenUserClicksOnReassignPackagesLink",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user selects search user {string}",
+      "MethodName": "WhenUserSelectsSearchUser",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks Search Queue button",
+      "MethodName": "WhenUserClicksSearchQueueButton",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user selects first package from queue",
+      "MethodName": "WhenUserSelectsFirstPackageFromQueue",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user selects assign user {string}",
+      "MethodName": "WhenUserSelectsAssignUser",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks Assign to Selected User button",
+      "MethodName": "WhenUserClicksAssignToSelectedUserButton",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks Dashboard link",
+      "MethodName": "WhenUserClicksDashboardLink",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user navigates to default dashboard page",
+      "MethodName": "WhenUserNavigatesToDefaultDashboardPage",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user selects package source {string}",
+      "MethodName": "WhenUserSelectsPackageSource",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user re-navigates to default dashboard page",
+      "MethodName": "ThenUserReNavigatesToDefaultDashboardPage",
+      "ClassName": "ViewDashboardSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDashboard",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user navigates to deals page",
+      "MethodName": "GivenUserNavigatesToDealsPage",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks on Deals Completion Status",
+      "MethodName": "WhenUserClicksOnDealsCompletionStatus",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user enters deal TID {string}",
+      "MethodName": "WhenUserEntersDealTid",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user presses Enter to search",
+      "MethodName": "WhenUserPressesEnterToSearch",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks on deal {string}",
+      "MethodName": "WhenUserClicksOnDeal",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user checks report action checkboxes",
+      "MethodName": "WhenUserChecksReportActionCheckboxes",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks view report link",
+      "MethodName": "WhenUserClicksViewReportLink",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user verifies deal report is displayed",
+      "MethodName": "ThenUserVerifiesDealReportIsDisplayed",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user clicks complete action",
+      "MethodName": "ThenUserClicksCompleteAction",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user closes the screen",
+      "MethodName": "ThenUserClosesTheScreen",
+      "ClassName": "ViewDealSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewDeal",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user navigates to WhoIam page",
+      "MethodName": "GivenUserNavigatesToWhoIamPage",
+      "ClassName": "ViewLoanReconciliationSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewLoanReconciliationSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user selects employee code {string}",
+      "MethodName": "WhenUserSelectsEmployeeCode",
+      "ClassName": "ViewLoanReconciliationSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewLoanReconciliationSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user runs as selected user",
+      "MethodName": "WhenUserRunsAsSelectedUser",
+      "ClassName": "ViewLoanReconciliationSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewLoanReconciliationSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user navigates to work queue page",
+      "MethodName": "WhenUserNavigatesToWorkQueuePage",
+      "ClassName": "ViewLoanReconciliationSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewLoanReconciliationSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user opens Loan Mgmt and searches cash management account {string}",
+      "MethodName": "WhenUserOpensLoanMgmtAndSearchesCashManagementAccount",
+      "ClassName": "ViewLoanReconciliationSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewLoanReconciliationSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user opens View Recon popup",
+      "MethodName": "WhenUserOpensViewReconPopup",
+      "ClassName": "ViewLoanReconciliationSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewLoanReconciliationSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0.85
+    },
+    {
+      "StepText": "user gets reconciliation from popup",
+      "MethodName": "ThenUserGetsReconciliationFromPopup",
+      "ClassName": "ViewLoanReconciliationSteps",
+      "Namespace": "AutomationFrameWork.StepDefinitions",
+      "FilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewLoanReconciliationSteps.cs",
+      "StepType": "Unknown",
+      "PageOwnership": "ViewLoanReconciliation",
+      "ConfidenceScore": 0.85
+    }
+  ],
+  "Features": [],
+  "PageRelationships": [
+    {
+      "PageName": "ViewDashboard",
+      "PageElementFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDashboardObjects.cs"
+      ],
+      "PageActionFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDashboardMethods.cs"
+      ],
+      "StepDefinitionFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDashboardSteps.cs"
+      ],
+      "FeatureFiles": [],
+      "Namespace": null,
+      "ConfidenceScore": 0
+    },
+    {
+      "PageName": "ViewDeal",
+      "PageElementFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewDealObjects.cs"
+      ],
+      "PageActionFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewDealMethods.cs"
+      ],
+      "StepDefinitionFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewDealSteps.cs"
+      ],
+      "FeatureFiles": [],
+      "Namespace": null,
+      "ConfidenceScore": 0
+    },
+    {
+      "PageName": "ViewLoanReconciliation",
+      "PageElementFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageElements\\ViewLoanReconciliationObjects.cs"
+      ],
+      "PageActionFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\ViewLoanReconciliationMethods.cs"
+      ],
+      "StepDefinitionFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\ViewLoanReconciliationSteps.cs"
+      ],
+      "FeatureFiles": [],
+      "Namespace": null,
+      "ConfidenceScore": 0
+    },
+    {
+      "PageName": "Login",
+      "PageElementFiles": [],
+      "PageActionFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\PageActions\\LoginMethods.cs"
+      ],
+      "StepDefinitionFiles": [
+        "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\StepDefinitions\\LoginSteps.cs"
+      ],
+      "FeatureFiles": [],
+      "Namespace": null,
+      "ConfidenceScore": 0
+    }
+  ],
+  "TotalPages": 4
+}

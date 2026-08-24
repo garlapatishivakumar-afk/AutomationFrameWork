@@ -1,0 +1,182 @@
+{
+  "generatedAt": "2026-08-23T21:26:41.822Z",
+  "branch": "feature/v2.1-intelligence-enhancements",
+  "artifacts": [
+    {
+      "type": "BusinessStep",
+      "name": "Open Application",
+      "action": "created"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Click AdministrationLink",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Click ReassignPackagesLink",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Select SearchUserDropdown",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Click SearchQueueButton",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Select ReassignCheckSelectCheckBox",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Checkbox",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Interact With Grid",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Select UsersDropdown",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Select AssignToSelectedUserButton",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Click AssignToSelectedUserButton",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Click DashboardLink",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Open Application",
+      "action": "created"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Select PackageSourceDropdown",
+      "action": "reused"
+    },
+    {
+      "type": "BusinessStep",
+      "name": "Open Application",
+      "action": "created"
+    }
+  ],
+  "semanticControls": [
+    {
+      "locator": "getByRole('link', { name: 'Administration' })",
+      "resolvedName": "AdministrationLink",
+      "controlType": "Link",
+      "confidence": 0.95,
+      "stabilityScore": 0.88,
+      "isTableControl": false,
+      "warnings": []
+    },
+    {
+      "locator": "getByRole('link', { name: 'Reassign Packages' })",
+      "resolvedName": "ReassignPackagesLink",
+      "controlType": "Link",
+      "confidence": 0.95,
+      "stabilityScore": 0.88,
+      "isTableControl": false,
+      "warnings": []
+    },
+    {
+      "locator": "#ctl00_ContentPlaceHolder1_ddlSearchUser",
+      "resolvedName": "SearchUserDropdown",
+      "controlType": "Dropdown",
+      "confidence": 0.85,
+      "stabilityScore": 0.75,
+      "isTableControl": false,
+      "warnings": []
+    },
+    {
+      "locator": "getByRole('button', { name: 'Search Queue' })",
+      "resolvedName": "SearchQueueButton",
+      "controlType": "Button",
+      "confidence": 0.95,
+      "stabilityScore": 0.88,
+      "isTableControl": false,
+      "warnings": []
+    },
+    {
+      "locator": "#ctl00_ContentPlaceHolder1_rgridPackages_ctl00_ctl04_ReassignCheckSelectCheckBox",
+      "resolvedName": "ReassignCheckSelectCheckBox",
+      "controlType": "Checkbox",
+      "confidence": 0.7,
+      "stabilityScore": 0.75,
+      "isTableControl": true,
+      "warnings": [
+        "Fragile row index: ctl00_ctl04"
+      ]
+    },
+    {
+      "locator": "#ctl00_ContentPlaceHolder1_ddlUsers",
+      "resolvedName": "UsersDropdown",
+      "controlType": "Dropdown",
+      "confidence": 0.85,
+      "stabilityScore": 0.75,
+      "isTableControl": false,
+      "warnings": []
+    },
+    {
+      "locator": "getByRole('button', { name: 'Assign to Selected User' })",
+      "resolvedName": "AssignToSelectedUserButton",
+      "controlType": "Button",
+      "confidence": 0.95,
+      "stabilityScore": 0.88,
+      "isTableControl": false,
+      "warnings": []
+    },
+    {
+      "locator": "getByRole('link', { name: 'Dashboard' })",
+      "resolvedName": "DashboardLink",
+      "controlType": "Link",
+      "confidence": 0.95,
+      "stabilityScore": 0.88,
+      "isTableControl": false,
+      "warnings": []
+    },
+    {
+      "locator": "#ctl00_ContentPlaceHolder1_ddlPackageSource",
+      "resolvedName": "PackageSourceDropdown",
+      "controlType": "Dropdown",
+      "confidence": 0.85,
+      "stabilityScore": 0.75,
+      "isTableControl": false,
+      "warnings": []
+    }
+  ],
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "warnings": [
+      "4 locator(s) use raw ASP.NET generated IDs (ctl00...). Consider using semantic names from LiveObservations.",
+      "1 locator(s) contain fragile double-indexed table row selectors. Use a stable business-key row strategy instead."
+    ]
+  },
+  "tokenUsage": {
+    "promptTokens": 0,
+    "completionTokens": 0,
+    "totalTokens": 0
+  },
+  "knownLimitations": [
+    "Live-browser DOM inspection is not performed. Static analysis is used (requires authenticated session for live DOM)."
+  ]
+}

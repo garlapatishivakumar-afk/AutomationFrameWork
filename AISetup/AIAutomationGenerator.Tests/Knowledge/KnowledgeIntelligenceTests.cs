@@ -337,5 +337,19 @@ namespace AIAutomationGenerator.Tests.Knowledge
 
             Assert.Equal(countBefore, retrieval.Items.Count);
         }
+
+        [Fact]
+        public void Enrichment_WithoutDecisions_AttachesEvidencePerRecordedAction()
+        {
+            var model = BuildModel();
+            model.Decisions.Clear();
+
+            new KnowledgeEnrichmentService().Enrich(model, BuildRetrieval());
+
+            Assert.True(model.DecisionEvidence.TryGetValue(0, out var evidence));
+            Assert.NotNull(evidence);
+            Assert.Contains(evidence, item => item.KnowledgeId != "none");
+            Assert.True(model.EvidenceCount > 0);
+        }
     }
 }

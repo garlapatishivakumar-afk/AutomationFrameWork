@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using AIAutomationGenerator.FrameworkScanner;
 using AIAutomationGenerator.Implementation;
@@ -11,6 +13,9 @@ using AIAutomationGenerator.Knowledge;
 using AIAutomationGenerator.Orchestration;
 using AIAutomationGenerator.Planning;
 using AIAutomationGenerator.Safety;
+using AIAutomationGenerator.Validation.Services;
+using ValidationBuildValidationResult = AIAutomationGenerator.Validation.Services.BuildValidationResult;
+using ValidationTestValidationResult = AIAutomationGenerator.Validation.Services.TestValidationResult;
 
 namespace AIAutomationGenerator.Agent
 {
@@ -45,13 +50,23 @@ namespace AIAutomationGenerator.Agent
         private readonly FrameworkIndexService _frameworkIndexService;
         private readonly RepositorySnapshotService _snapshotService;
         private readonly ProtectedFilePolicy _protectedFilePolicy;
+        private readonly FailureClassifier _failureClassifier;
+        private readonly ErrorDiagnostics _errorDiagnostics;
+        private readonly AutoCorrector _autoCorrector;
         private readonly KnowledgeIndexService _indexSvc;
         private readonly KnowledgeRetrievalService _retrievalSvc;
         private readonly KnowledgeEnrichmentService _enrichmentSvc;
         private readonly EngineeringPlanner _planner;
         private readonly ImplementationEngine _implEngine;
+        private readonly string _buildProjectPath;
+        private readonly string _testProjectPath;
+        private readonly int _maxSelfHealRetries;
 
-        public V7MasterOrchestrator(string repositoryRoot)
+        public V7MasterOrchestrator(
+            string repositoryRoot,
+            string? buildProjectPath = null,
+            string? testProjectPath = null,
+            int maxSelfHealRetries = 2)
         {
             _repositoryRoot  = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
             _parser          = new CodegenParser();
@@ -59,11 +74,17 @@ namespace AIAutomationGenerator.Agent
             _frameworkIndexService = new FrameworkIndexService(repositoryRoot, new SolutionScanner());
             _snapshotService = new RepositorySnapshotService();
             _protectedFilePolicy = new ProtectedFilePolicy(repositoryRoot);
+            _failureClassifier = new FailureClassifier();
+            _errorDiagnostics = new ErrorDiagnostics();
+            _autoCorrector = new AutoCorrector();
             _indexSvc        = new KnowledgeIndexService();
             _retrievalSvc    = new KnowledgeRetrievalService();
             _enrichmentSvc   = new KnowledgeEnrichmentService();
             _planner         = new EngineeringPlanner(_protectedFilePolicy);
             _implEngine      = new ImplementationEngine(_protectedFilePolicy);
+            _buildProjectPath = buildProjectPath ?? Path.Combine(_repositoryRoot, "AutomationFrameWork.csproj");
+            _testProjectPath = testProjectPath ?? Path.Combine(_repositoryRoot, "AISetup", "AIAutomationGenerator.Tests", "AIAutomationGenerator.Tests.csproj");
+            _maxSelfHealRetries = Math.Max(0, maxSelfHealRetries);
         }
 
         public async Task<V7ExecutionResult> RunAsync(string recordingFilePath, bool dryRun = true)
@@ -89,6 +110,7 @@ namespace AIAutomationGenerator.Agent
                     return Finalise(result, "HumanReviewRequired");
                 }
                 parseResult = _parser.ParseFile(recordingFilePath);
+                result.ParsedActions = parseResult.Actions.ToList();
                 if (parseResult.ActionCount == 0)
                 {
                     EndStage(s1, false, null, "0 actions parsed",
@@ -115,6 +137,7 @@ namespace AIAutomationGenerator.Agent
                 result.RepositoryFileCount = result.RepositorySnapshot.FileCount;
 
                 ctxResult   = _contextSelector.SelectRelevantContext(fullRepository, parseResult.Actions);
+                result.SelectedContextPages = ctxResult?.InferredPages?.ToList() ?? new List<string>();
                 filteredRepo = ctxResult.FilteredIndex;
                 EndStage(s2, true,
                     $"Context reduced by {ctxResult.Metrics.ReductionPercent}%");
@@ -130,7 +153,16 @@ namespace AIAutomationGenerator.Agent
                 var index  = _indexSvc.Build(filteredRepo);
                 retrieval  = _retrievalSvc.Retrieve(
                     index, ctxResult.InferredPages, parseResult.Actions);
+
+                if (retrieval.IsEmpty && HasKnowledgeCandidates(fullRepository))
+                {
+                    var fallbackIndex = _indexSvc.Build(fullRepository);
+                    retrieval = _retrievalSvc.Retrieve(
+                        fallbackIndex, ctxResult.InferredPages, parseResult.Actions);
+                }
+
                 result.KnowledgeRetrievedCount = retrieval.Metrics.RetrievedItems;
+                result.RetrievedEvidenceCount = retrieval.Items.Count;
                 EndStage(s3, true,
                     $"{retrieval.Metrics.RetrievedItems} items retrieved");
             }
@@ -155,6 +187,7 @@ namespace AIAutomationGenerator.Agent
                     }
                 };
                 _enrichmentSvc.Enrich(intelligence, retrieval);
+                result.EvidenceCount = intelligence.EvidenceCount;
                 EndStage(s4, true,
                     $"{intelligence.EvidenceCount} evidence items attached");
             }
@@ -181,6 +214,8 @@ namespace AIAutomationGenerator.Agent
                 result.ExtendCount        = plan.ExtendCount;
                 result.CreateCount        = plan.CreateCount;
                 result.HumanReviewCount   = plan.HumanReviewCount;
+                result.EngineeringPlanSummary = $"R={plan.ReuseCount},E={plan.ExtendCount},C={plan.CreateCount},HR={plan.HumanReviewCount}";
+                result.HumanReviewQuestions = plan.HumanReviewQuestions.ToList();
                 EndStage(s5, plan.Status != PlanStatus.HumanReviewRequired,
                     $"Plan: R={plan.ReuseCount} E={plan.ExtendCount} C={plan.CreateCount} HR={plan.HumanReviewCount}",
                     plan.Status == PlanStatus.HumanReviewRequired ? "Plan requires human review" : null,
@@ -204,6 +239,7 @@ namespace AIAutomationGenerator.Agent
                 result.CorrectionsAttempted   = implRecord.CorrectionsAttempted;
                 result.CorrectionsSucceeded   = implRecord.CorrectionsSucceeded;
                 result.Rollbacks              = implRecord.Rollbacks;
+                result.ImplementationChanges = implRecord.Changes.ToList();
                 EndStage(s6, true, $"Implementation plan executed: {implRecord.FinalStatus}");
                 EndStage(s7, implRecord.FinalStatus != ImplementationStatus.HumanReviewRequired,
                     $"Changes: {implRecord.Changes.Count}",
@@ -219,16 +255,108 @@ namespace AIAutomationGenerator.Agent
             result.AddStage(s6);
             result.AddStage(s7);
 
-            // ===== S8-S12: Build/Test/Analyze/SelfHeal/Retest (dry-run: skip) =====
-            foreach (var stageName in new[] { "S8:Build", "S9:ExecuteTests",
-                "S10:AnalyzeFailures", "S11:SelfHeal", "S12:Retest" })
+            // ===== S8-S12: Build/Test/Analyze/SelfHeal/Retest =====
+            if (dryRun)
             {
-                var sX = StartStage(stageName);
-                EndStage(sX, true, dryRun
-                    ? $"Skipped in dry-run — live build env required"
-                    : "Executed");
-                sX.Skipped = dryRun;
-                result.AddStage(sX);
+                foreach (var stageName in new[] { "S8:Build", "S9:ExecuteTests",
+                    "S10:AnalyzeFailures", "S11:SelfHeal", "S12:Retest" })
+                {
+                    var sX = StartStage(stageName);
+                    EndStage(sX, true, "Skipped in dry-run — live build/test not executed");
+                    sX.Skipped = true;
+                    result.AddStage(sX);
+                }
+            }
+            else
+            {
+                var buildStage = StartStage("S8:Build");
+                var buildValidator = new BuildValidator(_buildProjectPath);
+                var buildResult = await buildValidator.ValidateAsync();
+                result.BuildResult = buildResult;
+                EndStage(
+                    buildStage,
+                    buildResult.Success,
+                    $"Build {(buildResult.Success ? "succeeded" : "failed")} with {buildResult.Errors.Count} error(s)",
+                    buildResult.Success ? null : buildResult.Error);
+                result.AddStage(buildStage);
+
+                var testStage = StartStage("S9:ExecuteTests");
+                ValidationTestValidationResult? testResult = null;
+                if (buildResult.Success)
+                {
+                    var testValidator = new TestValidator(_testProjectPath);
+                    testResult = await testValidator.ValidateAsync();
+                    result.TestResult = testResult;
+                    EndStage(
+                        testStage,
+                        testResult.Success,
+                        $"Tests total={testResult.TotalTests}, passed={testResult.PassedTests}, failed={testResult.FailedTests}, skipped={testResult.SkippedTests}",
+                        testResult.Success ? null : testResult.Error);
+                }
+                else
+                {
+                    EndStage(testStage, true, "Skipped because build failed");
+                    testStage.Skipped = true;
+                }
+                result.AddStage(testStage);
+
+                var s10 = StartStage("S10:AnalyzeFailures");
+                var hasFailure = !buildResult.Success || (testResult != null && !testResult.Success);
+                if (!hasFailure)
+                {
+                    EndStage(s10, true, "No failures to classify");
+                    s10.Skipped = true;
+                    result.AddStage(s10);
+
+                    var s11 = StartStage("S11:SelfHeal");
+                    EndStage(s11, true, "No healing required");
+                    s11.Skipped = true;
+                    result.AddStage(s11);
+
+                    var s12 = StartStage("S12:Retest");
+                    EndStage(s12, true, "No retest required");
+                    s12.Skipped = true;
+                    result.AddStage(s12);
+                }
+                else
+                {
+                    var failureText = BuildFailureText(buildResult, testResult);
+                    var classification = _failureClassifier.Classify(failureText);
+                    result.FailureClassification = classification;
+                    EndStage(s10, true,
+                        $"Classified as {classification.Category}: {classification.Reason}");
+                    result.AddStage(s10);
+
+                    var s11 = StartStage("S11:SelfHeal");
+                    var correctionOutcome = await ExecuteSelfHealingAsync(
+                        result,
+                        plan,
+                        buildResult,
+                        testResult,
+                        classification);
+
+                    EndStage(
+                        s11,
+                        correctionOutcome.Success,
+                        correctionOutcome.Message,
+                        correctionOutcome.Success ? null : correctionOutcome.Error,
+                        correctionOutcome.RequiresHumanReview ? correctionOutcome.Error : null);
+                    result.AddStage(s11);
+
+                    var s12 = StartStage("S12:Retest");
+                    EndStage(
+                        s12,
+                        correctionOutcome.Success,
+                        correctionOutcome.RetrySummary,
+                        correctionOutcome.Success ? null : correctionOutcome.Error,
+                        correctionOutcome.RequiresHumanReview ? correctionOutcome.Error : null);
+                    result.AddStage(s12);
+
+                    if (!correctionOutcome.Success)
+                    {
+                        result.HumanReviewReason = correctionOutcome.Error;
+                    }
+                }
             }
 
             // ===== S13: FrameworkProtection =====
@@ -259,6 +387,332 @@ namespace AIAutomationGenerator.Agent
 
             return Finalise(result, result.Stages.Any(s => s.HumanReviewState != null)
                 ? "HumanReviewRequired" : "Success");
+        }
+
+        private async Task<SelfHealExecutionOutcome> ExecuteSelfHealingAsync(
+            V7ExecutionResult result,
+            EngineeringPlan plan,
+            ValidationBuildValidationResult buildResult,
+            ValidationTestValidationResult? testResult,
+            FailureClassification classification)
+        {
+            var outcome = new SelfHealExecutionOutcome
+            {
+                Success = false,
+                RequiresHumanReview = true,
+                Message = "Self-healing started.",
+                RetrySummary = "No retries executed yet."
+            };
+
+            if (!classification.IsAutoFixable || !classification.IsSafeToRetry)
+            {
+                outcome.Error = $"Failure is not eligible for deterministic auto-correction: {classification.Reason}";
+                return outcome;
+            }
+
+            var diagnoses = new List<ErrorDiagnosis>();
+            if (buildResult.Errors.Any())
+            {
+                diagnoses.AddRange(_errorDiagnostics.DiagnoseCompilationErrors(buildResult.Errors));
+            }
+            if (testResult?.Failures?.Any() == true)
+            {
+                diagnoses.AddRange(_errorDiagnostics.DiagnoseTestFailures(testResult.Failures));
+            }
+
+            var corrections = _autoCorrector.PlanCorrections(diagnoses)
+                .OrderBy(c => c.Priority)
+                .ToList();
+
+            if (!corrections.Any())
+            {
+                outcome.Error = "No deterministic correction proposals generated from failure evidence.";
+                return outcome;
+            }
+
+            var allowed = new HashSet<string>(
+                plan.PlannedFileChanges
+                    .Where(p => !string.IsNullOrWhiteSpace(p.FilePath))
+                    .Select(p => NormalizePath(ResolveAbsolutePath(p.FilePath))),
+                StringComparer.OrdinalIgnoreCase);
+
+            // include diagnostic file paths if under planned scope by folder
+            foreach (var d in diagnoses.Where(d => !string.IsNullOrWhiteSpace(d.FilePath)))
+            {
+                var absolute = Path.IsPathRooted(d.FilePath)
+                    ? d.FilePath
+                    : Path.Combine(_repositoryRoot, d.FilePath);
+                var normalized = NormalizePath(Path.GetFullPath(absolute));
+                var sameDirectoryAsPlanned = allowed.Any(p =>
+                    string.Equals(Path.GetDirectoryName(p), Path.GetDirectoryName(normalized), StringComparison.OrdinalIgnoreCase));
+                if (sameDirectoryAsPlanned)
+                {
+                    allowed.Add(normalized);
+                }
+            }
+
+            var correctionAttempts = new List<CorrectionAttemptResult>();
+            var retryResults = new List<RetryValidationResult>();
+
+            for (int attempt = 1; attempt <= _maxSelfHealRetries + 1; attempt++)
+            {
+                var proposal = corrections.FirstOrDefault(c => IsSupportedCorrection(c.CorrectionType));
+                if (proposal == null)
+                {
+                    outcome.Error = "Only unsupported correction types were proposed.";
+                    break;
+                }
+
+                var apply = ApplyCorrectionProposal(proposal, allowed);
+                correctionAttempts.Add(apply);
+                result.CorrectionAttempts = correctionAttempts;
+
+                if (!apply.Applied)
+                {
+                    outcome.Error = apply.Error ?? "Correction proposal could not be applied safely.";
+                    break;
+                }
+
+                var buildAfter = await new BuildValidator(_buildProjectPath).ValidateAsync();
+                var testAfter = buildAfter.Success
+                    ? await new TestValidator(_testProjectPath).ValidateAsync()
+                    : null;
+
+                var retryResult = new RetryValidationResult
+                {
+                    Attempt = attempt,
+                    BuildResult = buildAfter,
+                    TestResult = testAfter,
+                    Success = buildAfter.Success && (testAfter?.Success ?? false),
+                    FailureSummary = BuildFailureText(buildAfter, testAfter)
+                };
+                retryResults.Add(retryResult);
+                result.RetryResults = retryResults;
+
+                if (retryResult.Success)
+                {
+                    outcome.Success = true;
+                    outcome.RequiresHumanReview = false;
+                    outcome.Message = $"Correction resolved failure on attempt {attempt}.";
+                    outcome.RetrySummary = $"Resolved after {attempt} correction attempt(s).";
+                    result.BuildResult = buildAfter;
+                    result.TestResult = testAfter;
+                    return outcome;
+                }
+
+                // failure remains; rollback this attempt before next try
+                var rollback = RollbackCorrection(apply);
+                result.RollbackResult = rollback;
+                if (!rollback.Success)
+                {
+                    outcome.Error = "Rollback failed during self-healing retry.";
+                    outcome.RetrySummary = $"Rollback failed at attempt {attempt}.";
+                    return outcome;
+                }
+            }
+
+            outcome.RetrySummary = $"Retries exhausted (max={_maxSelfHealRetries}).";
+            if (string.IsNullOrWhiteSpace(outcome.Error))
+            {
+                outcome.Error = "Failure remains unresolved after deterministic retry limit.";
+            }
+
+            return outcome;
+        }
+
+        private CorrectionAttemptResult ApplyCorrectionProposal(CorrectionPlan plan, HashSet<string> allowedPaths)
+        {
+            var attempt = new CorrectionAttemptResult
+            {
+                AttemptedAt = DateTime.UtcNow,
+                CorrectionType = plan.CorrectionType.ToString(),
+                Description = plan.Description
+            };
+
+            try
+            {
+                string? filePath = null;
+                string? newContent = null;
+
+                if (plan.CorrectionType == CorrectionType.AddUsing && plan.Details is AddUsingCorrection addUsing)
+                {
+                    filePath = ResolveAbsolutePath(addUsing.FilePath);
+                    var original = File.ReadAllText(filePath);
+                    var usingToAdd = addUsing.SuggestedUsings?.FirstOrDefault();
+                    if (string.IsNullOrWhiteSpace(usingToAdd))
+                    {
+                        attempt.Error = "No using directive suggested.";
+                        return attempt;
+                    }
+
+                    if (original.Contains(usingToAdd, StringComparison.Ordinal))
+                    {
+                        attempt.Applied = true;
+                        attempt.SkippedAsAlreadyApplied = true;
+                        attempt.FilePath = filePath;
+                        attempt.BeforeHash = ComputeHash(File.ReadAllBytes(filePath));
+                        attempt.AfterHash = attempt.BeforeHash;
+                        return attempt;
+                    }
+
+                    newContent = usingToAdd + Environment.NewLine + original;
+                }
+                else if (plan.CorrectionType == CorrectionType.FixNamespace && plan.Details is FixNamespaceCorrection nsFix)
+                {
+                    filePath = ResolveAbsolutePath(nsFix.FilePath);
+                    var original = File.ReadAllText(filePath);
+                    var expected = nsFix.SuggestedNamespace;
+                    if (string.IsNullOrWhiteSpace(expected))
+                    {
+                        attempt.Error = "No namespace suggestion provided.";
+                        return attempt;
+                    }
+
+                    newContent = ReplaceNamespace(original, expected);
+                }
+                else
+                {
+                    attempt.Error = $"Unsupported correction type: {plan.CorrectionType}";
+                    return attempt;
+                }
+
+                if (string.IsNullOrWhiteSpace(filePath) || string.IsNullOrWhiteSpace(newContent))
+                {
+                    attempt.Error = "Correction did not resolve to concrete file/content.";
+                    return attempt;
+                }
+
+                var normalized = NormalizePath(Path.GetFullPath(filePath));
+                if (_protectedFilePolicy.IsProtected(filePath))
+                {
+                    attempt.Error = "Correction targets protected file.";
+                    return attempt;
+                }
+
+                if (!allowedPaths.Contains(normalized))
+                {
+                    attempt.Error = "Correction target is outside allowed planned paths.";
+                    return attempt;
+                }
+
+                var beforeBytes = File.ReadAllBytes(filePath);
+                attempt.FilePath = filePath;
+                attempt.BeforeHash = ComputeHash(beforeBytes);
+                attempt.BeforeContent = Encoding.UTF8.GetString(beforeBytes);
+
+                File.WriteAllText(filePath, newContent, Encoding.UTF8);
+                var afterBytes = File.ReadAllBytes(filePath);
+                attempt.AfterHash = ComputeHash(afterBytes);
+                attempt.AfterContent = Encoding.UTF8.GetString(afterBytes);
+                attempt.Applied = !string.Equals(attempt.BeforeHash, attempt.AfterHash, StringComparison.OrdinalIgnoreCase);
+
+                return attempt;
+            }
+            catch (Exception ex)
+            {
+                attempt.Error = ex.Message;
+                return attempt;
+            }
+        }
+
+        private RollbackExecutionResult RollbackCorrection(CorrectionAttemptResult attempt)
+        {
+            var result = new RollbackExecutionResult
+            {
+                FilePath = attempt.FilePath,
+                ExpectedHash = attempt.BeforeHash
+            };
+
+            try
+            {
+                if (!attempt.Applied || string.IsNullOrWhiteSpace(attempt.FilePath))
+                {
+                    result.Success = true;
+                    result.ActualHash = attempt.BeforeHash;
+                    return result;
+                }
+
+                File.WriteAllText(attempt.FilePath, attempt.BeforeContent ?? string.Empty, Encoding.UTF8);
+                var actualHash = ComputeHash(File.ReadAllBytes(attempt.FilePath));
+                result.ActualHash = actualHash;
+                result.Success = string.Equals(actualHash, attempt.BeforeHash, StringComparison.OrdinalIgnoreCase);
+                if (!result.Success)
+                {
+                    result.Error = "Restored hash mismatch.";
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.Error = ex.Message;
+                return result;
+            }
+        }
+
+        private string ResolveAbsolutePath(string filePath)
+        {
+            return Path.IsPathRooted(filePath)
+                ? filePath
+            : Path.GetFullPath(Path.Combine(_repositoryRoot, filePath));
+        }
+
+        private static bool IsSupportedCorrection(CorrectionType t) =>
+            t == CorrectionType.AddUsing || t == CorrectionType.FixNamespace;
+
+        private static string BuildFailureText(ValidationBuildValidationResult build, ValidationTestValidationResult? test)
+        {
+            if (!build.Success)
+            {
+                var top = build.Errors.FirstOrDefault()?.Message ?? build.Error ?? "Build failed";
+                return $"Build failure: {top}";
+            }
+
+            if (test != null && !test.Success)
+            {
+                var top = test.Failures.FirstOrDefault()?.AssertionError ?? test.Error ?? "Tests failed";
+                return $"Test failure: {top}";
+            }
+
+            return "No failure";
+        }
+
+        private static string ReplaceNamespace(string content, string desiredNamespace)
+        {
+            var marker = "namespace ";
+            var lines = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList();
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var trimmed = lines[i].TrimStart();
+                if (trimmed.StartsWith(marker, StringComparison.Ordinal))
+                {
+                    var indent = lines[i].Substring(0, lines[i].Length - trimmed.Length);
+                    lines[i] = indent + marker + desiredNamespace + ";";
+                    return string.Join(Environment.NewLine, lines);
+                }
+            }
+
+            return marker + desiredNamespace + ";" + Environment.NewLine + content;
+        }
+
+        private static string ComputeHash(byte[] bytes)
+        {
+            using var sha = SHA256.Create();
+            return Convert.ToHexString(sha.ComputeHash(bytes));
+        }
+
+        private static string NormalizePath(string path) =>
+            path.Replace('\\', '/');
+
+        private static bool HasKnowledgeCandidates(RepositoryKnowledgeModel repository)
+        {
+            return repository != null &&
+                   ((repository.PageElements?.Count ?? 0) > 0 ||
+                    (repository.PageActions?.Count ?? 0) > 0 ||
+                    (repository.StepDefinitions?.Count ?? 0) > 0 ||
+                    (repository.Features?.Count ?? 0) > 0 ||
+                    (repository.PageRelationships?.Count ?? 0) > 0);
         }
 
         // ===== Stage helpers =====
@@ -322,6 +776,20 @@ namespace AIAutomationGenerator.Agent
         public int    RepositoryFileCount     { get; set; }
         public string RepositorySnapshotHash  { get; set; } = string.Empty;
         public RepositorySnapshot? RepositorySnapshot { get; set; }
+        public List<RecordedActionIntelligence> ParsedActions { get; set; } = new();
+        public List<string> SelectedContextPages { get; set; } = new();
+        public int RetrievedEvidenceCount { get; set; }
+        public int EvidenceCount { get; set; }
+        public string EngineeringPlanSummary { get; set; } = string.Empty;
+        public List<ChangeRecord> ImplementationChanges { get; set; } = new();
+        public ValidationBuildValidationResult? BuildResult { get; set; }
+        public ValidationTestValidationResult? TestResult { get; set; }
+        public FailureClassification? FailureClassification { get; set; }
+        public List<CorrectionAttemptResult> CorrectionAttempts { get; set; } = new();
+        public List<RetryValidationResult> RetryResults { get; set; } = new();
+        public RollbackExecutionResult? RollbackResult { get; set; }
+        public List<HumanReviewQuestion> HumanReviewQuestions { get; set; } = new();
+        public string? HumanReviewReason { get; set; }
         public string TokenMeasurement        { get; set; } = "NOT_AVAILABLE";
         public string AiCreditsMeasurement    { get; set; } = "NOT_AVAILABLE";
 
@@ -339,5 +807,47 @@ namespace AIAutomationGenerator.Agent
         public string   Output          { get; set; }
         public string   Error           { get; set; }
         public string   HumanReviewState { get; set; }
+    }
+
+    public class CorrectionAttemptResult
+    {
+        public DateTime AttemptedAt { get; set; }
+        public string CorrectionType { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string? FilePath { get; set; }
+        public string? BeforeHash { get; set; }
+        public string? AfterHash { get; set; }
+        public string? BeforeContent { get; set; }
+        public string? AfterContent { get; set; }
+        public bool Applied { get; set; }
+        public bool SkippedAsAlreadyApplied { get; set; }
+        public string? Error { get; set; }
+    }
+
+    public class RetryValidationResult
+    {
+        public int Attempt { get; set; }
+        public ValidationBuildValidationResult? BuildResult { get; set; }
+        public ValidationTestValidationResult? TestResult { get; set; }
+        public bool Success { get; set; }
+        public string FailureSummary { get; set; } = string.Empty;
+    }
+
+    public class RollbackExecutionResult
+    {
+        public string? FilePath { get; set; }
+        public string? ExpectedHash { get; set; }
+        public string? ActualHash { get; set; }
+        public bool Success { get; set; }
+        public string? Error { get; set; }
+    }
+
+    internal class SelfHealExecutionOutcome
+    {
+        public bool Success { get; set; }
+        public bool RequiresHumanReview { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string RetrySummary { get; set; } = string.Empty;
+        public string? Error { get; set; }
     }
 }

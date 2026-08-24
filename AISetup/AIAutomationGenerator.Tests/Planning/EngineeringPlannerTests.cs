@@ -350,6 +350,90 @@ namespace AIAutomationGenerator.Tests.Planning
         }
 
         [Fact]
+        public void Planner_S5ConflictRule_MultiLayerEvidenceSameComponent_IsNotConflict()
+        {
+            // S5 fix: Multiple evidence records (PageElement, PageAction, Step) for the SAME
+            // component name should NOT be treated as a conflict—that's natural multi-layer evidence.
+            var evidence = new List<KnowledgeEvidence>
+            {
+                new() {
+                    KnowledgeId = "elem1", SourcePath = "PageElements/DashboardObjects.cs",
+                    SourceType = KnowledgeSourceType.PageElement,
+                    Page = "ViewDashboard", Component = "AdministrationLink",
+                    Relevance = 0.95, RetrievalReason = "action-signal-match"
+                },
+                new() {
+                    KnowledgeId = "action1", SourcePath = "PageActions/DashboardMethods.cs",
+                    SourceType = KnowledgeSourceType.PageAction,
+                    Page = "ViewDashboard", Component = "AdministrationLink",
+                    Relevance = 0.8, RetrievalReason = "action-signal-match"
+                },
+                new() {
+                    KnowledgeId = "step1", SourcePath = "StepDefinitions/DashboardSteps.cs",
+                    SourceType = KnowledgeSourceType.StepDefinition,
+                    Page = "ViewDashboard", Component = "AdministrationLink",
+                    Relevance = 0.85, RetrievalReason = "action-signal-match"
+                }
+            };
+
+            var model = new AutomationIntelligenceModel
+            {
+                RepositoryRoot = "AutomationFrameWork",
+                RepositoryKnowledge = new RepositoryKnowledgeModel { PageElements = new(), PageActions = new(), StepDefinitions = new() },
+                RecordingIntelligence = new RecordingIntelligenceModel { Actions = new List<RecordedActionIntelligence> { new() { Sequence = 0, ActionType = "click", Target = "Administration", InferredPageContext = "ViewDashboard", LocatorValue = "link[name='Administration']" } }, RelatedPages = new() { "ViewDashboard" } },
+                Decisions = new List<IntelligenceDecision> { new() { ActionIndex = 0, ActionDescription = "click Administration", DecisionType = "PageElement", Recommendation = "REUSE", TargetComponent = "AdministrationLink", ConfidenceScore = 0.9 } },
+                DecisionEvidence = new Dictionary<int, List<KnowledgeEvidence>> { [0] = evidence }
+            };
+
+            var planner = new EngineeringPlanner();
+            var plan = planner.CreatePlan(model);
+
+            // Should be REUSE, not HUMAN_REVIEW, because all evidence refers to same component/page
+            var decision = plan.Decisions.First(d => d.ActionIndex == 0);
+            Assert.Equal(EngineeringDecisionType.Reuse, decision.Decision);
+            Assert.Contains("confidence", decision.Reason.ToLower());
+        }
+
+        [Fact]
+        public void Planner_S5ConflictRule_DifferentComponents_IsConflict()
+        {
+            // S5 fix: If evidence supports DIFFERENT components (not just different source files), 
+            // that IS a genuine conflict requiring human review.
+            var evidence = new List<KnowledgeEvidence>
+            {
+                new() {
+                    KnowledgeId = "elem1", SourcePath = "PageElements/DashboardObjects.cs",
+                    SourceType = KnowledgeSourceType.PageElement,
+                    Page = "ViewDashboard", Component = "AdministrationLink",
+                    Relevance = 0.9, RetrievalReason = "action-signal-match"
+                },
+                new() {
+                    KnowledgeId = "elem2", SourcePath = "PageElements/ViewDealObjects.cs",
+                    SourceType = KnowledgeSourceType.PageElement,
+                    Page = "ViewDeal", Component = "CompleteLink",
+                    Relevance = 0.85, RetrievalReason = "action-signal-match"
+                }
+            };
+
+            var model = new AutomationIntelligenceModel
+            {
+                RepositoryRoot = "AutomationFrameWork",
+                RepositoryKnowledge = new RepositoryKnowledgeModel { PageElements = new(), PageActions = new(), StepDefinitions = new() },
+                RecordingIntelligence = new RecordingIntelligenceModel { Actions = new List<RecordedActionIntelligence> { new() { Sequence = 0, ActionType = "click", Target = "Administration", InferredPageContext = "ViewDashboard", LocatorValue = "link[name='Administration']" } }, RelatedPages = new() { "ViewDashboard" } },
+                Decisions = new List<IntelligenceDecision> { new() { ActionIndex = 0, ActionDescription = "click Administration", DecisionType = "PageElement", Recommendation = "REUSE", TargetComponent = "Administration", ConfidenceScore = 0.9 } },
+                DecisionEvidence = new Dictionary<int, List<KnowledgeEvidence>> { [0] = evidence }
+            };
+
+            var planner = new EngineeringPlanner();
+            var plan = planner.CreatePlan(model);
+
+            // Should be HUMAN_REVIEW because evidence supports different pages/components
+            var decision = plan.Decisions.First(d => d.ActionIndex == 0);
+            Assert.Equal(EngineeringDecisionType.HumanReviewRequired, decision.Decision);
+            Assert.Contains("conflicting", decision.Reason.ToLower());
+        }
+
+        [Fact]
         public void Planner_RealCodets_NoFabricatedComponents()
         {
             var root = FindRepoRoot();

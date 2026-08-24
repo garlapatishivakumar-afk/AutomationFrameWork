@@ -174,7 +174,7 @@ namespace AIAutomationGenerator.Intelligence.Services
                     FilePath = locator.FilePath,
                     LocatorType = locator.LocatorType,
                     Selector = locator.Selector,
-                    PageOwnership = locator.PageName,
+                    PageOwnership = ExtractPageName(locator.PageName),  // Use extracted page name for consistency with PageActions
                     IsMethod = true,
                     ConfidenceScore = locator.Score
                 });

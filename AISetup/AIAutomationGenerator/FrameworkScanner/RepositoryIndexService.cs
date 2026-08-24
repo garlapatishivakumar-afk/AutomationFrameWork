@@ -7,6 +7,7 @@ namespace AIAutomationGenerator.FrameworkScanner;
 public class RepositoryIndexService : IRepositoryIndexService
 {
     private readonly ILogger logger;
+    private static readonly SemaphoreSlim IndexWriteLock = new(1, 1);
     private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git",
@@ -131,6 +132,9 @@ public class RepositoryIndexService : IRepositoryIndexService
 
     private async Task SaveToFileAsync(string indexFilePath, RepositoryMetadata metadata)
     {
+        await IndexWriteLock.WaitAsync();
+        try
+        {
         string directory = Path.GetDirectoryName(indexFilePath) ?? string.Empty;
         Directory.CreateDirectory(directory);
 
@@ -146,7 +150,20 @@ public class RepositoryIndexService : IRepositoryIndexService
         };
 
         string json = JsonSerializer.Serialize(document, options);
-        await File.WriteAllTextAsync(indexFilePath, json);
+        string tempFile = Path.Combine(directory, $"{Path.GetFileName(indexFilePath)}.{Guid.NewGuid():N}.tmp");
+        await File.WriteAllTextAsync(tempFile, json);
+
+        if (File.Exists(indexFilePath))
+        {
+            File.Delete(indexFilePath);
+        }
+
+        File.Move(tempFile, indexFilePath);
+        }
+        finally
+        {
+            IndexWriteLock.Release();
+        }
     }
 
     private sealed class RepositoryIndexDocument

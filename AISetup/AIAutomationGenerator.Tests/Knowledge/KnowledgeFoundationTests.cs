@@ -62,6 +62,37 @@ namespace AIAutomationGenerator.Tests.Knowledge
         private static RecordedActionIntelligence Action(string type, string page, string locator = null) =>
             new() { Sequence = 0, ActionType = type, InferredPageContext = page, LocatorValue = locator };
 
+        private static RepositoryKnowledgeModel BuildDocumentAdminRepo() =>
+            new()
+            {
+                RepositoryRoot = "TestRepo",
+                LastScanTime = DateTime.UtcNow.ToString("O"),
+                PageElements = new List<PageElementInfo>
+                {
+                    new() { Name = "AdministrationLink", ClassName = "ViewDashboardObjects", FilePath = "PageElements/ViewDashboardObjects.cs", PageOwnership = "ViewDashboard", Selector = "page.GetByRole(AriaRole.Link, new() { Name = \"Administration\" })", LocatorType = "role", ConfidenceScore = 0.95 },
+                    new() { Name = "ReassignPackagesLink", ClassName = "ViewDashboardObjects", FilePath = "PageElements/ViewDashboardObjects.cs", PageOwnership = "ViewDashboard", Selector = "page.GetByRole(AriaRole.Link, new() { Name = \"Reassign Packages\" })", LocatorType = "role", ConfidenceScore = 0.95 },
+                    new() { Name = "SearchUserDropdown", ClassName = "ViewDashboardObjects", FilePath = "PageElements/ViewDashboardObjects.cs", PageOwnership = "ViewDashboard", Selector = "page.Locator(\"#ctl00_ContentPlaceHolder1_ddlSearchUser\")", LocatorType = "id", ConfidenceScore = 0.95 }
+                },
+                PageActions = new List<PageActionInfo>
+                {
+                    new() { Name = "NavigateToDocumentAdministrationAsync", ClassName = "ViewDashboardMethods", FilePath = "PageActions/ViewDashboardMethods.cs", PageOwnership = "ViewDashboard", IsAsync = true, ConfidenceScore = 0.9 },
+                    new() { Name = "ClickAdministrationLinkAsync", ClassName = "ViewDashboardMethods", FilePath = "PageActions/ViewDashboardMethods.cs", PageOwnership = "ViewDashboard", IsAsync = true, ConfidenceScore = 0.9 }
+                },
+                StepDefinitions = new List<StepDefinitionInfo>
+                {
+                    new() { StepText = "user navigates to document administration page", MethodName = "GivenUserNavigatesToDocumentAdministrationPage", ClassName = "ViewDashboardSteps", FilePath = "StepDefinitions/ViewDashboardSteps.cs", PageOwnership = "ViewDashboard", ConfidenceScore = 0.9 },
+                    new() { StepText = "user clicks on Administration link", MethodName = "WhenUserClicksOnAdministrationLink", ClassName = "ViewDashboardSteps", FilePath = "StepDefinitions/ViewDashboardSteps.cs", PageOwnership = "ViewDashboard", ConfidenceScore = 0.9 }
+                },
+                Features = new List<FeatureFileInfo>
+                {
+                    new() { FeatureName = "ViewDashboard", FilePath = "Features/ViewDashboard.feature", RelatedPages = new List<string> { "ViewDashboard" } }
+                },
+                PageRelationships = new List<PageComponentRelationship>
+                {
+                    new() { PageName = "ViewDashboard", PageElementFiles = new() { "PageElements/ViewDashboardObjects.cs" }, PageActionFiles = new() { "PageActions/ViewDashboardMethods.cs" }, StepDefinitionFiles = new() { "StepDefinitions/ViewDashboardSteps.cs" }, FeatureFiles = new() { "Features/ViewDashboard.feature" } }
+                }
+            };
+
         // ===========================
         // KnowledgeIndexService
         // ===========================
@@ -234,6 +265,56 @@ namespace AIAutomationGenerator.Tests.Knowledge
                 new[] { Action("click", null, "#btnSearch") });
 
             Assert.Contains(result.Items, i => i.LocatorValue == "#btnSearch");
+        }
+
+        [Fact]
+        public void Retrieval_WithRoleLocatorSyntaxVariance_ReturnsRepositoryEvidence()
+        {
+            var index = new KnowledgeIndexService().Build(BuildDocumentAdminRepo());
+            var svc = new KnowledgeRetrievalService();
+            var result = svc.Retrieve(index,
+                Array.Empty<string>(),
+                new[]
+                {
+                    new RecordedActionIntelligence
+                    {
+                        Sequence = 0,
+                        ActionType = "click",
+                        Target = "Administration",
+                        LocatorType = "role",
+                        LocatorValue = "getByRole('link', { name: 'Administration' })",
+                        GetByRoleName = "Administration",
+                        InferredPageContext = "Administration"
+                    }
+                });
+
+            Assert.Contains(result.Items, i => i.ComponentName == "AdministrationLink");
+            Assert.Contains(result.Items, i => i.ComponentName == "ClickAdministrationLinkAsync");
+        }
+
+        [Fact]
+        public void Retrieval_WhenPageInferenceMisses_CanRecoverPageFromRealLocatorSignals()
+        {
+            var index = new KnowledgeIndexService().Build(BuildDocumentAdminRepo());
+            var svc = new KnowledgeRetrievalService();
+            var result = svc.Retrieve(index,
+                new[] { "ReassignPackages" },
+                new[]
+                {
+                    new RecordedActionIntelligence
+                    {
+                        Sequence = 0,
+                        ActionType = "selectOption",
+                        Target = "SearchUserDropdown",
+                        LocatorType = "id",
+                        LocatorValue = "#ctl00_ContentPlaceHolder1_ddlSearchUser",
+                        InferredPageContext = "ReassignPackages"
+                    }
+                });
+
+            Assert.Contains(result.Items, i => i.ComponentName == "SearchUserDropdown");
+            Assert.Contains(result.Items, i => i.ComponentName == "ViewDashboard");
+            Assert.Contains("ViewDashboard", result.Metrics.InferredPages);
         }
 
         [Fact]

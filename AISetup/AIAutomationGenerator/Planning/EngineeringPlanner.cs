@@ -149,24 +149,51 @@ namespace AIAutomationGenerator.Planning
                 return decision;
             }
 
-            // Rule 2: conflicting evidence → HUMAN_REVIEW_REQUIRED
+            // Rule 2: conflicting evidence → HUMAN_REVIEW_REQUIRED (only when truly ambiguous)
+            // 
+            // Natural multi-layer evidence (same page, different components/layers) is ALLOWED:
+            //   - PageElement "AdministrationLink" + PageAction "ClickAdministrationLink" + Step "user clicks Admin"
+            //   - All from ViewDashboard page = same semantic component, different representation layers
+            //
+            // True conflict (different semantic purposes on different pages) is NOT allowed:
+            //   - PageElement "AdministrationLink" from ViewDashboard + "CompleteLink" from ViewDeal
+            //   - Two distinct pages = ambiguous which one to use
+            //
+            // Special case: Multiple paths with missing metadata (ambiguous origin) = NOT allowed
+
+            var distinctPages = evidence
+                .Where(e => !string.IsNullOrEmpty(e.Page))
+                .Select(e => e.Page)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+
             var distinctPaths = evidence
                 .Where(e => !string.IsNullOrEmpty(e.SourcePath))
                 .Select(e => e.SourcePath)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count();
-            if (distinctPaths > 1)
+
+            bool hasMultiplePaths = distinctPaths > 1;
+            bool hasMissingMetadata = evidence.Any(e => string.IsNullOrEmpty(e.Component) || string.IsNullOrEmpty(e.Page));
+            
+            // Only flag conflict if: (A) different pages, OR (B) multiple paths with missing metadata
+            // Multiple component names from SAME page is OK—that's multi-layer evidence.
+            if (distinctPages > 1 || (hasMultiplePaths && hasMissingMetadata))
             {
                 decision.Decision        = EngineeringDecisionType.HumanReviewRequired;
-                decision.Reason          = $"Conflicting evidence from {distinctPaths} different source paths.";
+                decision.Reason          = $"Conflicting evidence from {distinctPages} different pages.";
                 decision.Confidence      = 0.3;
-                decision.HumanReviewNote = $"Conflict: {distinctPaths} different sources for '{intelDecision.TargetComponent}'.";
+                decision.HumanReviewNote = $"Conflict: evidence from different pages for '{intelDecision.TargetComponent}'.";
                 return decision;
             }
 
             // Rule 3: apply intel recommendation when evidence supports it
             var intelRec = intelDecision.Recommendation?.ToUpperInvariant();
             double avgConfidence = evidence.Average(e => e.Relevance);
+            
+            // Select the best-confidence evidence item for SourcePath (e.g., prefer PageElement over Step)
+            var bestConfidenceItem = evidence.OrderByDescending(e => e.Relevance).FirstOrDefault();
+            decision.SourcePath = bestConfidenceItem?.SourcePath ?? evidence.FirstOrDefault(e => !string.IsNullOrEmpty(e.SourcePath))?.SourcePath;
 
             if (intelRec == "REUSE" && avgConfidence >= MediumConfidenceThreshold)
             {
