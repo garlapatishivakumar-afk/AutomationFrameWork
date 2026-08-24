@@ -25,21 +25,29 @@ namespace AIAutomationGenerator.Intelligence.Services
 
         /// <summary>
         /// Build complete automation intelligence from recording and repository.
+        /// V5.0 P1: Applies RelevantContextSelector before enrichment so only
+        /// relevant components enter the pipeline. Metrics are recorded in the model.
         /// </summary>
         public async Task<AutomationIntelligenceModel> AnalyzeRecordingAsync(
             string repositoryRoot,
             List<RecordedActionIntelligence> recordingActions,
             bool forceRebuildIndex = false)
         {
-            // Phase 1: Load/rebuild repository knowledge
-            var repositoryKnowledge = await _indexService.GetIndexAsync(forceRebuildIndex);
+            // Phase 1: Load/rebuild full repository index
+            var fullIndex = await _indexService.GetIndexAsync(forceRebuildIndex);
 
-            if (repositoryKnowledge == null || !repositoryKnowledge.PageElements.Any())
+            if (fullIndex == null || !fullIndex.PageElements.Any())
             {
                 throw new InvalidOperationException("Repository knowledge index is empty. Cannot build intelligence.");
             }
 
-            // Phase 2: Build recording intelligence
+            // Phase 1b (V5.0 P1): Select only relevant context before passing downstream.
+            // This replaces passing the full index through every pipeline stage.
+            var selector      = new RelevantContextSelector();
+            var selectionResult = selector.SelectRelevantContext(fullIndex, recordingActions);
+            var repositoryKnowledge = selectionResult.FilteredIndex;
+
+            // Phase 2: Build recording intelligence (enriches actions against filtered index)
             var recordingIntelligence = BuildRecordingIntelligence(repositoryKnowledge, recordingActions);
 
             // Phase 3: Build business flow analysis
@@ -48,15 +56,16 @@ namespace AIAutomationGenerator.Intelligence.Services
             // Phase 4: Extract architecture decisions
             var decisions = BuildIntelligenceDecisions(recordingIntelligence, repositoryKnowledge);
 
-            // Phase 5: Assemble unified result
+            // Phase 5: Assemble unified result — RepositoryKnowledge is now the FILTERED slice
             var intelligence = new AutomationIntelligenceModel
             {
-                AnalysisTimestamp = DateTime.UtcNow.ToString("O"),
-                RepositoryRoot = repositoryRoot,
-                RepositoryKnowledge = repositoryKnowledge,
+                AnalysisTimestamp   = DateTime.UtcNow.ToString("O"),
+                RepositoryRoot      = repositoryRoot,
+                RepositoryKnowledge = repositoryKnowledge,   // filtered slice
+                ContextSelection    = selectionResult.Metrics, // measurable reduction
                 RecordingIntelligence = recordingIntelligence,
-                BusinessFlows = businessFlows,
-                Decisions = decisions
+                BusinessFlows       = businessFlows,
+                Decisions           = decisions
             };
 
             return intelligence;

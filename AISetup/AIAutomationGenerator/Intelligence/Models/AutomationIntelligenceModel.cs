@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AIAutomationGenerator.Intelligence.Services;
 
 namespace AIAutomationGenerator.Intelligence.Models
 {
@@ -7,14 +8,21 @@ namespace AIAutomationGenerator.Intelligence.Models
     /// Unified intelligence result that brings together all V4.0 Prompt 1 knowledge.
     /// This is the input to V4.0 Prompt 2 (Generation).
     /// Designed to be compact and avoid duplicating source code.
+    ///
+    /// V5.0 P1 addition: ContextSelection carries the metrics from RelevantContextSelector,
+    /// documenting exactly how many components were considered vs selected.
+    /// RepositoryKnowledge is now the FILTERED slice, not the full index.
     /// </summary>
     public class AutomationIntelligenceModel
     {
         public string AnalysisTimestamp { get; set; }
         public string RepositoryRoot { get; set; }
 
-        // Repository knowledge (from FrameworkIndex)
+        // Repository knowledge — V5.0: filtered slice (only relevant components)
         public RepositoryKnowledgeModel RepositoryKnowledge { get; set; }
+
+        // V5.0 P1: context selection metrics (how much was reduced)
+        public ContextSelectionMetrics ContextSelection { get; set; }
 
         // Recording intelligence
         public RecordingIntelligenceModel RecordingIntelligence { get; set; }
@@ -32,8 +40,8 @@ namespace AIAutomationGenerator.Intelligence.Models
         public int TotalStepDefinitions => RepositoryKnowledge?.StepDefinitions?.Count ?? 0;
         public int RecordingActionCount => RecordingIntelligence?.Actions?.Count ?? 0;
 
-        public bool IsValid => 
-            RepositoryKnowledge != null && 
+        public bool IsValid =>
+            RepositoryKnowledge != null &&
             RecordingIntelligence != null;
     }
 
