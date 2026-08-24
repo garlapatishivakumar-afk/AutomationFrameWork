@@ -1,17 +1,16 @@
 using System;
 using System.Collections.Generic;
 using AIAutomationGenerator.Intelligence.Services;
+using AIAutomationGenerator.Knowledge;
 
 namespace AIAutomationGenerator.Intelligence.Models
 {
     /// <summary>
-    /// Unified intelligence result that brings together all V4.0 Prompt 1 knowledge.
-    /// This is the input to V4.0 Prompt 2 (Generation).
-    /// Designed to be compact and avoid duplicating source code.
+    /// Unified intelligence result.
     ///
-    /// V5.0 P1 addition: ContextSelection carries the metrics from RelevantContextSelector,
-    /// documenting exactly how many components were considered vs selected.
-    /// RepositoryKnowledge is now the FILTERED slice, not the full index.
+    /// V5.0 P1: ContextSelection metrics, filtered RepositoryKnowledge.
+    /// V6.0 P2: RetrievedKnowledge, Evidence, KnowledgeMetrics — all optional
+    ///          to preserve full backward compatibility with V5.0 pipeline.
     /// </summary>
     public class AutomationIntelligenceModel
     {
@@ -21,7 +20,7 @@ namespace AIAutomationGenerator.Intelligence.Models
         // Repository knowledge — V5.0: filtered slice (only relevant components)
         public RepositoryKnowledgeModel RepositoryKnowledge { get; set; }
 
-        // V5.0 P1: context selection metrics (how much was reduced)
+        // V5.0 P1: context selection metrics
         public ContextSelectionMetrics ContextSelection { get; set; }
 
         // Recording intelligence
@@ -33,12 +32,28 @@ namespace AIAutomationGenerator.Intelligence.Models
         // Extracted relationships for easy consumption by generator
         public List<IntelligenceDecision> Decisions { get; set; } = new();
 
+        // V6.0 P2: Retrieved knowledge items (optional — null when V5 path used)
+        public KnowledgeRetrievalResult RetrievedKnowledge { get; set; }
+
+        // V6.0 P2: Evidence attached to decisions (keyed by decision ActionIndex)
+        public Dictionary<int, List<KnowledgeEvidence>> DecisionEvidence { get; set; } = new();
+
+        // V6.0 P2: Conflicts that require human review
+        public List<KnowledgeConflict> KnowledgeConflicts { get; set; } = new();
+
+        // V6.0 P2: Knowledge-enrichment metrics
+        public KnowledgeIntelligenceMetrics KnowledgeMetrics { get; set; }
+
         // Summary statistics
         public int TotalPagesInRepository => RepositoryKnowledge?.TotalPages ?? 0;
         public int TotalPageElements => RepositoryKnowledge?.PageElements?.Count ?? 0;
         public int TotalPageActions => RepositoryKnowledge?.PageActions?.Count ?? 0;
         public int TotalStepDefinitions => RepositoryKnowledge?.StepDefinitions?.Count ?? 0;
         public int RecordingActionCount => RecordingIntelligence?.Actions?.Count ?? 0;
+
+        // V6.0 P2 helpers
+        public bool HasKnowledgeEnrichment => RetrievedKnowledge != null;
+        public int  EvidenceCount => DecisionEvidence.Values.Sum(l => l.Count);
 
         public bool IsValid =>
             RepositoryKnowledge != null &&
