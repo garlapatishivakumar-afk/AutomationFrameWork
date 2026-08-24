@@ -37,7 +37,9 @@ namespace AIAutomationGenerator.Tests.Planning
         private static AutomationIntelligenceModel BuildModel(
             string recommendation,
             bool withEvidence,
-            bool conflicting = false)
+            bool conflicting = false,
+            double confidence = 0.9,
+            double evidenceRelevance = 0.9)
         {
             var evidence = new List<KnowledgeEvidence>();
             if (withEvidence && !conflicting)
@@ -53,7 +55,7 @@ namespace AIAutomationGenerator.Tests.Planning
                     EvidenceText    = "Matching element found",
                     IsDirect        = true,
                     Confidence      = ConfidenceLevel.High,
-                    Relevance       = 0.9
+                    Relevance       = evidenceRelevance
                 });
             }
             else if (conflicting)
@@ -106,7 +108,7 @@ namespace AIAutomationGenerator.Tests.Planning
                     new() { ActionIndex = 0, ActionDescription = "click SearchButton",
                             DecisionType = "PageElement", Recommendation = recommendation,
                             TargetComponent = "DashboardObjects.SearchButton",
-                            ConfidenceScore = 0.9 }
+                            ConfidenceScore = confidence }
                 },
                 DecisionEvidence = new Dictionary<int, List<KnowledgeEvidence>>
                 {
@@ -238,6 +240,17 @@ namespace AIAutomationGenerator.Tests.Planning
 
             Assert.NotEmpty(plan.ProtectedFiles);
             Assert.Contains(plan.ProtectedFiles, f => f.Contains("Hooks.cs"));
+            Assert.Contains(plan.ProtectedFiles, f => f.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase));
+        }
+
+        [Fact]
+        public void Planner_CreateLowConfidence_RequiresHumanReview()
+        {
+            var planner = new EngineeringPlanner();
+            var plan = planner.CreatePlan(BuildModel("CREATE", withEvidence: true, confidence: 0.9, evidenceRelevance: 0.2));
+
+            Assert.Contains(plan.Decisions, d => d.Decision == EngineeringDecisionType.HumanReviewRequired);
+            Assert.DoesNotContain(plan.Decisions, d => d.Decision == EngineeringDecisionType.Create);
         }
 
         // ===========================

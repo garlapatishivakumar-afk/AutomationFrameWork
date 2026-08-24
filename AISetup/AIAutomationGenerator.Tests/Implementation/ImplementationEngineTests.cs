@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Xunit;
 using AIAutomationGenerator.Implementation;
 using AIAutomationGenerator.Planning;
 using AIAutomationGenerator.Knowledge;
+using AIAutomationGenerator.Safety;
 
 namespace AIAutomationGenerator.Tests.Implementation
 {
@@ -56,6 +58,7 @@ namespace AIAutomationGenerator.Tests.Implementation
                                 : FileModificationType.Create,
                         Reason    = "test",
                         Evidence  = "element found",
+                        PlannedContent = "public string AddedByTest => \"ok\";",
                         IsProtected = withProtectedFile
                     }
                 }
@@ -115,10 +118,25 @@ namespace AIAutomationGenerator.Tests.Implementation
         public void Engine_ProtectedFile_ReturnsHumanReviewRequired()
         {
             var plan   = MakePlan(withProtectedFile: true);
-            var engine = new ImplementationEngine();
+            var engine = new ImplementationEngine(new ProtectedFilePolicy());
             var result = engine.Execute(plan);
 
             Assert.Contains(result.Changes, c => c.Status == ChangeStatus.HumanReviewRequired);
+        }
+
+        [Fact]
+        public void Engine_ProtectedFile_CreatesExactlyOneChangeRecord()
+        {
+            var plan = MakePlan(withProtectedFile: true);
+            var engine = new ImplementationEngine(new ProtectedFilePolicy());
+
+            var result = engine.Execute(plan);
+            var protectedRecords = result.Changes
+                .Where(c => c.FilePath.Contains("Hooks.cs", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Assert.Single(protectedRecords);
+            Assert.Equal(ChangeStatus.HumanReviewRequired, protectedRecords[0].Status);
         }
 
         [Fact]
@@ -273,6 +291,103 @@ namespace AIAutomationGenerator.Tests.Implementation
 
             var applied = result.Changes.Where(c => c.Status == ChangeStatus.Applied).ToList();
             Assert.All(applied, c => Assert.False(string.IsNullOrEmpty(c.Evidence)));
+        }
+
+        [Fact]
+        public void Engine_ApplyFileSystemChanges_CreatesFileWithHashes()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempRoot);
+            try
+            {
+                var target = Path.Combine(tempRoot, "Generated", "NewFile.cs");
+                var plan = new EngineeringPlan
+                {
+                    PlanId = "p-real-create",
+                    Status = PlanStatus.Ready,
+                    Decisions = new List<EngineeringDecision>(),
+                    PlannedFileChanges = new List<FilePlan>
+                    {
+                        new()
+                        {
+                            FilePath = target,
+                            ModificationType = FileModificationType.Create,
+                            PlannedContent = "namespace T; public class NewFile { }",
+                            Reason = "create",
+                            Evidence = "test"
+                        }
+                    }
+                };
+
+                var result = new ImplementationEngine().Execute(plan, applyFileSystemChanges: true);
+                var applied = Assert.Single(result.Changes.Where(c => c.Status == ChangeStatus.Applied));
+                Assert.True(File.Exists(target));
+                Assert.Null(applied.BeforeHash);
+                Assert.False(string.IsNullOrWhiteSpace(applied.AfterHash));
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, recursive: true);
+                }
+            }
+        }
+
+        [Fact]
+        public void Engine_ApplyFileSystemChanges_RestoresOnMultiFileFailure()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempRoot);
+            try
+            {
+                var fileA = Path.Combine(tempRoot, "A.cs");
+                var fileB = Path.Combine(tempRoot, "B.cs");
+                File.WriteAllText(fileA, "class A { }\n");
+                File.WriteAllText(fileB, "class B { \n"); // invalid braces to force safe rejection
+
+                var beforeA = File.ReadAllText(fileA);
+                var beforeB = File.ReadAllText(fileB);
+
+                var plan = new EngineeringPlan
+                {
+                    PlanId = "p-real-rollback",
+                    Status = PlanStatus.Ready,
+                    Decisions = new List<EngineeringDecision>(),
+                    PlannedFileChanges = new List<FilePlan>
+                    {
+                        new()
+                        {
+                            FilePath = fileA,
+                            ModificationType = FileModificationType.Extend,
+                            PlannedContent = "public void M(){}",
+                            Reason = "extend A",
+                            Evidence = "test"
+                        },
+                        new()
+                        {
+                            FilePath = fileB,
+                            ModificationType = FileModificationType.Extend,
+                            PlannedContent = "public void N(){}",
+                            Reason = "extend B",
+                            Evidence = "test"
+                        }
+                    }
+                };
+
+                var result = new ImplementationEngine().Execute(plan, applyFileSystemChanges: true);
+
+                Assert.Equal(ImplementationStatus.HumanReviewRequired, result.FinalStatus);
+                Assert.Equal(beforeA, File.ReadAllText(fileA));
+                Assert.Equal(beforeB, File.ReadAllText(fileB));
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, recursive: true);
+                }
+            }
         }
     }
 }

@@ -58,6 +58,9 @@ namespace AIAutomationGenerator.Acceptance
                     CreateCount         = r.CreateCount,
                     HumanReviewCount    = r.HumanReviewCount,
                     FilesModified       = r.FilesModified,
+                    CorrectionsAttempted = r.CorrectionsAttempted,
+                    CorrectionsSucceeded = r.CorrectionsSucceeded,
+                    Rollbacks           = r.Rollbacks,
                     TokenMeasurement    = r.TokenMeasurement,
                     AiCredits           = r.AiCreditsMeasurement,
                     HumanReviewNotes    = r.Stages
@@ -87,6 +90,13 @@ namespace AIAutomationGenerator.Acceptance
             var m = new List<V7CriterionResult>();
             bool allRecordingsOk = report.RecordingResults.Count > 0 &&
                 report.RecordingResults.All(r => r.FinalStatus != "Failed");
+            bool hasPlanningEvidence = report.RecordingResults.All(r =>
+                r.ReuseCount + r.ExtendCount + r.CreateCount + r.HumanReviewCount > 0);
+            bool anyReuse = report.RecordingResults.Any(r => r.ReuseCount > 0);
+            bool anyExtend = report.RecordingResults.Any(r => r.ExtendCount > 0);
+            bool anyCreate = report.RecordingResults.Any(r => r.CreateCount > 0);
+            bool anySelfHealAttempt = report.RecordingResults.Any(r => r.CorrectionsAttempted > 0);
+            bool anyRollback = report.RecordingResults.Any(r => r.Rollbacks > 0);
 
             // C1–C25
             m.Add(Pass("C1_RealRecordingsProcessed", "Real recordings processed",
@@ -102,11 +112,14 @@ namespace AIAutomationGenerator.Acceptance
             m.Add(Pass("C6_EngineeringPlanning", "Engineering plan produced (V7 P1)",
                 allRecordingsOk, allRecordingsOk ? "PASS" : "Some recordings failed"));
             m.Add(Pass("C7_ReuseDecision", "REUSE decision logic exists",
-                true, "PASS — EngineeringPlanner implements REUSE"));
+                hasPlanningEvidence,
+                anyReuse ? "PASS — run evidence includes REUSE." : "PASS — planning executed; no REUSE needed for current recordings."));
             m.Add(Pass("C8_ExtendDecision", "EXTEND decision logic exists",
-                true, "PASS — EngineeringPlanner implements EXTEND"));
+                hasPlanningEvidence,
+                anyExtend ? "PASS — run evidence includes EXTEND." : "PASS — planning executed; no EXTEND needed for current recordings."));
             m.Add(Pass("C9_CreateDecision", "CREATE decision logic exists",
-                true, "PASS — EngineeringPlanner implements CREATE"));
+                hasPlanningEvidence,
+                anyCreate ? "PASS — run evidence includes CREATE." : "PASS — planning executed; no CREATE needed for current recordings."));
             m.Add(Pass("C10_HumanReviewBoundary", "HUMAN_REVIEW_REQUIRED stops pipeline",
                 true, "PASS — verified in orchestrator and tests"));
             m.Add(Pass("C11_ImplementationGeneration", "Implementation engine generates change records",
@@ -122,10 +135,16 @@ namespace AIAutomationGenerator.Acceptance
                 true, "PASS — S9:ExecuteTests stage (dry-run: skipped)"));
             m.Add(Pass("C15_FailureClassification", "Failures classified via FailureClassifier",
                 true, "PASS — ImplementationEngine uses existing FailureClassifier (V5)"));
-            m.Add(Pass("C16_SafeSelfHealing", "Bounded self-healing with retry limit",
-                true, "PASS — TryCorrect() with MaxRetries=2"));
-            m.Add(Pass("C17_Rollback", "Rollback capability present",
-                true, "PASS — Rollback() in ImplementationEngine"));
+            m.Add(Pending("C16_SafeSelfHealing", "Bounded self-healing with retry limit",
+                anySelfHealAttempt,
+                anySelfHealAttempt
+                    ? "PASS — correction attempts observed with bounded retry policy."
+                    : "PENDING — no runtime failures triggered self-healing in this run."));
+            m.Add(Pending("C17_Rollback", "Rollback capability present",
+                anyRollback,
+                anyRollback
+                    ? "PASS — rollback executed and recorded."
+                    : "PENDING — no runtime failure required rollback in this run."));
             m.Add(Pass("C18_Repeatability", "Same recording → identical results",
                 report.IsDeterministic, report.RepeatabilityNote));
             m.Add(Pending("C19_MultiRecording", "Multi-recording acceptance (≥3 real recordings)",
@@ -236,6 +255,9 @@ namespace AIAutomationGenerator.Acceptance
         public int          CreateCount      { get; set; }
         public int          HumanReviewCount { get; set; }
         public int          FilesModified    { get; set; }
+        public int          CorrectionsAttempted { get; set; }
+        public int          CorrectionsSucceeded { get; set; }
+        public int          Rollbacks { get; set; }
         public string       TokenMeasurement { get; set; }
         public string       AiCredits        { get; set; }
         public List<string> HumanReviewNotes { get; set; } = new();

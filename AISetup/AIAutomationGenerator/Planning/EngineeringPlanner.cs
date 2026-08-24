@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AIAutomationGenerator.Intelligence.Models;
 using AIAutomationGenerator.Knowledge;
+using AIAutomationGenerator.Safety;
 
 namespace AIAutomationGenerator.Planning
 {
@@ -24,6 +25,13 @@ namespace AIAutomationGenerator.Planning
     {
         private const double HighConfidenceThreshold = 0.85;
         private const double MediumConfidenceThreshold = 0.6;
+        private const double CreateConfidenceFloor = 0.5;
+        private readonly ProtectedFilePolicy _protectedFilePolicy;
+
+        public EngineeringPlanner(ProtectedFilePolicy? protectedFilePolicy = null)
+        {
+            _protectedFilePolicy = protectedFilePolicy ?? new ProtectedFilePolicy();
+        }
 
         public EngineeringPlan CreatePlan(AutomationIntelligenceModel intelligence, string recordingSource = null)
         {
@@ -69,7 +77,7 @@ namespace AIAutomationGenerator.Planning
             plan.PlannedFileChanges = BuildFilePlan(plan.Decisions, intelligence);
 
             // Identify protected files
-            plan.ProtectedFiles = IdentifyProtectedFiles(intelligence);
+            plan.ProtectedFiles = _protectedFilePolicy.GetProtectedPaths();
 
             // Compute overall confidence
             plan.OverallConfidence = plan.Decisions.Any()
@@ -84,6 +92,25 @@ namespace AIAutomationGenerator.Planning
                     .Where(d => d.Decision == EngineeringDecisionType.HumanReviewRequired)
                     .Select(d => d.HumanReviewNote)
                     .Where(n => !string.IsNullOrEmpty(n))
+                    .ToList();
+
+                plan.HumanReviewQuestions = plan.Decisions
+                    .Where(d => d.Decision == EngineeringDecisionType.HumanReviewRequired)
+                    .Select(d => new HumanReviewQuestion
+                    {
+                        RunId = plan.PlanId,
+                        Reason = d.Reason ?? "Ambiguous repository evidence.",
+                        Question = $"Which component should action '{d.ActionDescription}' target?",
+                        Options = new List<string>
+                        {
+                            d.SourcePath ?? "Use current proposed component",
+                            "Select another existing component",
+                            "Create new component"
+                        },
+                        Evidence = d.Evidence.Select(e => e.EvidenceText).Where(t => !string.IsNullOrWhiteSpace(t)).ToList(),
+                        RecommendedOption = d.SourcePath,
+                        Risk = "Protected"
+                    })
                     .ToList();
             }
             else if (plan.Decisions.Any())
@@ -155,6 +182,15 @@ namespace AIAutomationGenerator.Planning
             }
             else if (intelRec == "CREATE")
             {
+                if (avgConfidence < CreateConfidenceFloor)
+                {
+                    decision.Decision        = EngineeringDecisionType.HumanReviewRequired;
+                    decision.Reason          = $"CREATE confidence {avgConfidence:P0} is below minimum floor {CreateConfidenceFloor:P0}.";
+                    decision.Confidence      = avgConfidence;
+                    decision.HumanReviewNote = $"Insufficient confidence for CREATE on '{intelDecision.TargetComponent}'.";
+                    return decision;
+                }
+
                 // CREATE requires evidence that the page/context is genuinely new
                 decision.Decision   = EngineeringDecisionType.Create;
                 decision.Reason     = "No matching existing component; recording supports creation.";
@@ -206,8 +242,13 @@ namespace AIAutomationGenerator.Planning
                         : d.Decision == EngineeringDecisionType.Extend
                             ? "Append new method/locator to existing file"
                             : "New file created",
-                    IsProtected = false
+                    IsProtected = _protectedFilePolicy.IsProtected(path)
                 };
+
+                if (plans[path].IsProtected)
+                {
+                    plans[path].ModificationType = FileModificationType.Protected;
+                }
             }
 
             return plans.Values.ToList();
@@ -249,17 +290,5 @@ namespace AIAutomationGenerator.Planning
             return result.Distinct().ToList();
         }
 
-        private static List<string> IdentifyProtectedFiles(AutomationIntelligenceModel m)
-        {
-            // Framework infrastructure files — never auto-modified
-            var root = m.RepositoryRoot ?? "AutomationFrameWork";
-            return new List<string>
-            {
-                $"{root}/Hooks/Hooks.cs",
-                $"{root}/DriverFactory/PlaywrightDriver.cs",
-                $"{root}/XunitAssembly.cs",
-                $"{root}/ImplicitUsings.cs"
-            };
-        }
     }
 }

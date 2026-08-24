@@ -1,5 +1,6 @@
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Models;
+using AIAutomationGenerator.Safety;
 
 namespace AIAutomationGenerator.Implementation;
 
@@ -12,15 +13,26 @@ public class FrameworkFileModifier : IFrameworkFileModifier
 {
     private readonly IArchitectureValidator validator;
     private readonly ILogger logger;
+    private readonly ProtectedFilePolicy protectedFilePolicy;
 
-    public FrameworkFileModifier(IArchitectureValidator validator, ILogger logger)
+    public FrameworkFileModifier(
+        IArchitectureValidator validator,
+        ILogger logger,
+        ProtectedFilePolicy? protectedFilePolicy = null)
     {
         this.validator = validator;
         this.logger    = logger;
+        this.protectedFilePolicy = protectedFilePolicy ?? new ProtectedFilePolicy();
     }
 
     public async Task<bool> ApplyAsync(ImplementationChange change, string frameworkRoot)
     {
+        if (!string.IsNullOrWhiteSpace(change.FilePath) && protectedFilePolicy.IsProtected(change.FilePath))
+        {
+            logger.LogInformation($"[FrameworkFileModifier] Protected file rejected: {change.FilePath}");
+            return false;
+        }
+
         if (change.Action == "REUSE")
         {
             logger.LogInformation($"[FrameworkFileModifier] REUSE — no file change: {change.ClassName}.{change.MemberName}");
@@ -150,6 +162,12 @@ public class FrameworkFileModifier : IFrameworkFileModifier
         {
             string original = await File.ReadAllTextAsync(change.FilePath);
 
+            if (!HasBalancedBraces(original))
+            {
+                logger.LogInformation($"[FrameworkFileModifier] EXTEND rejected — ambiguous structure in {change.FilePath}");
+                return false;
+            }
+
             // Safety: do not insert if the member already exists
             if (!string.IsNullOrWhiteSpace(change.MemberName) &&
                 original.Contains(change.MemberName, StringComparison.OrdinalIgnoreCase))
@@ -187,5 +205,18 @@ public class FrameworkFileModifier : IFrameworkFileModifier
             + content.TrimEnd()
             + "\n"
             + source.Substring(lastBrace);
+    }
+
+    private static bool HasBalancedBraces(string source)
+    {
+        int balance = 0;
+        foreach (char c in source)
+        {
+            if (c == '{') balance++;
+            if (c == '}') balance--;
+            if (balance < 0) return false;
+        }
+
+        return balance == 0;
     }
 }

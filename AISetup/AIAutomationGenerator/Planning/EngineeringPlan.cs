@@ -22,6 +22,7 @@ namespace AIAutomationGenerator.Planning
         public List<EngineeringDecision> Decisions { get; set; } = new();
         public List<FilePlan> PlannedFileChanges   { get; set; } = new();
         public List<string> ProtectedFiles         { get; set; } = new();
+        public List<HumanReviewQuestion> HumanReviewQuestions { get; set; } = new();
 
         public bool FrameworkModificationsAllowed  { get; set; } = false;
         public PlanStatus Status                   { get; set; } = PlanStatus.Draft;
@@ -75,6 +76,7 @@ namespace AIAutomationGenerator.Planning
         public string Reason          { get; set; }
         public string Evidence        { get; set; }
         public string ExpectedImpact  { get; set; }
+        public string PlannedContent  { get; set; }
         public bool   IsProtected     { get; set; }
     }
 

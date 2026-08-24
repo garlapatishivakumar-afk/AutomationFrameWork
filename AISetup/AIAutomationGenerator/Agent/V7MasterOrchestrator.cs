@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using AIAutomationGenerator.FrameworkScanner;
 using AIAutomationGenerator.Implementation;
 using AIAutomationGenerator.Intelligence.Models;
 using AIAutomationGenerator.Intelligence.Services;
 using AIAutomationGenerator.Knowledge;
 using AIAutomationGenerator.Orchestration;
 using AIAutomationGenerator.Planning;
+using AIAutomationGenerator.Safety;
 
 namespace AIAutomationGenerator.Agent
 {
@@ -40,6 +42,9 @@ namespace AIAutomationGenerator.Agent
         private readonly string _repositoryRoot;
         private readonly CodegenParser _parser;
         private readonly RelevantContextSelector _contextSelector;
+        private readonly FrameworkIndexService _frameworkIndexService;
+        private readonly RepositorySnapshotService _snapshotService;
+        private readonly ProtectedFilePolicy _protectedFilePolicy;
         private readonly KnowledgeIndexService _indexSvc;
         private readonly KnowledgeRetrievalService _retrievalSvc;
         private readonly KnowledgeEnrichmentService _enrichmentSvc;
@@ -51,17 +56,21 @@ namespace AIAutomationGenerator.Agent
             _repositoryRoot  = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
             _parser          = new CodegenParser();
             _contextSelector = new RelevantContextSelector();
+            _frameworkIndexService = new FrameworkIndexService(repositoryRoot, new SolutionScanner());
+            _snapshotService = new RepositorySnapshotService();
+            _protectedFilePolicy = new ProtectedFilePolicy(repositoryRoot);
             _indexSvc        = new KnowledgeIndexService();
             _retrievalSvc    = new KnowledgeRetrievalService();
             _enrichmentSvc   = new KnowledgeEnrichmentService();
-            _planner         = new EngineeringPlanner();
-            _implEngine      = new ImplementationEngine();
+            _planner         = new EngineeringPlanner(_protectedFilePolicy);
+            _implEngine      = new ImplementationEngine(_protectedFilePolicy);
         }
 
         public async Task<V7ExecutionResult> RunAsync(string recordingFilePath, bool dryRun = true)
         {
             var result = new V7ExecutionResult
             {
+                RunId = Guid.NewGuid().ToString("N"),
                 RecordingPath = recordingFilePath,
                 StartedAt     = DateTime.UtcNow,
                 DryRun        = dryRun
@@ -95,12 +104,17 @@ namespace AIAutomationGenerator.Agent
 
             // ===== S2: SelectContext =====
             var s2 = StartStage("S2:SelectContext");
+            RepositoryKnowledgeModel fullRepository = null;
             RepositoryKnowledgeModel filteredRepo = null;
             ContextSelectionResult ctxResult = null;
             try
             {
-                var minRepo = BuildMinimalRepo();
-                ctxResult   = _contextSelector.SelectRelevantContext(minRepo, parseResult.Actions);
+                fullRepository = await _frameworkIndexService.GetIndexAsync(forceRebuild: false);
+                result.RepositorySnapshot = _snapshotService.Create(_repositoryRoot, fullRepository, result.RunId);
+                result.RepositorySnapshotHash = result.RepositorySnapshot.SnapshotHash;
+                result.RepositoryFileCount = result.RepositorySnapshot.FileCount;
+
+                ctxResult   = _contextSelector.SelectRelevantContext(fullRepository, parseResult.Actions);
                 filteredRepo = ctxResult.FilteredIndex;
                 EndStage(s2, true,
                     $"Context reduced by {ctxResult.Metrics.ReductionPercent}%");
@@ -153,6 +167,16 @@ namespace AIAutomationGenerator.Agent
             try
             {
                 plan = _planner.CreatePlan(intelligence, recordingFilePath);
+                plan.ProtectedFiles = _protectedFilePolicy.GetProtectedPaths();
+                foreach (var change in plan.PlannedFileChanges)
+                {
+                    change.IsProtected = _protectedFilePolicy.IsProtected(change.FilePath);
+                    if (change.IsProtected)
+                    {
+                        change.ModificationType = FileModificationType.Protected;
+                    }
+                }
+
                 result.ReuseCount         = plan.ReuseCount;
                 result.ExtendCount        = plan.ExtendCount;
                 result.CreateCount        = plan.CreateCount;
@@ -174,9 +198,12 @@ namespace AIAutomationGenerator.Agent
             ImplementationExecutionRecord implRecord = null;
             try
             {
-                implRecord = _implEngine.Execute(plan);
+                implRecord = _implEngine.Execute(plan, applyFileSystemChanges: !dryRun);
                 result.FilesModified          = implRecord.Changes.Count(c => c.Status == ChangeStatus.Applied);
                 result.FrameworkModifications = implRecord.FrameworkModified ? 1 : 0;
+                result.CorrectionsAttempted   = implRecord.CorrectionsAttempted;
+                result.CorrectionsSucceeded   = implRecord.CorrectionsSucceeded;
+                result.Rollbacks              = implRecord.Rollbacks;
                 EndStage(s6, true, $"Implementation plan executed: {implRecord.FinalStatus}");
                 EndStage(s7, implRecord.FinalStatus != ImplementationStatus.HumanReviewRequired,
                     $"Changes: {implRecord.Changes.Count}",
@@ -257,10 +284,10 @@ namespace AIAutomationGenerator.Agent
             return r;
         }
 
-        private RepositoryKnowledgeModel BuildMinimalRepo() =>
+        private static RepositoryKnowledgeModel BuildMinimalRepoForTestsOnly() =>
             new()
             {
-                RepositoryRoot  = _repositoryRoot,
+                RepositoryRoot  = "TEST_ONLY",
                 LastScanTime    = DateTime.UtcNow.ToString("O"),
                 PageElements    = new List<PageElementInfo>(),
                 PageActions     = new List<PageActionInfo>(),
@@ -272,6 +299,7 @@ namespace AIAutomationGenerator.Agent
 
     public class V7ExecutionResult
     {
+        public string       RunId                  { get; set; }
         public string       RecordingPath         { get; set; }
         public DateTime     StartedAt             { get; set; }
         public DateTime     CompletedAt           { get; set; }
@@ -288,6 +316,12 @@ namespace AIAutomationGenerator.Agent
         public int    HumanReviewCount        { get; set; }
         public int    FilesModified           { get; set; }
         public int    FrameworkModifications  { get; set; }
+        public int    CorrectionsAttempted    { get; set; }
+        public int    CorrectionsSucceeded    { get; set; }
+        public int    Rollbacks               { get; set; }
+        public int    RepositoryFileCount     { get; set; }
+        public string RepositorySnapshotHash  { get; set; } = string.Empty;
+        public RepositorySnapshot? RepositorySnapshot { get; set; }
         public string TokenMeasurement        { get; set; } = "NOT_AVAILABLE";
         public string AiCreditsMeasurement    { get; set; } = "NOT_AVAILABLE";
 
