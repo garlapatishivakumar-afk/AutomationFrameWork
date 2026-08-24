@@ -190,25 +190,36 @@ namespace AIAutomationGenerator.Planning
             // Rule 3: apply intel recommendation when evidence supports it
             var intelRec = intelDecision.Recommendation?.ToUpperInvariant();
             double avgConfidence = evidence.Average(e => e.Relevance);
+
+            // maxConfidence: the single best-matching evidence item.
+            // S4 enrichment attaches multi-layer evidence (PageElement + PageAction + StepDefinition)
+            // for the same component. PageElement/PageAction items may score 0.0 because locator
+            // signal matching doesn't apply to every action type (e.g. navigate), while
+            // StepDefinition items score 0.85 via semantic step text matching.
+            // Averaging all items together incorrectly dilutes genuine high-confidence evidence.
+            // Using maxConfidence for REUSE/EXTEND threshold: if the best single evidence item
+            // strongly matches, the component exists in the repository and REUSE/EXTEND is safe.
+            double maxConfidence = evidence.Max(e => e.Relevance);
             
             // Select the best-confidence evidence item for SourcePath (e.g., prefer PageElement over Step)
             var bestConfidenceItem = evidence.OrderByDescending(e => e.Relevance).FirstOrDefault();
             decision.SourcePath = bestConfidenceItem?.SourcePath ?? evidence.FirstOrDefault(e => !string.IsNullOrEmpty(e.SourcePath))?.SourcePath;
 
-            if (intelRec == "REUSE" && avgConfidence >= MediumConfidenceThreshold)
+            if (intelRec == "REUSE" && maxConfidence >= MediumConfidenceThreshold)
             {
                 decision.Decision   = EngineeringDecisionType.Reuse;
-                decision.Reason     = $"Existing component matches (confidence {avgConfidence:P0}).";
-                decision.Confidence = avgConfidence;
+                decision.Reason     = $"Existing component matches (confidence {maxConfidence:P0}).";
+                decision.Confidence = maxConfidence;
             }
-            else if (intelRec == "EXTEND" && avgConfidence >= MediumConfidenceThreshold)
+            else if (intelRec == "EXTEND" && maxConfidence >= MediumConfidenceThreshold)
             {
                 decision.Decision   = EngineeringDecisionType.Extend;
-                decision.Reason     = $"Page exists; new capability needed (confidence {avgConfidence:P0}).";
-                decision.Confidence = avgConfidence;
+                decision.Reason     = $"Page exists; new capability needed (confidence {maxConfidence:P0}).";
+                decision.Confidence = maxConfidence;
             }
             else if (intelRec == "CREATE")
             {
+                // CREATE needs overall support (avg), not just one matching item
                 if (avgConfidence < CreateConfidenceFloor)
                 {
                     decision.Decision        = EngineeringDecisionType.HumanReviewRequired;
@@ -227,10 +238,10 @@ namespace AIAutomationGenerator.Planning
             }
             else
             {
-                // Ambiguous recommendation or low confidence
+                // Ambiguous recommendation or confidence below all thresholds
                 decision.Decision        = EngineeringDecisionType.HumanReviewRequired;
-                decision.Reason          = $"Ambiguous recommendation '{intelRec}' with confidence {avgConfidence:P0}.";
-                decision.Confidence      = avgConfidence;
+                decision.Reason          = $"Ambiguous recommendation '{intelRec}' with confidence {maxConfidence:P0}.";
+                decision.Confidence      = maxConfidence;
                 decision.HumanReviewNote = $"Cannot determine safe decision for '{intelDecision.TargetComponent}'.";
             }
 

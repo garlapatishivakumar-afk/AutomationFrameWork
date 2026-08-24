@@ -464,5 +464,120 @@ namespace AIAutomationGenerator.Tests.Planning
 
             Assert.All(reuseOrExtend, d => Assert.True(d.HasEvidence));
         }
+
+        // ===========================
+        // S5 maxConfidence fix regression tests
+        // ===========================
+
+        [Fact]
+        public void Planner_S5_MultiLayerEvidence_LowAvgHighMax_ProducesReuse()
+        {
+            // Scenario: S4 enrichment attaches PageElement/PageAction (Relevance=0) AND
+            // StepDefinition (Relevance=0.85) for the same ViewDashboard page.
+            // avgConfidence = (0+0+0+0.85+0.85)/5 = 0.34 < 0.6 (would fail with avg check).
+            // maxConfidence = 0.85 >= 0.6 → should produce REUSE.
+            var evidence = new List<KnowledgeEvidence>
+            {
+                new() { KnowledgeId = "pe1", SourceType = KnowledgeSourceType.PageElement,
+                        SourcePath = "PageElements/ViewDashboardObjects.cs",
+                        Page = "ViewDashboard", Component = "AdministrationLink",
+                        RetrievalReason = "page-match", Relevance = 0.0 },
+                new() { KnowledgeId = "pa1", SourceType = KnowledgeSourceType.PageAction,
+                        SourcePath = "PageActions/ViewDashboardMethods.cs",
+                        Page = "ViewDashboard", Component = "ClickAdministrationLinkAsync",
+                        RetrievalReason = "page-match", Relevance = 0.0 },
+                new() { KnowledgeId = "pa2", SourceType = KnowledgeSourceType.PageAction,
+                        SourcePath = "PageActions/ViewDashboardMethods.cs",
+                        Page = "ViewDashboard", Component = "NavigateToDocumentAdministrationAsync",
+                        RetrievalReason = "page-match", Relevance = 0.0 },
+                new() { KnowledgeId = "sd1", SourceType = KnowledgeSourceType.StepDefinition,
+                        SourcePath = "StepDefinitions/ViewDashboardSteps.cs",
+                        Page = "ViewDashboard", Component = "user clicks on Administration link",
+                        RetrievalReason = "action-signal-match", Relevance = 0.85 },
+                new() { KnowledgeId = "sd2", SourceType = KnowledgeSourceType.StepDefinition,
+                        SourcePath = "StepDefinitions/ViewDashboardSteps.cs",
+                        Page = "ViewDashboard", Component = "user navigates to document administration page",
+                        RetrievalReason = "action-signal-match", Relevance = 0.85 }
+            };
+
+            var model = new AutomationIntelligenceModel
+            {
+                RepositoryRoot = "AutomationFrameWork",
+                RepositoryKnowledge = new RepositoryKnowledgeModel { PageElements = new(), PageActions = new(), StepDefinitions = new() },
+                RecordingIntelligence = new RecordingIntelligenceModel
+                {
+                    Actions = new List<RecordedActionIntelligence>
+                    {
+                        new() { Sequence = 0, ActionType = "navigate",
+                                Target = "https://documentadministration-uat.trimont.com/",
+                                InferredPageContext = "ViewDashboard" }
+                    },
+                    RelatedPages = new() { "ViewDashboard" }
+                },
+                Decisions = new List<IntelligenceDecision>
+                {
+                    new() { ActionIndex = 0, ActionDescription = "navigate dashboard",
+                            DecisionType = "PageElement", Recommendation = "REUSE",
+                            TargetComponent = "AdministrationLink", ConfidenceScore = 0.9 }
+                },
+                DecisionEvidence = new Dictionary<int, List<KnowledgeEvidence>> { [0] = evidence }
+            };
+
+            var planner = new EngineeringPlanner();
+            var plan = planner.CreatePlan(model);
+            var d = plan.Decisions.First(x => x.ActionIndex == 0);
+
+            // maxConfidence (0.85) >= MediumConfidenceThreshold (0.6) → REUSE, not HR
+            Assert.Equal(EngineeringDecisionType.Reuse, d.Decision);
+            Assert.DoesNotContain(plan.Decisions, x => x.Decision == EngineeringDecisionType.HumanReviewRequired);
+        }
+
+        [Fact]
+        public void Planner_S5_AllZeroRelevance_REUSE_RequiresHumanReview()
+        {
+            // Scenario: All evidence items have Relevance=0.0 (no strong match found).
+            // maxConfidence = 0.0 < 0.6 → must remain HUMAN_REVIEW, never silent REUSE.
+            var evidence = new List<KnowledgeEvidence>
+            {
+                new() { KnowledgeId = "pe1", SourceType = KnowledgeSourceType.PageElement,
+                        SourcePath = "PageElements/ViewDashboardObjects.cs",
+                        Page = "ViewDashboard", Component = "SomeUnrelatedElement",
+                        RetrievalReason = "page-match", Relevance = 0.0 },
+                new() { KnowledgeId = "pa1", SourceType = KnowledgeSourceType.PageAction,
+                        SourcePath = "PageActions/ViewDashboardMethods.cs",
+                        Page = "ViewDashboard", Component = "AnotherMethod",
+                        RetrievalReason = "page-match", Relevance = 0.0 }
+            };
+
+            var model = new AutomationIntelligenceModel
+            {
+                RepositoryRoot = "AutomationFrameWork",
+                RepositoryKnowledge = new RepositoryKnowledgeModel { PageElements = new(), PageActions = new(), StepDefinitions = new() },
+                RecordingIntelligence = new RecordingIntelligenceModel
+                {
+                    Actions = new List<RecordedActionIntelligence>
+                    {
+                        new() { Sequence = 0, ActionType = "click", Target = "UnknownTarget",
+                                InferredPageContext = "ViewDashboard" }
+                    },
+                    RelatedPages = new() { "ViewDashboard" }
+                },
+                Decisions = new List<IntelligenceDecision>
+                {
+                    new() { ActionIndex = 0, ActionDescription = "click UnknownTarget",
+                            DecisionType = "PageElement", Recommendation = "REUSE",
+                            TargetComponent = "UnknownTarget", ConfidenceScore = 0.5 }
+                },
+                DecisionEvidence = new Dictionary<int, List<KnowledgeEvidence>> { [0] = evidence }
+            };
+
+            var planner = new EngineeringPlanner();
+            var plan = planner.CreatePlan(model);
+            var d = plan.Decisions.First(x => x.ActionIndex == 0);
+
+            // maxConfidence (0.0) < MediumConfidenceThreshold (0.6) → still HUMAN_REVIEW
+            Assert.Equal(EngineeringDecisionType.HumanReviewRequired, d.Decision);
+            Assert.DoesNotContain(plan.Decisions, x => x.Decision == EngineeringDecisionType.Reuse);
+        }
     }
 }
