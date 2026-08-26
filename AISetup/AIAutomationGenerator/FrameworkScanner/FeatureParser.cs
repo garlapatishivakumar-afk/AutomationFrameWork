@@ -1,10 +1,13 @@
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Models;
+using AIAutomationGenerator.Optimization;
 
 namespace AIAutomationGenerator.FrameworkScanner;
 
 public class FeatureParser : IFeatureParser
 {
+    private static readonly IFileContentCacheService FileCache = new FileContentCacheService();
+
     public FeatureModel Parse(string filePath)
     {
         FeatureModel feature = new()
@@ -18,7 +21,8 @@ public class FeatureParser : IFeatureParser
         bool inBackground = false;
         bool inExamples = false;
 
-        foreach (string rawLine in File.ReadLines(filePath))
+        UsageTelemetryService.Current?.IncrementParserInvocations();
+        foreach (string rawLine in FileCache.ReadAllText(filePath).Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
         {
             string line = rawLine.Trim();
 

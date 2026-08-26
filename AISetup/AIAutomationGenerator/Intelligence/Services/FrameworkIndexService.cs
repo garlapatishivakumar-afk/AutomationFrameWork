@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using AIAutomationGenerator.Intelligence.Models;
 using AIAutomationGenerator.Interfaces;
+using AIAutomationGenerator.Optimization;
 
 namespace AIAutomationGenerator.Intelligence.Services
 {
@@ -19,6 +20,7 @@ namespace AIAutomationGenerator.Intelligence.Services
         private readonly string _repositoryRoot;
         private readonly string _indexFilePath;
         private readonly IFrameworkScanner _frameworkScanner;
+        private readonly IRepositoryDigestService _digestService;
         private RepositoryKnowledgeModel _cachedIndex;
         private string _cachedSignature;
 
@@ -27,6 +29,7 @@ namespace AIAutomationGenerator.Intelligence.Services
             _repositoryRoot = repositoryRoot;
             _indexFilePath = Path.Combine(repositoryRoot, "AISetup", "frameworkIndex.json");
             _frameworkScanner = frameworkScanner;
+            _digestService = new RepositoryDigestService();
         }
 
         /// <summary>
@@ -34,10 +37,13 @@ namespace AIAutomationGenerator.Intelligence.Services
         /// </summary>
         public async Task<RepositoryKnowledgeModel> GetIndexAsync(bool forceRebuild = false)
         {
-            if (!forceRebuild && _cachedIndex != null)
-                return _cachedIndex;
-
             string currentSignature = GenerateRepositorySignature();
+
+            if (!forceRebuild && _cachedIndex != null &&
+                string.Equals(_cachedSignature, currentSignature, StringComparison.Ordinal))
+            {
+                return _cachedIndex;
+            }
 
             // Try loading from disk cache
             if (!forceRebuild && File.Exists(_indexFilePath))
@@ -279,30 +285,38 @@ namespace AIAutomationGenerator.Intelligence.Services
 
         private string GenerateRepositorySignature()
         {
-            // Deterministic signature based on framework file modification times
-            var keyFiles = new[]
+            try
             {
-                Path.Combine(_repositoryRoot, "PageElements"),
-                Path.Combine(_repositoryRoot, "PageActions"),
-                Path.Combine(_repositoryRoot, "StepDefinitions"),
-                Path.Combine(_repositoryRoot, "Features")
-            };
-
-            var hash = 0;
-            foreach (var dir in keyFiles)
+                return _digestService.ComputeDigest(_repositoryRoot);
+            }
+            catch
             {
-                if (Directory.Exists(dir))
+                // Safe fallback for environments where digesting cannot complete.
+                var hash = 0;
+                var keyDirs = new[]
                 {
-                    var files = Directory.GetFiles(dir, "*.cs", SearchOption.AllDirectories);
-                    foreach (var file in files.OrderBy(f => f))
+                    Path.Combine(_repositoryRoot, "PageElements"),
+                    Path.Combine(_repositoryRoot, "PageActions"),
+                    Path.Combine(_repositoryRoot, "StepDefinitions"),
+                    Path.Combine(_repositoryRoot, "Features")
+                };
+
+                foreach (var dir in keyDirs)
+                {
+                    if (!Directory.Exists(dir))
+                    {
+                        continue;
+                    }
+
+                    foreach (var file in Directory.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories).OrderBy(f => f, StringComparer.Ordinal))
                     {
                         var lastWrite = File.GetLastWriteTimeUtc(file).Ticks;
                         hash ^= lastWrite.GetHashCode();
                     }
                 }
-            }
 
-            return hash.ToString();
+                return hash.ToString();
+            }
         }
 
         private RepositoryKnowledgeModel LoadIndexFromDisk()

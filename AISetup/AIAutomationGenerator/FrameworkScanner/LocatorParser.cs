@@ -1,5 +1,6 @@
 using AIAutomationGenerator.Interfaces;
 using AIAutomationGenerator.Models;
+using AIAutomationGenerator.Optimization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -8,6 +9,8 @@ namespace AIAutomationGenerator.FrameworkScanner;
 
 public class LocatorParser : ILocatorParser
 {
+    private static readonly IFileContentCacheService FileCache = new FileContentCacheService();
+
     // Return-type tokens that indicate an ILocator-returning member
     private static readonly HashSet<string> LocatorReturnTypes =
         new(StringComparer.OrdinalIgnoreCase)
@@ -20,7 +23,8 @@ public class LocatorParser : ILocatorParser
         List<LocatorModel> locators = new();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        string source = File.ReadAllText(filePath);
+        UsageTelemetryService.Current?.IncrementParserInvocations();
+        string source = FileCache.ReadAllText(filePath);
 
         SyntaxTree tree = CSharpSyntaxTree.ParseText(source);
 

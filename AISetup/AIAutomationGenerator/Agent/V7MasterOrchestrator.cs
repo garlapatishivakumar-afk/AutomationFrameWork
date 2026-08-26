@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 using AIAutomationGenerator.FrameworkScanner;
@@ -10,6 +11,8 @@ using AIAutomationGenerator.Implementation;
 using AIAutomationGenerator.Intelligence.Models;
 using AIAutomationGenerator.Intelligence.Services;
 using AIAutomationGenerator.Knowledge;
+using AIAutomationGenerator.Models;
+using AIAutomationGenerator.Optimization;
 using AIAutomationGenerator.Orchestration;
 using AIAutomationGenerator.Planning;
 using AIAutomationGenerator.Safety;
@@ -61,6 +64,10 @@ namespace AIAutomationGenerator.Agent
         private readonly string _buildProjectPath;
         private readonly string _testProjectPath;
         private readonly int _maxSelfHealRetries;
+        private readonly IDeterministicRetrievalService _deterministicRetrieval;
+        private readonly IAiContextPackBuilder _contextPackBuilder;
+        private readonly IAiEscalationPolicy _aiEscalationPolicy;
+        private readonly IValidationImpactAnalyzer _validationImpactAnalyzer;
 
         public V7MasterOrchestrator(
             string repositoryRoot,
@@ -85,10 +92,29 @@ namespace AIAutomationGenerator.Agent
             _buildProjectPath = buildProjectPath ?? Path.Combine(_repositoryRoot, "AutomationFrameWork.csproj");
             _testProjectPath = testProjectPath ?? Path.Combine(_repositoryRoot, "AISetup", "AIAutomationGenerator.Tests", "AIAutomationGenerator.Tests.csproj");
             _maxSelfHealRetries = Math.Max(0, maxSelfHealRetries);
+            _deterministicRetrieval = new DeterministicRetrievalService();
+            _contextPackBuilder = new AiContextPackBuilder();
+            _aiEscalationPolicy = new AiEscalationPolicy();
+            _validationImpactAnalyzer = new ValidationImpactAnalyzer();
         }
 
         public async Task<V7ExecutionResult> RunAsync(string recordingFilePath, bool dryRun = true)
+            => await RunAsync(recordingFilePath, dryRun, humanApprovals: null);
+
+        /// <summary>
+        /// Runs the full pipeline. If humanApprovals are provided, they are applied after S5
+        /// evaluation — S5 still flags ambiguities correctly; the approvals are a separate,
+        /// auditable step that can unlock a HumanReviewRequired plan only when ALL flagged
+        /// decisions are explicitly resolved.
+        /// </summary>
+        public async Task<V7ExecutionResult> RunAsync(
+            string recordingFilePath,
+            bool dryRun,
+            IReadOnlyList<HumanApprovalRecord>? humanApprovals)
         {
+            var telemetry = new UsageTelemetryService();
+            using var telemetryScope = UsageTelemetryService.BeginScope(telemetry);
+
             var result = new V7ExecutionResult
             {
                 RunId = Guid.NewGuid().ToString("N"),
@@ -161,10 +187,25 @@ namespace AIAutomationGenerator.Agent
                         fallbackIndex, ctxResult.InferredPages, parseResult.Actions);
                 }
 
+                var reranked = _deterministicRetrieval.RankCandidates(
+                    retrieval.Items,
+                    parseResult.Actions,
+                    maxCandidates: 150,
+                    out var deterministicConfidence);
+
+                retrieval = new KnowledgeRetrievalResult
+                {
+                    Items = reranked,
+                    Metrics = retrieval.Metrics
+                };
+                retrieval.Metrics.RetrievedItems = reranked.Count;
+                retrieval.Metrics.CandidateItems = Math.Max(retrieval.Metrics.CandidateItems, reranked.Count);
+                result.DeterministicRetrievalConfidence = deterministicConfidence;
+
                 result.KnowledgeRetrievedCount = retrieval.Metrics.RetrievedItems;
                 result.RetrievedEvidenceCount = retrieval.Items.Count;
                 EndStage(s3, true,
-                    $"{retrieval.Metrics.RetrievedItems} items retrieved");
+                    $"{retrieval.Metrics.RetrievedItems} items retrieved (confidence={deterministicConfidence:F3})");
             }
             catch (Exception ex) { EndStage(s3, false, null, ex.Message); }
             result.AddStage(s3);
@@ -174,6 +215,21 @@ namespace AIAutomationGenerator.Agent
             AutomationIntelligenceModel intelligence = null;
             try
             {
+                var contextModel = BuildContextModel(filteredRepo);
+                result.AiContextPack = _contextPackBuilder.BuildPack(
+                    contextModel,
+                    parseResult.Actions,
+                    maxMethods: 20,
+                    maxLocators: 20,
+                    maxSteps: 10,
+                    tokenBudgetChars: 12000);
+
+                result.AiEscalationTriggered = _aiEscalationPolicy.ShouldEscalateToAi(
+                    contextModel,
+                    parseResult.Actions,
+                    out var escalationReason);
+                result.AiEscalationReason = escalationReason;
+
                 intelligence = new AutomationIntelligenceModel
                 {
                     AnalysisTimestamp   = DateTime.UtcNow.ToString("O"),
@@ -189,7 +245,7 @@ namespace AIAutomationGenerator.Agent
                 _enrichmentSvc.Enrich(intelligence, retrieval);
                 result.EvidenceCount = intelligence.EvidenceCount;
                 EndStage(s4, true,
-                    $"{intelligence.EvidenceCount} evidence items attached");
+                    $"{intelligence.EvidenceCount} evidence items attached; AI escalation={(result.AiEscalationTriggered ? "yes" : "no")}");
             }
             catch (Exception ex) { EndStage(s4, false, null, ex.Message); }
             result.AddStage(s4);
@@ -214,6 +270,10 @@ namespace AIAutomationGenerator.Agent
                 result.ExtendCount        = plan.ExtendCount;
                 result.CreateCount        = plan.CreateCount;
                 result.HumanReviewCount   = plan.HumanReviewCount;
+                UsageTelemetryService.Current?.IncrementReusedFiles(plan.ReuseCount);
+                UsageTelemetryService.Current?.IncrementExtendedFiles(plan.ExtendCount);
+                UsageTelemetryService.Current?.IncrementGeneratedFiles(plan.CreateCount);
+                UsageTelemetryService.Current?.IncrementHumanReviewCount(plan.HumanReviewCount);
                 result.EngineeringPlanSummary = $"R={plan.ReuseCount},E={plan.ExtendCount},C={plan.CreateCount},HR={plan.HumanReviewCount}";
                 result.HumanReviewQuestions = plan.HumanReviewQuestions.ToList();
                 EndStage(s5, plan.Status != PlanStatus.HumanReviewRequired,
@@ -224,8 +284,29 @@ namespace AIAutomationGenerator.Agent
             }
             catch (Exception ex) { EndStage(s5, false, null, ex.Message); }
             result.AddStage(s5);
-            if (plan?.Status == PlanStatus.HumanReviewRequired)
+
+            // ===== S5.5: ApplyHumanApprovals (only when explicit approvals provided) =====
+            // S5 safety gate remains unchanged — this step runs AFTER S5 has flagged ambiguities.
+            // It only unlocks the plan if the caller has provided explicit human-approved resolutions
+            // for ALL flagged decisions. If any HR decision remains unresolved, the gate still blocks.
+            if (plan?.Status == PlanStatus.HumanReviewRequired &&
+                humanApprovals != null && humanApprovals.Count > 0)
+            {
+                var approvalSvc = new HumanApprovalService();
+                var approvalResult = approvalSvc.Apply(plan, humanApprovals);
+                result.HumanApprovalResult = approvalResult;
+
+                if (!approvalResult.AllApproved)
+                {
+                    // Some HR decisions still unresolved or some approvals rejected
+                    return Finalise(result, "HumanReviewRequired");
+                }
+                // All HR decisions resolved — plan.Status is now Ready; continue to S6
+            }
+            else if (plan?.Status == PlanStatus.HumanReviewRequired)
+            {
                 return Finalise(result, "HumanReviewRequired");
+            }
 
             // ===== S6+S7: GenerateImplementation + ApplyChanges =====
             var s6 = StartStage("S6:GenerateImplementation");
@@ -269,10 +350,28 @@ namespace AIAutomationGenerator.Agent
             }
             else
             {
+                var impactedProjects = _validationImpactAnalyzer.GetImpactedTestProjects(
+                    plan?.PlannedFileChanges ?? new List<FilePlan>(),
+                    _repositoryRoot);
+
+                if (impactedProjects.Count == 0)
+                {
+                    foreach (var stageName in new[] { "S8:Build", "S9:ExecuteTests", "S10:AnalyzeFailures", "S11:SelfHeal", "S12:Retest" })
+                    {
+                        var skippedStage = StartStage(stageName);
+                        EndStage(skippedStage, true, "Skipped - no impacted automation assets detected");
+                        skippedStage.Skipped = true;
+                        result.AddStage(skippedStage);
+                    }
+
+                    goto Stage13;
+                }
+
                 var buildStage = StartStage("S8:Build");
                 var buildValidator = new BuildValidator(_buildProjectPath);
                 var buildResult = await buildValidator.ValidateAsync();
                 result.BuildResult = buildResult;
+                UsageTelemetryService.Current?.RecordBuildDuration((long)buildResult.Duration.TotalMilliseconds);
                 EndStage(
                     buildStage,
                     buildResult.Success,
@@ -287,6 +386,7 @@ namespace AIAutomationGenerator.Agent
                     var testValidator = new TestValidator(_testProjectPath);
                     testResult = await testValidator.ValidateAsync();
                     result.TestResult = testResult;
+                    UsageTelemetryService.Current?.RecordTestDuration((long)testResult.Duration.TotalMilliseconds);
                     EndStage(
                         testStage,
                         testResult.Success,
@@ -334,6 +434,10 @@ namespace AIAutomationGenerator.Agent
                         buildResult,
                         testResult,
                         classification);
+                    if (result.CorrectionAttempts.Count > 0)
+                    {
+                        UsageTelemetryService.Current?.IncrementSelfHealAttempts(result.CorrectionAttempts.Count);
+                    }
 
                     EndStage(
                         s11,
@@ -359,6 +463,7 @@ namespace AIAutomationGenerator.Agent
                 }
             }
 
+        Stage13:
             // ===== S13: FrameworkProtection =====
             var s13 = StartStage("S13:FrameworkProtection");
             EndStage(s13, result.FrameworkModifications == 0,
@@ -368,9 +473,19 @@ namespace AIAutomationGenerator.Agent
 
             // ===== S14: CollectUsage =====
             var s14 = StartStage("S14:CollectUsage");
-            result.TokenMeasurement = "NOT_AVAILABLE";
-            result.AiCreditsMeasurement = "NOT_AVAILABLE";
-            EndStage(s14, true, "Usage: NOT_AVAILABLE — no LLM calls in current pipeline");
+            foreach (var stage in result.Stages)
+            {
+                telemetry.RecordStageDuration(stage.StageName, (long)stage.Duration.TotalMilliseconds);
+            }
+
+            var usage = telemetry.Snapshot(aiCredits: "NOT_AVAILABLE", estimatedCost: "NOT_AVAILABLE");
+            result.Usage = usage;
+            result.TokenMeasurement = usage.TotalTokens > 0
+                ? usage.TotalTokens.ToString()
+                : "NOT_AVAILABLE";
+            result.AiCreditsMeasurement = usage.AiCredits;
+            EndStage(s14, true,
+                $"Usage captured: filesRead={usage.RepositoryFilesRead}, cacheHits={usage.CacheHits}, tokens={result.TokenMeasurement}");
             result.AddStage(s14);
 
             // ===== S15: GenerateEvidence =====
@@ -715,6 +830,55 @@ namespace AIAutomationGenerator.Agent
                     (repository.PageRelationships?.Count ?? 0) > 0);
         }
 
+        private static ContextModel BuildContextModel(RepositoryKnowledgeModel repository)
+        {
+            var context = new ContextModel();
+            if (repository == null)
+            {
+                return context;
+            }
+
+            context.Methods.AddRange((repository.PageActions ?? new List<PageActionInfo>())
+                .Select(a => new MethodModel
+                {
+                    Name = a.Name,
+                    ClassName = a.ClassName,
+                    Namespace = a.Namespace,
+                    FilePath = a.FilePath,
+                    IsAsync = a.IsAsync,
+                    Score = (int)Math.Round(a.ConfidenceScore * 100)
+                }));
+
+            context.Locators.AddRange((repository.PageElements ?? new List<PageElementInfo>())
+                .Select(l => new LocatorModel
+                {
+                    Name = l.Name,
+                    PageName = l.PageOwnership,
+                    FilePath = l.FilePath,
+                    LocatorType = l.LocatorType,
+                    Selector = l.Selector,
+                    Score = (int)Math.Round(l.ConfidenceScore * 100)
+                }));
+
+            context.Steps.AddRange((repository.StepDefinitions ?? new List<StepDefinitionInfo>())
+                .Select(s => new StepDefinitionModel
+                {
+                    StepText = s.StepText,
+                    MethodName = s.MethodName,
+                    FilePath = s.FilePath,
+                    Score = (int)Math.Round(s.ConfidenceScore * 100)
+                }));
+
+            context.Features.AddRange((repository.Features ?? new List<FeatureFileInfo>())
+                .Select(f => new FeatureModel
+                {
+                    Name = f.FeatureName,
+                    FilePath = f.FilePath
+                }));
+
+            return context;
+        }
+
         // ===== Stage helpers =====
 
         private static AgentStageRecord StartStage(string name) =>
@@ -790,8 +954,14 @@ namespace AIAutomationGenerator.Agent
         public RollbackExecutionResult? RollbackResult { get; set; }
         public List<HumanReviewQuestion> HumanReviewQuestions { get; set; } = new();
         public string? HumanReviewReason { get; set; }
+        public HumanApprovalResult? HumanApprovalResult { get; set; }
         public string TokenMeasurement        { get; set; } = "NOT_AVAILABLE";
         public string AiCreditsMeasurement    { get; set; } = "NOT_AVAILABLE";
+        public double DeterministicRetrievalConfidence { get; set; }
+        public bool AiEscalationTriggered { get; set; }
+        public string AiEscalationReason { get; set; } = string.Empty;
+        public string AiContextPack { get; set; } = string.Empty;
+        public UsageTelemetrySnapshot? Usage { get; set; }
 
         public void AddStage(AgentStageRecord s) => Stages.Add(s);
     }
