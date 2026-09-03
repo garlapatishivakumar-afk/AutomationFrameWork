@@ -15,6 +15,7 @@ import { WorkflowEngine } from "./WorkflowEngine";
 import { WorkflowStep } from "./WorkflowStep";
 import { ReviewResult } from "../Review/ReviewResult";
 import { UploadAssetManager } from "../Upload/UploadAssetManager";
+import { DownloadManager } from "../Download/DownloadManager";
 
 export interface GenerationPipelineInput {
 
@@ -65,6 +66,9 @@ export class GenerationPipeline {
     private readonly uploadAssets =
         new UploadAssetManager(process.cwd());
 
+    private readonly downloadManager =
+        new DownloadManager(process.cwd());
+
     public async run(input: GenerationPipelineInput): Promise<GenerationResult> {
 
         const uploadResult =
@@ -74,6 +78,15 @@ export class GenerationPipeline {
             const copied = uploadResult.stagedFiles.join(", ");
             console.log(
                 `[Upload] detected in ${uploadResult.codeFilePath}; copied: ${copied || "none"}; rewritten: ${uploadResult.modifiedCode}`
+            );
+        }
+
+        const downloadResult =
+            this.downloadManager.processCodeFile("AIRecorder/code.ts");
+
+        if (downloadResult.hasDownload) {
+            console.log(
+                `[Download] detected in ${downloadResult.codeFilePath}; instrumented: ${downloadResult.instrumentedDownloads}; rewritten: ${downloadResult.modifiedCode}`
             );
         }
 
