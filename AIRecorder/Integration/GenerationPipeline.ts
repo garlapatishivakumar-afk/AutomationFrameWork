@@ -14,6 +14,7 @@ import { WorkflowContext } from "./WorkflowContext";
 import { WorkflowEngine } from "./WorkflowEngine";
 import { WorkflowStep } from "./WorkflowStep";
 import { ReviewResult } from "../Review/ReviewResult";
+import { UploadAssetManager } from "../Upload/UploadAssetManager";
 
 export interface GenerationPipelineInput {
 
@@ -61,7 +62,20 @@ export class GenerationPipeline {
     private readonly autoFix =
         new AutoFixEngine();
 
+    private readonly uploadAssets =
+        new UploadAssetManager(process.cwd());
+
     public async run(input: GenerationPipelineInput): Promise<GenerationResult> {
+
+        const uploadResult =
+            this.uploadAssets.processCodeFile("AIRecorder/code.ts");
+
+        if (uploadResult.hasUpload) {
+            const copied = uploadResult.stagedFiles.join(", ");
+            console.log(
+                `[Upload] detected in ${uploadResult.codeFilePath}; copied: ${copied || "none"}; rewritten: ${uploadResult.modifiedCode}`
+            );
+        }
 
         const context: WorkflowContext = {
             input,
