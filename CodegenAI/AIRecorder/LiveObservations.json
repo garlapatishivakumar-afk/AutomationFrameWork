@@ -1,0 +1,31 @@
+{
+  "generatedAtUtc": "2026-09-28T09:55:40.943Z",
+  "source": {
+    "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\docadministration-app\\testing\\Doc Administration Playwright Automation\\AutomationFrameWork\\CodegenAI\\Code.ts"
+  },
+  "actions": [
+    {
+      "line": 8,
+      "raw": "  await page.goto('https://documentadministration-sit.trimont.com/default.aspx');",
+      "type": "goto",
+      "page": "https://documentadministration-sit.trimont.com/default.aspx",
+      "debug": {
+        "actionIndex": 0,
+        "originalLocator": "page.goto(...)",
+        "currentUrl": "https://documentadministration-sit.trimont.com/default.aspx",
+        "pageTitle": "Document Administration - SIT",
+        "readyState": "complete",
+        "frameCount": 1,
+        "frames": [
+          {
+            "index": 0,
+            "name": null,
+            "url": "https://documentadministration-sit.trimont.com/default.aspx",
+            "isMainFrame": true
+          }
+        ],
+        "reason": "Navigation replayed"
+      }
+    }
+  ]
+}

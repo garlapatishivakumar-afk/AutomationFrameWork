@@ -11,18 +11,22 @@
     <Compile Remove="bin\**" />
     <Compile Remove="obj\**" />
     <Compile Remove="AISetup\**" />
+    <Compile Remove="GeneratedOutput\**" />
     <EmbeddedResource Remove="node_modules\**" />
     <EmbeddedResource Remove="bin\**" />
     <EmbeddedResource Remove="obj\**" />
     <EmbeddedResource Remove="AISetup\**" />
+    <EmbeddedResource Remove="GeneratedOutput\**" />
     <None Remove="node_modules\**" />
     <None Remove="bin\**" />
     <None Remove="obj\**" />
     <None Remove="AISetup\**" />
+    <None Remove="GeneratedOutput\**" />
     <ReqnrollFeatureFile Remove="node_modules\**" />
     <ReqnrollFeatureFile Remove="bin\**" />
     <ReqnrollFeatureFile Remove="obj\**" />
     <ReqnrollFeatureFile Remove="AISetup\**" />
+    <ReqnrollFeatureFile Remove="GeneratedOutput\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -54,6 +58,7 @@
     <ReqnrollObsoleteCodeBehindFiles Remove="bin\**" />
     <ReqnrollObsoleteCodeBehindFiles Remove="obj\**" />
     <ReqnrollObsoleteCodeBehindFiles Remove="AISetup\**" />
+    <ReqnrollObsoleteCodeBehindFiles Remove="GeneratedOutput\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -61,6 +66,7 @@
     <ReqnrollLegacyCodeBehindFiles Remove="bin\**" />
     <ReqnrollLegacyCodeBehindFiles Remove="obj\**" />
     <ReqnrollLegacyCodeBehindFiles Remove="AISetup\**" />
+    <ReqnrollLegacyCodeBehindFiles Remove="GeneratedOutput\**" />
   </ItemGroup>
 
 </Project>

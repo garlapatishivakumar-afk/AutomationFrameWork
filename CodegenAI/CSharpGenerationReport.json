@@ -1,0 +1,40 @@
+{
+  "generatedAtUtc": "2026-10-03T18:30:06.155Z",
+  "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.ts",
+  "outputFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.cs",
+  "actionCount": 2,
+  "frameworkMatches": [
+    {
+      "sourceLine": 8,
+      "type": "navigation",
+      "target": "CommonActionsPage.NavigateToURLAsync"
+    },
+    {
+      "sourceLine": 9,
+      "type": "navigation",
+      "target": "CommonActionsPage.NavigateToURLAsync"
+    }
+  ],
+  "sourceMap": [
+    {
+      "sourceLine": 8,
+      "generatedLine": 27,
+      "actionType": "goto",
+      "locatorStrategy": "PAGE_URL",
+      "supported": true
+    },
+    {
+      "sourceLine": 9,
+      "generatedLine": 29,
+      "actionType": "goto",
+      "locatorStrategy": "PAGE_URL",
+      "supported": true
+    }
+  ],
+  "unsupportedActions": [],
+  "validation": {
+    "success": true,
+    "errors": [],
+    "warnings": []
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "enabled": true,
+  "rules": [
+    {
+      "id": "specific-username-text",
+      "enabled": true,
+      "match": {
+        "onlyNonTable": true,
+        "kinds": ["text"],
+        "originalLocatorContains": "page.getByText('Garlapati, Shivakumar')"
+      },
+      "allowedAttributes": ["data-testid", "id", "aria-label"],
+      "allowDynamicId": true
+    },
+    {
+      "id": "specific-cell-attribute-package-queue",
+      "enabled": true,
+      "match": {
+        "onlyNonTable": false,
+        "kinds": ["role"],
+        "originalLocatorContains": "page.getByRole('cell', { name: 'Attribute Package Queue' })"
+      },
+      "allowedAttributes": ["data-testid", "id", "aria-label"]
+    },
+    {
+      "id": "specific-cell-selected-package-attachments",
+      "enabled": true,
+      "match": {
+        "onlyNonTable": false,
+        "kinds": ["role"],
+        "originalLocatorContains": "page.getByRole('cell', { name: 'Selected Package Attachments' })"
+      },
+      "allowedAttributes": ["data-testid", "id", "aria-label"]
+    }
+  ]
+}

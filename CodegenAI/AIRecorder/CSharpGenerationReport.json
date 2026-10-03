@@ -1,0 +1,31 @@
+{
+  "generatedAtUtc": "2026-09-16T11:51:06.561Z",
+  "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\docadministration-app\\testing\\Doc Administration Playwright Automation\\AutomationFrameWork\\CodegenAI\\Code.ts",
+  "outputFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\docadministration-app\\testing\\Doc Administration Playwright Automation\\AutomationFrameWork\\CodegenAI\\AIRecorder\\Code.cs",
+  "actionCount": 7,
+  "unsupportedActions": [
+    {
+      "sourceLine": 11,
+      "raw": "  await page.getByRole('cell', { name: 'generated' }).first().click();",
+      "diagnostics": [
+        "Unsupported Playwright statement. Manual review required."
+      ]
+    },
+    {
+      "sourceLine": 12,
+      "raw": "  await page.getByRole('cell', { name: 'generated' }).nth(1).click();",
+      "diagnostics": [
+        "Unsupported Playwright statement. Manual review required."
+      ]
+    }
+  ],
+  "validation": {
+    "success": false,
+    "errors": [
+      "Generated code still contains lowercase TypeScript page references."
+    ],
+    "warnings": [
+      "2 recorded action(s) require manual review."
+    ]
+  }
+}
