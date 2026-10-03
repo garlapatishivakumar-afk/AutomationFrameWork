@@ -388,8 +388,9 @@ function testTransientControlTableFallsBack() {
   };
 
   const result = runTransform(input, observations);
-  assert.ok(result.code.includes(input), "Transient non-grid control tables should fallback to original locator");
-  assert.strictEqual(result.metadata.transformedActions, 0);
+  assert.ok(result.code.includes("await page.locator("), "Transient table controls should still use locator() under locator-only policy");
+  assert.ok(!result.code.includes("getByRole('link'"), "Table controls should not remain as getByRole under locator-only policy");
+  assert.strictEqual(result.metadata.transformedActions, 1);
 }
 
 function testFrameKeyValueTextActionRewritten() {
@@ -646,6 +647,43 @@ function testScopedTextActionRewrittenWithRowIdCandidate() {
   assert.strictEqual(result.metadata.transformedActions, 1);
 }
 
+function testPopupTableTextboxTextActionPrefersTargetId() {
+  const input = "await page1.getByText('test').click();";
+  const observations = {
+    actions: [
+      {
+        line: 1,
+        text: "test",
+        insideTable: true,
+        scope: "page",
+        table: { id: "ReportDetailsTable", className: "rgMasterTable" },
+        row: {
+          id: "trOverrideComments",
+          businessValue: "Override Comments",
+          className: "rgRow",
+          rowValues: ["Override Comments", "test"]
+        },
+        cell: { columnIndex: 2 },
+        target: {
+          tagName: "textarea",
+          id: "txtOverrideComments",
+          attributeCounts: { id: 1 }
+        },
+        matchCount: 2,
+        sameBusinessRowCount: 1
+      }
+    ]
+  };
+
+  const result = runTransform(input, observations);
+  assert.ok(
+    result.code.includes("await page1.locator(\"//textarea[@id='txtOverrideComments']\").click();"),
+    "Popup table textbox getByText action should rewrite to target id locator"
+  );
+  assert.ok(!result.code.includes("getByText('test')"), "Rewritten textbox action should not keep getByText locator");
+  assert.strictEqual(result.metadata.transformedActions, 1);
+}
+
 function testExistingIndexedTableLocatorKeepsIndexWhenNoUniqueAttribute() {
   const input = "await page.locator(\"//tr[@id='ctl00_ContentPlaceHolder1_AttachmentRadGrid_ctl00__0']/td[5]\").first().click();";
   const observations = {
@@ -730,6 +768,7 @@ function runAllTests() {
   testStableNumericBusinessValueAccepted();
   testScopedRoleActionRewrittenWithRowIdCandidate();
   testScopedTextActionRewrittenWithRowIdCandidate();
+  testPopupTableTextboxTextActionPrefersTargetId();
   testExistingIndexedTableLocatorKeepsIndexWhenNoUniqueAttribute();
   testRowIdPrefersStableCellClassOverIndex();
   testSpecificNonTableTextRuleRewritesToUniqueAttribute();

@@ -95,6 +95,90 @@ function isKnownStableGridLinkId(value) {
   return /^g_ctl\d+_hE_\d+$/i.test(String(value || "").trim());
 }
 
+function buildIdStabilityIndex(observations) {
+  const index = {};
+  const actions = Array.isArray(observations && observations.actions) ? observations.actions : [];
+
+  for (const item of actions) {
+    const id = item && item.target && item.target.id ? String(item.target.id).trim() : "";
+    if (!id) {
+      continue;
+    }
+
+    if (!index[id]) {
+      index[id] = {
+        seen: 0,
+        tables: new Set()
+      };
+    }
+
+    index[id].seen += 1;
+    const tableId = item && item.table && item.table.id ? String(item.table.id).trim() : "";
+    if (tableId) {
+      index[id].tables.add(tableId);
+    }
+  }
+
+  return index;
+}
+
+function classifyIdStability(idValue, idProfile) {
+  const id = String(idValue || "").trim();
+  if (!id) {
+    return {
+      stable: false,
+      reason: "No id"
+    };
+  }
+
+  const allowPatterns = [
+    /^g_ctl\d+_hE_\d+$/i,
+    /^ctl\d+_/i,
+    /^ctl00_/i,
+    /_(lnk|btn|img|ch|chk|txt|ddl|lbl)[A-Za-z0-9_]*$/i
+  ];
+
+  const denyPatterns = [
+    /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i,
+    /(?:^|[_-])(tmp|rand|uuid|session|token|nonce|hash)(?:[_-]|$)/i,
+    /[0-9a-f]{20,}/i,
+    /\d{13,}/
+  ];
+
+  if (allowPatterns.some((pattern) => pattern.test(id))) {
+    return {
+      stable: true,
+      reason: "Matched allow-pattern"
+    };
+  }
+
+  if (denyPatterns.some((pattern) => pattern.test(id))) {
+    return {
+      stable: false,
+      reason: "Matched deny-pattern"
+    };
+  }
+
+  if (idProfile && Number(idProfile.seen || 0) >= 2) {
+    return {
+      stable: true,
+      reason: "Observed repeatedly in capture"
+    };
+  }
+
+  if (isDynamicId(id)) {
+    return {
+      stable: false,
+      reason: "Dynamic id pattern"
+    };
+  }
+
+  return {
+    stable: true,
+    reason: "Default stable"
+  };
+}
+
 function isNumericLike(value) {
   return /^\d{3,}$/.test(String(value || "").trim());
 }
@@ -394,12 +478,13 @@ function resolveTargetTag(context) {
 function buildAttributeLocator(context) {
   const targetTag = resolveTargetTag(context) || "*";
   const idCount = Number((context.target && context.target.attributeCounts && context.target.attributeCounts.id) || 0);
+  const idStability = context.target && context.target.idStability ? context.target.idStability : { stable: false, reason: "unknown" };
 
   // Rule priority for future maintenance:
   // 1) If the resolved target (last tag) has a unique id in observed DOM, prefer it.
   // 2) Otherwise prefer test id and then other validated table-aware strategies.
   // 3) Avoid normalize-space() based locator generation in table strategies.
-  if (hasValue(context.target.id) && idCount === 1) {
+  if (hasValue(context.target.id) && idCount === 1 && idStability.stable) {
     return `//${targetTag}[@id='${escapeXPathLiteral(context.target.id)}']`;
   }
 
@@ -409,6 +494,7 @@ function buildAttributeLocator(context) {
 
   if (
     hasValue(context.target.id) &&
+    idStability.stable &&
     (!isDynamicId(context.target.id) || isKnownStableGridLinkId(context.target.id))
   ) {
     return `//${targetTag}[@id='${escapeXPathLiteral(context.target.id)}']`;
@@ -555,6 +641,7 @@ function buildTargetSelectorInRow(context, escapedText) {
 function buildUniqueTargetAttributeSelectorInRow(context) {
   const targetTag = resolveTargetTag(context) || "*";
   const counts = context.target.attributeCounts || {};
+  const idStability = context.target && context.target.idStability ? context.target.idStability : { stable: false, reason: "unknown" };
   const candidates = [
     { key: "id", value: context.target.id, count: Number(counts.id || 0) },
     { key: "data-testid", value: context.target.testId, count: Number(counts.testId || 0) },
@@ -570,10 +657,10 @@ function buildUniqueTargetAttributeSelectorInRow(context) {
       continue;
     }
 
-    if (candidate.key === "id" && candidate.count === 1) {
+    if (candidate.key === "id" && candidate.count === 1 && idStability.stable) {
       return {
         selector: `.//${targetTag}[@id='${escapeXPathLiteral(candidate.value)}']`,
-        reason: "Unique id"
+        reason: `Unique id (${idStability.reason})`
       };
     }
 
@@ -664,6 +751,47 @@ function buildKeyValueRowCandidate(context, escapedText, method) {
   };
 }
 
+function isUniqueInTableScope(candidate, context) {
+  if (!context || !context.insideTable || !candidate) {
+    return false;
+  }
+
+  const hasRowScopedAnchor =
+    Number.isFinite(context.cell.columnIndex) && context.cell.columnIndex > 0;
+  const idCount = Number((context.target && context.target.attributeCounts && context.target.attributeCounts.id) || 0);
+  const testIdCount = Number((context.target && context.target.attributeCounts && context.target.attributeCounts.testId) || 0);
+
+  if (candidate.strategy === "TARGET_ID") {
+    return hasValue(context.target.id) && (idCount === 1 || context.candidateEvidence.roleMatchCount === 1);
+  }
+
+  if (candidate.strategy === "TARGET_TESTID") {
+    return hasValue(context.target.testId) && (testIdCount === 1 || context.candidateEvidence.roleMatchCount === 1);
+  }
+
+  if (candidate.strategy === "TABLE_ROW_ID") {
+    return hasValue(context.row.id) && (hasRowScopedAnchor || hasValue(context.target.id) || hasValue(context.target.testId));
+  }
+
+  if (candidate.strategy === "TABLE_ROW_BUSINESS_VALUE") {
+    return (
+      hasValue(context.row.businessValue) &&
+      context.candidateEvidence.sameBusinessRowCount === 1 &&
+      (hasRowScopedAnchor || hasValue(context.target.id) || hasValue(context.target.testId))
+    );
+  }
+
+  if (candidate.strategy === "TABLE_KEY_VALUE_ROW") {
+    return hasValue(context.row.labelValue) && (hasRowScopedAnchor || hasValue(context.target.id));
+  }
+
+  if (candidate.strategy === "DATA_ATTRIBUTE" || candidate.strategy === "COMPOSITE" || candidate.strategy === "TABLE_CELL") {
+    return context.candidateEvidence.roleMatchCount === 1;
+  }
+
+  return false;
+}
+
 function validateCandidate(candidate, context) {
   const result = {
     valid: false,
@@ -684,6 +812,11 @@ function validateCandidate(candidate, context) {
 
   if (context.candidateEvidence.roleMatchCount === 0) {
     result.reason = "Observed locator did not resolve in replay";
+    return result;
+  }
+
+  if (!isUniqueInTableScope(candidate, context)) {
+    result.reason = "Candidate is not unique in table scope";
     return result;
   }
 
@@ -829,7 +962,7 @@ function inferInsideTable(actionText, observation) {
   return false;
 }
 
-function buildContext(action, observation, tableSelector) {
+function buildContext(action, observation, tableSelector, idStabilityIndex) {
   const row = observation && observation.row ? observation.row : {};
   const table = observation && observation.table ? observation.table : {};
   const cell = observation && observation.cell ? observation.cell : {};
@@ -842,6 +975,9 @@ function buildContext(action, observation, tableSelector) {
     row.keyValue ||
     row.primaryValue ||
     null;
+
+  const targetId = observation && observation.target ? observation.target.id || null : null;
+  const targetIdStability = classifyIdStability(targetId, targetId ? idStabilityIndex[targetId] : null);
 
   return {
     action: {
@@ -870,6 +1006,7 @@ function buildContext(action, observation, tableSelector) {
     target: {
       tagName: observation && observation.target ? observation.target.tagName || null : null,
       id: observation && observation.target ? observation.target.id || null : null,
+      idStability: targetIdStability,
       className: observation && observation.target ? observation.target.className || null : null,
       testId: observation && observation.target ? observation.target.testId || null : null,
       ariaLabel: observation && observation.target ? observation.target.ariaLabel || null : null,
@@ -929,6 +1066,21 @@ function buildCandidates(context) {
   }
 
   if ((!context.dataGridDetected && !context.keyValueTableDetected) || !isTransformableTarget(context)) {
+    const fallbackTag = resolveTargetTag(context) || normalize(context.target.tagName) || "*";
+    let forcedLocator = "";
+
+    if (hasValue(context.target.id)) {
+      forcedLocator = `//${fallbackTag}[@id='${escapeXPathLiteral(context.target.id)}']`;
+    } else if (hasValue(context.target.testId)) {
+      forcedLocator = `//${fallbackTag}[@data-testid='${escapeXPathLiteral(context.target.testId)}']`;
+    } else if (hasValue(context.row.id) && Number.isFinite(context.cell.columnIndex) && context.cell.columnIndex > 0) {
+      forcedLocator = `//tr[@id='${escapeXPathLiteral(context.row.id)}']//td[${context.cell.columnIndex}]//${stripRelativePrefix(fallbackTag)}`;
+    } else if (hasValue(context.action.text)) {
+      forcedLocator = `//${context.tableSelector}//${fallbackTag}[text()='${text}']`;
+    } else {
+      forcedLocator = `//${context.tableSelector}//${fallbackTag}`;
+    }
+
     candidates.push({
       strategy: "TABLE_CONTEXT_REJECTED",
       locator: context.action.originalLocator,
@@ -936,6 +1088,21 @@ function buildCandidates(context) {
       reasonParts: ["Table context not eligible for safe transformation"],
       method,
       rewrite: false
+    });
+
+    candidates.push({
+      strategy: "TABLE_FORCED_LOCATOR",
+      locator: forcedLocator,
+      score: 6,
+      reasonParts: ["Forced locator-only table policy"],
+      method,
+      rewrite: true,
+      validation: {
+        valid: true,
+        unique: true,
+        matchEstimate: 1,
+        reason: "Locator-only table policy fallback"
+      }
     });
     return candidates;
   }
@@ -1086,120 +1253,188 @@ function selectBestValidatedRewriteCandidate(candidates) {
   return ordered[0] || null;
 }
 
+function selectBestRewriteCandidate(candidates) {
+  const ordered = [...candidates]
+    .filter((candidate) => candidate.rewrite && hasValue(candidate.locator))
+    .sort((a, b) => b.score - a.score);
+
+  return ordered[0] || null;
+}
+
 function toConfidence(score) {
   const value = (score + 10) / 25;
   return Math.max(0, Math.min(1, Number(value.toFixed(2))));
 }
 
 function parseActionLine(line) {
-  const scopedRolePattern = /^(\s*)await\s+page\.locator\((['"`])(.+?)\2\)\.getByRole\((['"`])(\w+)\4,\s*\{[^}]*name:\s*(['"`])([^'"`]+)\6[^}]*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const scopedRolePattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.locator\((['"`])(.+?)\3\)\.getByRole\((['"`])(\w+)\5,\s*\{[^}]*name:\s*(['"`])([^'"`]+)\7[^}]*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
   const scopedRoleMatch = line.match(scopedRolePattern);
   if (scopedRoleMatch) {
-    const role = scopedRoleMatch[5];
-    const text = scopedRoleMatch[7];
-    const positionRaw = scopedRoleMatch[8] || "";
+    const actor = scopedRoleMatch[2];
+    const role = scopedRoleMatch[6];
+    const text = scopedRoleMatch[8];
+    const positionRaw = scopedRoleMatch[9] || "";
 
     return {
       indent: scopedRoleMatch[1],
+      actor,
       kind: "role",
       role,
       text,
-      method: scopedRoleMatch[10],
+      method: scopedRoleMatch[11],
       first: positionRaw === "first()",
-      nth: scopedRoleMatch[9] ? Number(scopedRoleMatch[9]) : null,
-      originalLocator: `page.locator('${scopedRoleMatch[3]}').getByRole('${role}', { name: '${text}' })`
+      nth: scopedRoleMatch[10] ? Number(scopedRoleMatch[10]) : null,
+      originalLocator: `${actor}.locator('${scopedRoleMatch[4]}').getByRole('${role}', { name: '${text}' })`
     };
   }
 
-  const scopedRoleFilterPattern = /^(\s*)await\s+page\.locator\((['"`])(.+?)\2\)\.getByRole\((['"`])(\w+)\4\)\.filter\(\{\s*hasText:\s*\/\^\$\/\s*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const scopedRoleFilterPattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.locator\((['"`])(.+?)\3\)\.getByRole\((['"`])(\w+)\5\)\.filter\(\{\s*hasText:\s*\/\^\$\/\s*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
   const scopedRoleFilterMatch = line.match(scopedRoleFilterPattern);
   if (scopedRoleFilterMatch) {
-    const positionRaw = scopedRoleFilterMatch[6] || "";
+    const actor = scopedRoleFilterMatch[2];
+    const positionRaw = scopedRoleFilterMatch[7] || "";
     return {
       indent: scopedRoleFilterMatch[1],
+      actor,
       kind: "role",
-      role: scopedRoleFilterMatch[5],
+      role: scopedRoleFilterMatch[6],
       text: "",
-      method: scopedRoleFilterMatch[8],
+      method: scopedRoleFilterMatch[9],
       first: positionRaw === "first()",
-      nth: scopedRoleFilterMatch[7] ? Number(scopedRoleFilterMatch[7]) : null,
-      originalLocator: `page.locator('${scopedRoleFilterMatch[3]}').getByRole('${scopedRoleFilterMatch[5]}').filter({ hasText: /^$/ })`
+      nth: scopedRoleFilterMatch[8] ? Number(scopedRoleFilterMatch[8]) : null,
+      originalLocator: `${actor}.locator('${scopedRoleFilterMatch[4]}').getByRole('${scopedRoleFilterMatch[6]}').filter({ hasText: /^$/ })`
     };
   }
 
-  const scopedTextPattern = /^(\s*)await\s+page\.locator\((['"`])(.+?)\2\)\.getByText\((['"`])([^'"`]+)\4(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const scopedTextPattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.locator\((['"`])(.+?)\3\)\.getByText\((['"`])([^'"`]+)\5(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
   const scopedTextMatch = line.match(scopedTextPattern);
   if (scopedTextMatch) {
     return {
       indent: scopedTextMatch[1],
+      actor: scopedTextMatch[2],
       kind: "text",
       role: "text",
-      text: scopedTextMatch[5],
-      exact: scopedTextMatch[6] === "true",
-      method: scopedTextMatch[7],
-      originalLocator: `page.locator('${scopedTextMatch[3]}').getByText('${scopedTextMatch[5]}')`
+      text: scopedTextMatch[6],
+      exact: scopedTextMatch[7] === "true",
+      method: scopedTextMatch[8],
+      originalLocator: `${scopedTextMatch[2]}.locator('${scopedTextMatch[4]}').getByText('${scopedTextMatch[6]}')`
     };
   }
 
-  const rolePattern = /^(\s*)await\s+page\.getByRole\((['"`])(\w+)\2,\s*\{[^}]*name:\s*(['"`])([^'"`]+)\4[^}]*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const scopedTextFillPattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.locator\((['"`])(.+?)\3\)\.getByText\((['"`])([^'"`]+)\5(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.fill\((['"`])([^'"`]*)\8\);\s*$/;
+  const scopedTextFillMatch = line.match(scopedTextFillPattern);
+  if (scopedTextFillMatch) {
+    return {
+      indent: scopedTextFillMatch[1],
+      actor: scopedTextFillMatch[2],
+      kind: "text",
+      role: "text",
+      text: scopedTextFillMatch[6],
+      exact: scopedTextFillMatch[7] === "true",
+      method: "fill",
+      fillValue: scopedTextFillMatch[9],
+      originalLocator: `${scopedTextFillMatch[2]}.locator('${scopedTextFillMatch[4]}').getByText('${scopedTextFillMatch[6]}')`
+    };
+  }
+
+  const rolePattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.getByRole\((['"`])(\w+)\3,\s*\{[^}]*name:\s*(['"`])([^'"`]+)\5[^}]*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
   const match = line.match(rolePattern);
   if (match) {
-    const role = match[3];
-    const text = match[5];
-    const positionRaw = match[6] || "";
+    const actor = match[2];
+    const role = match[4];
+    const text = match[6];
+    const positionRaw = match[7] || "";
 
     return {
       indent: match[1],
+      actor,
       kind: "role",
       role,
       text,
-      method: match[8],
+      method: match[9],
       first: positionRaw === "first()",
-      nth: match[7] ? Number(match[7]) : null,
-      originalLocator: `page.getByRole('${role}', { name: '${text}' })`
+      nth: match[8] ? Number(match[8]) : null,
+      originalLocator: `${actor}.getByRole('${role}', { name: '${text}' })`
     };
   }
 
-  const pageTextPattern = /^(\s*)await\s+page\.getByText\((['"`])([^'"`]+)\2(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const pageTextPattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.getByText\((['"`])([^'"`]+)\3(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
   const pageTextMatch = line.match(pageTextPattern);
   if (pageTextMatch) {
     return {
       indent: pageTextMatch[1],
+      actor: pageTextMatch[2],
       kind: "text",
       role: "text",
-      text: pageTextMatch[3],
-      exact: pageTextMatch[4] === "true",
-      method: pageTextMatch[5],
+      text: pageTextMatch[4],
+      exact: pageTextMatch[5] === "true",
+      method: pageTextMatch[6],
       originalLocator: pageTextMatch[0].trim().replace(/^await\s+/, "").replace(/\.(click|dblclick|hover|check|uncheck)\(\);\s*$/, "")
     };
   }
 
-  const frameTextPattern = /^(\s*)await\s+page\.locator\((['"`])(.+?)\2\)\.contentFrame\(\)\.getByText\((['"`])([^'"`]+)\4(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const pageTextFillPattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.getByText\((['"`])([^'"`]+)\3(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.fill\((['"`])([^'"`]*)\6\);\s*$/;
+  const pageTextFillMatch = line.match(pageTextFillPattern);
+  if (pageTextFillMatch) {
+    return {
+      indent: pageTextFillMatch[1],
+      actor: pageTextFillMatch[2],
+      kind: "text",
+      role: "text",
+      text: pageTextFillMatch[4],
+      exact: pageTextFillMatch[5] === "true",
+      method: "fill",
+      fillValue: pageTextFillMatch[7],
+      originalLocator: pageTextFillMatch[0].trim().replace(/^await\s+/, "").replace(/\.fill\((['"`])([^'"`]*)\1\);\s*$/, "")
+    };
+  }
+
+  const frameTextPattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.locator\((['"`])(.+?)\3\)\.contentFrame\(\)\.getByText\((['"`])([^'"`]+)\5(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
   const frameTextMatch = line.match(frameTextPattern);
   if (frameTextMatch) {
     return {
       indent: frameTextMatch[1],
+      actor: frameTextMatch[2],
       kind: "text",
       role: "text",
-      text: frameTextMatch[5],
-      exact: frameTextMatch[6] === "true",
-      method: frameTextMatch[7],
+      text: frameTextMatch[6],
+      exact: frameTextMatch[7] === "true",
+      method: frameTextMatch[8],
       scope: "frame",
-      frameSelector: frameTextMatch[3],
+      frameSelector: frameTextMatch[4],
       originalLocator: frameTextMatch[0].trim().replace(/^await\s+/, "").replace(/\.(click|dblclick|hover|check|uncheck)\(\);\s*$/, "")
     };
   }
 
-    const locatorActionPattern = /^(\s*)await\s+page\.locator\((['"`])(.+?)\2\)(?:\.first\(\))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const frameTextFillPattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.locator\((['"`])(.+?)\3\)\.contentFrame\(\)\.getByText\((['"`])([^'"`]+)\5(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.fill\((['"`])([^'"`]*)\8\);\s*$/;
+  const frameTextFillMatch = line.match(frameTextFillPattern);
+  if (frameTextFillMatch) {
+    return {
+      indent: frameTextFillMatch[1],
+      actor: frameTextFillMatch[2],
+      kind: "text",
+      role: "text",
+      text: frameTextFillMatch[6],
+      exact: frameTextFillMatch[7] === "true",
+      method: "fill",
+      fillValue: frameTextFillMatch[9],
+      scope: "frame",
+      frameSelector: frameTextFillMatch[4],
+      originalLocator: frameTextFillMatch[0].trim().replace(/^await\s+/, "").replace(/\.fill\((['"`])([^'"`]*)\1\);\s*$/, "")
+    };
+  }
+
+    const locatorActionPattern = /^(\s*)await\s+([A-Za-z_$][\w$]*)\.locator\((['"`])(.+?)\3\)(?:\.first\(\))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
     const locatorActionMatch = line.match(locatorActionPattern);
     if (locatorActionMatch) {
       return {
         indent: locatorActionMatch[1],
+        actor: locatorActionMatch[2],
         kind: "locator",
         role: "locator",
         text: "",
-        method: locatorActionMatch[4],
-        originalLocator: `page.locator('${locatorActionMatch[3]}')`,
+        method: locatorActionMatch[5],
+        originalLocator: `${locatorActionMatch[2]}.locator('${locatorActionMatch[4]}')`,
       };
     }
 
@@ -1208,11 +1443,17 @@ function parseActionLine(line) {
 
 function rewriteAction(lineInfo, bestCandidate) {
   const indent = lineInfo.action.indent;
+  const actor = lineInfo.action.actor || "page";
   const escapedLocator = bestCandidate.locator.replace(/"/g, '\\"');
   const baseExpression =
     lineInfo.action.scope === "frame" && lineInfo.action.frameSelector
-      ? `page.locator('${lineInfo.action.frameSelector}').contentFrame().locator("${escapedLocator}")`
-      : `page.locator("${escapedLocator}")`;
+      ? `${actor}.locator('${lineInfo.action.frameSelector}').contentFrame().locator("${escapedLocator}")`
+      : `${actor}.locator("${escapedLocator}")`;
+
+  if (lineInfo.action.method === "fill") {
+    const fillValue = String(lineInfo.action.fillValue || "").replace(/'/g, "\\'");
+    return [`${indent}await ${baseExpression}.fill('${fillValue}');`];
+  }
 
   return [`${indent}await ${baseExpression}.${lineInfo.action.method}();`];
 }
@@ -1220,6 +1461,7 @@ function rewriteAction(lineInfo, bestCandidate) {
 function transformCode(options) {
   const codeText = safeRead(options.codeFilePath);
   const observations = safeReadJson(options.domFilePath);
+  const idStabilityIndex = buildIdStabilityIndex(observations);
   const specificRules = loadSpecificLocatorRules(options.specificRulesFilePath);
   const lines = codeText.split(/\r?\n/);
   const outLines = [];
@@ -1249,7 +1491,7 @@ function transformCode(options) {
 
     try {
       const observation = findObservation(lineNumber, action.text, observations);
-      const context = buildContext(action, observation, options.tableSelector);
+      const context = buildContext(action, observation, options.tableSelector, idStabilityIndex);
       context.dataGridDetected = isDataGridContext(context);
       context.keyValueTableDetected = isKeyValueTableContext(context);
 
@@ -1342,18 +1584,25 @@ function transformCode(options) {
       const candidates = buildCandidates(context);
       const selected = selectBestCandidate(candidates);
       const bestValidatedRewrite = selectBestValidatedRewriteCandidate(candidates);
-      const chosenCandidate = bestValidatedRewrite || selected.best;
+      const bestRewriteCandidate = selectBestRewriteCandidate(candidates);
+      const chosenCandidate = bestValidatedRewrite || bestRewriteCandidate || selected.best;
       const confidence = toConfidence(chosenCandidate.score);
       const roleScore = candidates.find((item) => item.strategy === "ROLE")?.score ?? 0;
       const selectedValidation = chosenCandidate.validation || { valid: chosenCandidate.rewrite, unique: false, matchEstimate: 0, reason: "No validation" };
       const shouldRewrite =
         chosenCandidate.rewrite &&
-        selectedValidation.valid &&
-        selectedValidation.unique &&
-        selectedValidation.matchEstimate === 1 &&
-        chosenCandidate.score >= roleScore + 2 &&
-        confidence >= 0.65 &&
-        (!context.duplicateText || !strategyDependsOnTargetText(chosenCandidate.strategy));
+        hasValue(chosenCandidate.locator) &&
+        (
+          chosenCandidate.strategy === "TABLE_FORCED_LOCATOR" ||
+          (
+            selectedValidation.valid &&
+            selectedValidation.unique &&
+            selectedValidation.matchEstimate === 1 &&
+            chosenCandidate.score >= roleScore + 2 &&
+            confidence >= 0.65 &&
+            (!context.duplicateText || !strategyDependsOnTargetText(chosenCandidate.strategy))
+          )
+        );
 
       metadata.actions.push({
         line: lineNumber,
@@ -1454,5 +1703,6 @@ module.exports = {
   buildCandidates,
   selectBestCandidate,
   selectBestValidatedRewriteCandidate,
+  selectBestRewriteCandidate,
   toConfidence
 };

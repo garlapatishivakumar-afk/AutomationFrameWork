@@ -1,8 +1,8 @@
 {
-  "generatedAtUtc": "2026-10-03T21:44:52.065Z",
+  "generatedAtUtc": "2026-10-03T23:43:50.664Z",
   "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.ts",
   "outputFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.cs",
-  "actionCount": 15,
+  "actionCount": 17,
   "frameworkMatches": [
     {
       "sourceLine": 8,
@@ -13,76 +13,83 @@
   "sourceMap": [
     {
       "sourceLine": 8,
-      "generatedLine": 43,
+      "generatedLine": 41,
       "actionType": "goto",
       "locatorStrategy": "PAGE_URL",
       "supported": true
     },
     {
       "sourceLine": 9,
-      "generatedLine": 44,
+      "generatedLine": 42,
       "actionType": "click",
       "locatorStrategy": "ROLE",
       "supported": true
     },
     {
       "sourceLine": 10,
-      "generatedLine": 45,
+      "generatedLine": 43,
       "actionType": "click",
       "locatorStrategy": "ROLE",
       "supported": true
     },
     {
       "sourceLine": 11,
-      "generatedLine": 46,
+      "generatedLine": 44,
       "actionType": "click",
       "locatorStrategy": "TABLE_LOCATOR",
       "supported": true
     },
     {
       "sourceLine": 12,
-      "generatedLine": 47,
+      "generatedLine": 45,
       "actionType": "click",
       "locatorStrategy": "TABLE_LOCATOR",
       "supported": true
     },
     {
       "sourceLine": 13,
-      "generatedLine": 48,
-      "actionType": "check",
-      "locatorStrategy": "TABLE_LOCATOR",
+      "generatedLine": 46,
+      "actionType": "popupWait",
+      "locatorStrategy": "POPUP_WAIT",
       "supported": true
     },
     {
       "sourceLine": 14,
-      "generatedLine": 49,
+      "generatedLine": 47,
       "actionType": "click",
-      "locatorStrategy": "ROLE",
+      "locatorStrategy": "LOCATOR",
       "supported": true
     },
     {
       "sourceLine": 15,
-      "generatedLine": 50,
-      "actionType": "click",
-      "locatorStrategy": "TABLE_LOCATOR",
+      "generatedLine": 48,
+      "actionType": "popupResolve",
+      "locatorStrategy": "POPUP_RESOLVE",
       "supported": true
     },
     {
       "sourceLine": 16,
-      "generatedLine": 51,
+      "generatedLine": 49,
       "actionType": "click",
-      "locatorStrategy": "TABLE_LOCATOR",
+      "locatorStrategy": "TEXT",
       "supported": true
     },
     {
       "sourceLine": 17,
-      "generatedLine": 52,
+      "generatedLine": 50,
       "actionType": "click",
       "locatorStrategy": "LOCATOR",
       "supported": true
     },
     {
       "sourceLine": 18,
+      "generatedLine": 52,
+      "actionType": "fill",
+      "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 19,
       "generatedLine": 53,
       "actionType": "click",
       "locatorStrategy": "LOCATOR",
@@ -96,24 +103,31 @@
       "supported": true
     },
     {
-      "sourceLine": 22,
+      "sourceLine": 21,
       "generatedLine": 55,
       "actionType": "click",
       "locatorStrategy": "LOCATOR",
       "supported": true
     },
     {
-      "sourceLine": 23,
+      "sourceLine": 22,
       "generatedLine": 56,
       "actionType": "click",
       "locatorStrategy": "LOCATOR",
       "supported": true
     },
     {
-      "sourceLine": 25,
-      "generatedLine": 57,
-      "actionType": "click",
+      "sourceLine": 23,
+      "generatedLine": 58,
+      "actionType": "fill",
       "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 24,
+      "generatedLine": 59,
+      "actionType": "click",
+      "locatorStrategy": "ROLE",
       "supported": true
     }
   ],

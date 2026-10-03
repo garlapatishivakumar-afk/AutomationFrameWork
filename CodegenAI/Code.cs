@@ -10,6 +10,8 @@ namespace AutomationFrameWork.CodegenAI
     {
         private readonly CommonActionsPage _commonActions;
 
+        private IPage _page1 = default!;
+
         public CodegenRecordedFlow(IPage page, ConfigReader config)
         {
             Page = page ?? throw new ArgumentNullException(nameof(page));
@@ -24,18 +26,14 @@ namespace AutomationFrameWork.CodegenAI
         // Locators
         public ILocator Deals => Page.GetByRole(AriaRole.Link, new() { Name = "Deals", Exact = true });
         public ILocator DealsCompletionStatus => Page.GetByRole(AriaRole.Link, new() { Name = "Deals Completion Status" });
-        public ILocator TrIDCp1GdTd => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__5']//td[8]");
-        public ILocator TrIDCp1GdTd2 => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__5']//td[6]");
-        public ILocator TrIDCp1GdInputNameCp1GdChRoll => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__7']//input[@name='ctl00$cp1$gd$ctl00$ctl18$chRoll']");
-        public ILocator NextPage => Page.GetByRole(AriaRole.Button, new() { Name = "Next Page" });
-        public ILocator TrIDCp1GdTdA => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__9']//td[2]/a");
-        public ILocator TrIDRgrdReportsTdA => Page.Locator("//tr[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00__1']//td[3]/a");
-        public ILocator Aidghe => Page.Locator("//a[@id='g_ctl08_hE_4']");
-        public ILocator Aidghe2 => Page.Locator("//a[@id='g_ctl08_hE_5']");
-        public ILocator Aidghe3 => Page.Locator("//a[@id='g_ctl08_hE_6']");
-        public ILocator Aidghe4 => Page.Locator("//a[@id='g_ctl08_hE_31']");
-        public ILocator Aidghe5 => Page.Locator("//a[@id='g_ctl08_hE_42']");
-        public ILocator Aidghe6 => Page.Locator("//a[@id='g_ctl08_hE_58']");
+        public ILocator TrIDCp1GdTdA => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__8']//td[2]/a");
+        public ILocator AidRgrdReportsLnkView => Page.Locator("//a[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView']");
+        public ILocator Aidghe => Page.Locator("//a[@id='g_ctl02_hE_4']");
+        public ILocator FieldValue => _page1.GetByText("Field Value:");
+        public ILocator OverrideValue => _page1.Locator("#txtOverrideValue");
+        public ILocator OverrideRule => _page1.Locator("#txtOverrideRule");
+        public ILocator OverrideExplan => _page1.Locator("#txtOverrideExplan");
+        public ILocator Ok => _page1.GetByRole(AriaRole.Button, new() { Name = "OK" });
 
         public async Task ReplayAsync()
         {
@@ -43,18 +41,22 @@ namespace AutomationFrameWork.CodegenAI
             await _commonActions.NavigateToURLAsync("https://investorreporting-mb-sit.trimont.com/default.aspx");
             await Deals.ClickAsync();
             await DealsCompletionStatus.ClickAsync();
-            await TrIDCp1GdTd.ClickAsync();
-            await TrIDCp1GdTd2.ClickAsync();
-            await TrIDCp1GdInputNameCp1GdChRoll.CheckAsync();
-            await NextPage.ClickAsync();
             await TrIDCp1GdTdA.ClickAsync();
-            await TrIDRgrdReportsTdA.ClickAsync();
+            await AidRgrdReportsLnkView.ClickAsync();
+            var page1Promise = Page.WaitForPopupAsync();
             await Aidghe.ClickAsync();
-            await Aidghe2.ClickAsync();
-            await Aidghe3.ClickAsync();
-            await Aidghe4.ClickAsync();
-            await Aidghe5.ClickAsync();
-            await Aidghe6.ClickAsync();
+            _page1 = await page1Promise;
+            await FieldValue.ClickAsync();
+            await OverrideValue.ClickAsync();
+            // Review: Literal input value preserved from recording. Consider replacing with framework data binding.
+            await OverrideValue.FillAsync("1324");
+            await OverrideRule.ClickAsync();
+            await OverrideRule.ClickAsync();
+            await OverrideRule.ClickAsync();
+            await OverrideExplan.ClickAsync();
+            // Review: Literal input value preserved from recording. Consider replacing with framework data binding.
+            await OverrideExplan.FillAsync("test");
+            await Ok.ClickAsync();
         }
     }
 }

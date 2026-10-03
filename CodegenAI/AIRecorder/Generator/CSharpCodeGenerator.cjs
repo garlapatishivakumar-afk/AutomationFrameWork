@@ -144,6 +144,27 @@ function createAction(sourceLine, raw, data) {
   };
 }
 
+function resolveActorName(actor) {
+  const normalized = String(actor || "").trim();
+  return normalized || "page";
+}
+
+function toCSharpActor(actor) {
+  const normalized = resolveActorName(actor);
+  return normalized === "page" ? "Page" : normalized;
+}
+
+function actorToFieldName(actor) {
+  const normalized = resolveActorName(actor);
+  if (normalized === "page") {
+    return "Page";
+  }
+
+  const camel = toCamelCase(normalized);
+  const safe = /^[A-Za-z_][A-Za-z0-9_]*$/.test(camel) ? camel : "popupPage";
+  return `_${safe}`;
+}
+
 function parseLocatorPosition(segment) {
   const value = String(segment || "");
   if (!value) {
@@ -273,7 +294,11 @@ function parseActionLine(rawLine, sourceLine) {
     return null;
   }
 
-  const gotoMatch = line.match(/^await\s+page\.goto\((['"`])([^'"`]+)\1\);$/);
+  const actorMatch = line.match(/^await\s+([A-Za-z_$][\w$]*)\./);
+  const actor = resolveActorName(actorMatch ? actorMatch[1] : "page");
+  const normalizedLine = actorMatch ? line.replace(/^await\s+[A-Za-z_$][\w$]*\./, "await page.") : line;
+
+  const gotoMatch = normalizedLine.match(/^await\s+page\.goto\((['"`])([^'"`]+)\1\);$/);
   if (gotoMatch) {
     return createAction(sourceLine, rawLine, {
       actionType: "goto",
@@ -283,7 +308,7 @@ function parseActionLine(rawLine, sourceLine) {
     });
   }
 
-  const waitForSelectorMatch = line.match(/^await\s+page\.waitForSelector\((['"`])(.+?)\1\);$/);
+  const waitForSelectorMatch = normalizedLine.match(/^await\s+page\.waitForSelector\((['"`])(.+?)\1\);$/);
   if (waitForSelectorMatch) {
     return createAction(sourceLine, rawLine, {
       actionType: "waitForSelector",
@@ -293,7 +318,7 @@ function parseActionLine(rawLine, sourceLine) {
     });
   }
 
-  const keyboardMatch = line.match(/^await\s+page\.keyboard\.(press|type|insertText|down|up)\((['"`])([^'"`]*)\2\);$/);
+  const keyboardMatch = normalizedLine.match(/^await\s+page\.keyboard\.(press|type|insertText|down|up)\((['"`])([^'"`]*)\2\);$/);
   if (keyboardMatch) {
     return createAction(sourceLine, rawLine, {
       actionType: `keyboard.${keyboardMatch[1]}`,
@@ -303,7 +328,7 @@ function parseActionLine(rawLine, sourceLine) {
     });
   }
 
-  const mouseMatch = line.match(/^await\s+page\.mouse\.(click|dblclick|move)\(([^\)]*)\);$/);
+  const mouseMatch = normalizedLine.match(/^await\s+page\.mouse\.(click|dblclick|move)\(([^\)]*)\);$/);
   if (mouseMatch) {
     const values = mouseMatch[2]
       .split(",")
@@ -318,7 +343,7 @@ function parseActionLine(rawLine, sourceLine) {
     });
   }
 
-  const expectVisibleMatch = line.match(/^await\s+expect\((.+)\)\.(toBeVisible|toContainText|toHaveText)\((?:\s*(['"`])([\s\S]*?)\3\s*)?\);$/);
+  const expectVisibleMatch = normalizedLine.match(/^await\s+expect\((.+)\)\.(toBeVisible|toContainText|toHaveText)\((?:\s*(['"`])([\s\S]*?)\3\s*)?\);$/);
   if (expectVisibleMatch) {
     return createAction(sourceLine, rawLine, {
       actionType: expectVisibleMatch[2],
@@ -331,75 +356,75 @@ function parseActionLine(rawLine, sourceLine) {
 
   const patterns = [
     {
-      match: line.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[8],
         locatorStrategy: "FRAME_ROLE",
-        locator: { kind: "frameRole", frameSelector: matches[2], role: matches[4], name: matches[6], exact: matches[7] === "true" },
+        locator: { kind: "frameRole", actor, frameSelector: matches[2], role: matches[4], name: matches[6], exact: matches[7] === "true" },
         targetElement: matches[4],
         frame: { selector: matches[2] },
         confidence: 0.9
       })
     },
     {
-      match: line.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.getByText\((['"`])([^'"`]+)\3(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.getByText\((['"`])([^'"`]+)\3(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[6],
         locatorStrategy: "FRAME_TEXT",
-        locator: { kind: "frameText", frameSelector: matches[2], text: matches[4], exact: matches[5] === "true" },
+        locator: { kind: "frameText", actor, frameSelector: matches[2], text: matches[4], exact: matches[5] === "true" },
         targetElement: "text",
         frame: { selector: matches[2] },
         confidence: 0.88
       })
     },
     {
-      match: line.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[8],
         locatorStrategy: "SCOPED_ROLE",
-        locator: { kind: "scopedRole", selector: matches[2], role: matches[4], name: matches[6], exact: matches[7] === "true" },
+        locator: { kind: "scopedRole", actor, selector: matches[2], role: matches[4], name: matches[6], exact: matches[7] === "true" },
         targetElement: matches[4],
         table: detectTableInfo(matches[2]),
         confidence: 0.92
       })
     },
     {
-      match: line.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.getByText\((['"`])([^'"`]+)\3(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.getByText\((['"`])([^'"`]+)\3(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[6],
         locatorStrategy: "SCOPED_TEXT",
-        locator: { kind: "scopedText", selector: matches[2], text: matches[4], exact: matches[5] === "true" },
+        locator: { kind: "scopedText", actor, selector: matches[2], text: matches[4], exact: matches[5] === "true" },
         targetElement: "text",
         table: detectTableInfo(matches[2]),
         confidence: 0.9
       })
     },
     {
-      match: line.match(/^await\s+page\.getByRole\((['"`])(\w+)\1,\s*\{\s*name:\s*(['"`])([^'"`]+)\3(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      match: normalizedLine.match(/^await\s+page\.getByRole\((['"`])(\w+)\1,\s*\{\s*name:\s*(['"`])([^'"`]+)\3(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[6],
         locatorStrategy: "ROLE",
-        locator: { kind: "role", role: matches[2], name: matches[4], exact: matches[5] === "true" },
+        locator: { kind: "role", actor, role: matches[2], name: matches[4], exact: matches[5] === "true" },
         targetElement: matches[2],
         confidence: 0.95
       })
     },
     {
-      match: line.match(/^await\s+page\.getByText\((['"`])([^'"`]+)\1(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      match: normalizedLine.match(/^await\s+page\.getByText\((['"`])([^'"`]+)\1(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[4],
         locatorStrategy: "TEXT",
-        locator: { kind: "text", text: matches[2], exact: matches[3] === "true" },
+        locator: { kind: "text", actor, text: matches[2], exact: matches[3] === "true" },
         targetElement: "text",
         confidence: 0.82
       })
     },
     {
-      match: line.match(/^await\s+page\.getByLabel\((['"`])([^'"`]+)\1(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(fill|press|focus|click)\((?:\s*(['"`])([\s\S]*?)\5\s*)?\);$/),
+      match: normalizedLine.match(/^await\s+page\.getByLabel\((['"`])([^'"`]+)\1(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(fill|press|focus|click)\((?:\s*(['"`])([\s\S]*?)\5\s*)?\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[4],
         locatorStrategy: "LABEL",
-        locator: { kind: "label", text: matches[2], exact: matches[3] === "true" },
+        locator: { kind: "label", actor, text: matches[2], exact: matches[3] === "true" },
         targetElement: "label",
         value: matches[6] || null,
         confidence: 0.92,
@@ -407,22 +432,22 @@ function parseActionLine(rawLine, sourceLine) {
       })
     },
     {
-      match: line.match(/^await\s+page\.locator\((['"`])(.+?)\1\)(\.first\(\))?\.(click|dblclick|hover|check|uncheck|focus|waitFor)\(\);$/),
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)(\.first\(\))?\.(click|dblclick|hover|check|uncheck|focus|waitFor)\(\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[4],
         locatorStrategy: detectTableInfo(matches[2]) ? "TABLE_LOCATOR" : "LOCATOR",
-        locator: { kind: "locator", selector: matches[2], first: Boolean(matches[3]) },
+        locator: { kind: "locator", actor, selector: matches[2], first: Boolean(matches[3]) },
         targetElement: "locator",
         table: detectTableInfo(matches[2]),
         confidence: 0.93
       })
     },
     {
-      match: line.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.(fill|press|selectOption|setInputFiles)\((['"`])([\s\S]*?)\4\);$/),
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.(fill|press|selectOption|setInputFiles)\((['"`])([\s\S]*?)\4\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
         actionType: matches[3],
         locatorStrategy: detectTableInfo(matches[2]) ? "TABLE_LOCATOR" : "LOCATOR",
-        locator: { kind: "locator", selector: matches[2], first: false },
+        locator: { kind: "locator", actor, selector: matches[2], first: false },
         targetElement: "locator",
         value: matches[5],
         table: detectTableInfo(matches[2]),
@@ -438,8 +463,11 @@ function parseActionLine(rawLine, sourceLine) {
     }
   }
 
-  const genericAction = tryParseGenericLocatorAction(line, rawLine, sourceLine);
+  const genericAction = tryParseGenericLocatorAction(normalizedLine, rawLine, sourceLine);
   if (genericAction) {
+    if (genericAction.locator && !genericAction.locator.actor) {
+      genericAction.locator.actor = actor;
+    }
     return genericAction;
   }
 
@@ -471,6 +499,38 @@ function parseRecordedActions(code) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const normalizedLine = normalizeRecordedLine(lines[index]);
+    const trimmed = normalizedLine.trim();
+
+    const popupWaitMatch = trimmed.match(/^const\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\.waitForEvent\((['"`])popup\3\);$/);
+    if (popupWaitMatch) {
+      actions.push(createAction(index + 1, lines[index], {
+        actionType: "popupWait",
+        locatorStrategy: "POPUP_WAIT",
+        targetElement: "popup",
+        popup: {
+          promiseVar: popupWaitMatch[1],
+          actor: popupWaitMatch[2]
+        },
+        confidence: 0.95
+      }));
+      continue;
+    }
+
+    const popupResolveMatch = trimmed.match(/^const\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+([A-Za-z_$][\w$]*)\s*;$/);
+    if (popupResolveMatch) {
+      actions.push(createAction(index + 1, lines[index], {
+        actionType: "popupResolve",
+        locatorStrategy: "POPUP_RESOLVE",
+        targetElement: "popup",
+        popup: {
+          pageVar: popupResolveMatch[1],
+          promiseVar: popupResolveMatch[2]
+        },
+        confidence: 0.95
+      }));
+      continue;
+    }
+
     const action = parseActionLine(normalizedLine, index + 1);
     if (action) {
       actions.push(action);
@@ -520,7 +580,7 @@ function convertLocatorExpressionFromTs(expression) {
     .replace(/'/g, '"');
 }
 
-function buildLocatorExpression(locator) {
+function buildLocatorExpression(locator, actorFieldMap = new Map()) {
   if (!locator) {
     return "Page";
   }
@@ -545,58 +605,63 @@ function buildLocatorExpression(locator) {
     return expression;
   };
 
+  const actorName = resolveActorName(locator.actor);
+  const actorRef = actorName === "page"
+    ? "Page"
+    : (actorFieldMap.get(actorName) || toCSharpActor(actorName));
+
   if (locator.kind === "role") {
     const exactPart = locator.exact ? ", Exact = true" : "";
-    return applyPosition(`Page.GetByRole(AriaRole.${inferRoleEnum(locator.role)}, new() { Name = \"${escapeCSharpString(locator.name)}\"${exactPart} })`);
+    return applyPosition(`${actorRef}.GetByRole(AriaRole.${inferRoleEnum(locator.role)}, new() { Name = \"${escapeCSharpString(locator.name)}\"${exactPart} })`);
   }
 
   if (locator.kind === "text") {
     const options = locator.exact ? ", new() { Exact = true }" : "";
-    return applyPosition(`Page.GetByText(\"${escapeCSharpString(locator.text)}\"${options})`);
+    return applyPosition(`${actorRef}.GetByText(\"${escapeCSharpString(locator.text)}\"${options})`);
   }
 
   if (locator.kind === "label") {
     const options = locator.exact ? ", new() { Exact = true }" : "";
-    return applyPosition(`Page.GetByLabel(\"${escapeCSharpString(locator.text)}\"${options})`);
+    return applyPosition(`${actorRef}.GetByLabel(\"${escapeCSharpString(locator.text)}\"${options})`);
   }
 
   if (locator.kind === "placeholder") {
-    return applyPosition(`Page.GetByPlaceholder(\"${escapeCSharpString(locator.text)}\")`);
+    return applyPosition(`${actorRef}.GetByPlaceholder(\"${escapeCSharpString(locator.text)}\")`);
   }
 
   if (locator.kind === "title") {
-    return applyPosition(`Page.GetByTitle(\"${escapeCSharpString(locator.text)}\")`);
+    return applyPosition(`${actorRef}.GetByTitle(\"${escapeCSharpString(locator.text)}\")`);
   }
 
   if (locator.kind === "testid") {
-    return applyPosition(`Page.GetByTestId(\"${escapeCSharpString(locator.text)}\")`);
+    return applyPosition(`${actorRef}.GetByTestId(\"${escapeCSharpString(locator.text)}\")`);
   }
 
   if (locator.kind === "locator") {
     const base = locator.filterText
-      ? `Page.Locator(\"${escapeCSharpString(locator.selector)}\").Filter(new() { HasText = \"${escapeCSharpString(locator.filterText)}\" })`
-      : `Page.Locator(\"${escapeCSharpString(locator.selector)}\")`;
+      ? `${actorRef}.Locator(\"${escapeCSharpString(locator.selector)}\").Filter(new() { HasText = \"${escapeCSharpString(locator.filterText)}\" })`
+      : `${actorRef}.Locator(\"${escapeCSharpString(locator.selector)}\")`;
     return applyPosition(base);
   }
 
   if (locator.kind === "scopedRole") {
     const exactPart = locator.exact ? ", Exact = true" : "";
-    return applyPosition(`Page.Locator(\"${escapeCSharpString(locator.selector)}\").GetByRole(AriaRole.${inferRoleEnum(locator.role)}, new() { Name = \"${escapeCSharpString(locator.name)}\"${exactPart} })`);
+    return applyPosition(`${actorRef}.Locator(\"${escapeCSharpString(locator.selector)}\").GetByRole(AriaRole.${inferRoleEnum(locator.role)}, new() { Name = \"${escapeCSharpString(locator.name)}\"${exactPart} })`);
   }
 
   if (locator.kind === "scopedText") {
     const options = locator.exact ? ", new() { Exact = true }" : "";
-    return applyPosition(`Page.Locator(\"${escapeCSharpString(locator.selector)}\").GetByText(\"${escapeCSharpString(locator.text)}\"${options})`);
+    return applyPosition(`${actorRef}.Locator(\"${escapeCSharpString(locator.selector)}\").GetByText(\"${escapeCSharpString(locator.text)}\"${options})`);
   }
 
   if (locator.kind === "frameRole") {
     const exactPart = locator.exact ? ", Exact = true" : "";
-    return applyPosition(`Page.FrameLocator(\"${escapeCSharpString(locator.frameSelector)}\").GetByRole(AriaRole.${inferRoleEnum(locator.role)}, new() { Name = \"${escapeCSharpString(locator.name)}\"${exactPart} })`);
+    return applyPosition(`${actorRef}.FrameLocator(\"${escapeCSharpString(locator.frameSelector)}\").GetByRole(AriaRole.${inferRoleEnum(locator.role)}, new() { Name = \"${escapeCSharpString(locator.name)}\"${exactPart} })`);
   }
 
   if (locator.kind === "frameText") {
     const options = locator.exact ? ", new() { Exact = true }" : "";
-    return applyPosition(`Page.FrameLocator(\"${escapeCSharpString(locator.frameSelector)}\").GetByText(\"${escapeCSharpString(locator.text)}\"${options})`);
+    return applyPosition(`${actorRef}.FrameLocator(\"${escapeCSharpString(locator.frameSelector)}\").GetByText(\"${escapeCSharpString(locator.text)}\"${options})`);
   }
 
   if (locator.kind === "expression") {
@@ -861,7 +926,7 @@ function applyPositionSuffix(name, position) {
   return name;
 }
 
-function buildGeneratedLocatorRegistry(actions, frameworkContext) {
+function buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap) {
   const expressionToProperty = new Map();
   const usedNames = new Map();
   const actionBindings = new Map();
@@ -872,7 +937,7 @@ function buildGeneratedLocatorRegistry(actions, frameworkContext) {
       continue;
     }
 
-    const locatorExpression = buildLocatorExpression(action.locator);
+    const locatorExpression = buildLocatorExpression(action.locator, actorFieldMap);
     const frameworkReference = frameworkContext
       ? resolveFrameworkLocatorReference(locatorExpression, frameworkContext)
       : null;
@@ -943,7 +1008,11 @@ function collectFrameworkDependencies(actions, options) {
       continue;
     }
 
-    const locatorExpression = buildLocatorExpression(action.locator);
+    if (action.locator.actor && action.locator.actor !== "page") {
+      continue;
+    }
+
+    const locatorExpression = buildLocatorExpression(action.locator, options.actorFieldMap || new Map());
     const reference = resolveFrameworkLocatorReference(locatorExpression, frameworkContext);
     if (reference) {
       dependencies.pageElementClasses.set(reference.className, reference.fieldName);
@@ -988,6 +1057,22 @@ function buildActionStatement(action, options) {
     ];
   }
 
+  if (action.actionType === "popupWait") {
+    const popupActor = toCSharpActor(action.popup && action.popup.actor ? action.popup.actor : "page");
+    const promiseVar = (action.popup && action.popup.promiseVar) || "popupPromise";
+    return [`            var ${promiseVar} = ${popupActor}.WaitForPopupAsync();`];
+  }
+
+  if (action.actionType === "popupResolve") {
+    const pageVar = (action.popup && action.popup.pageVar) || "popupPage";
+    const promiseVar = (action.popup && action.popup.promiseVar) || "popupPromise";
+    const pageField = options.actorFieldMap ? options.actorFieldMap.get(pageVar) : null;
+    if (pageField) {
+      return [`            ${pageField} = await ${promiseVar};`];
+    }
+    return [`            var ${pageVar} = await ${promiseVar};`];
+  }
+
   if (action.actionType.startsWith("keyboard.")) {
     const methodName = action.actionType.split(".")[1];
     const mapping = {
@@ -1021,7 +1106,7 @@ function buildActionStatement(action, options) {
       : null;
     const locatorExpression = locatorBinding
       ? locatorBinding.expression
-      : buildLocatorExpression(action.locator);
+      : buildLocatorExpression(action.locator, options.actorFieldMap || new Map());
     if (action.actionType === "toBeVisible") {
       return [`            await Assertions.Expect(${locatorExpression}).ToBeVisibleAsync();`];
     }
@@ -1036,7 +1121,7 @@ function buildActionStatement(action, options) {
   const locatorBinding = options.locatorBindings
     ? options.locatorBindings.get(action.sourceLine)
     : null;
-  const locatorExpression = buildLocatorExpression(action.locator);
+  const locatorExpression = buildLocatorExpression(action.locator, options.actorFieldMap || new Map());
   const effectiveExpression = locatorBinding ? locatorBinding.expression : locatorExpression;
   const warnings = action.diagnostics.map((message) => `            // Review: ${message}`);
   const methodMap = {
@@ -1049,40 +1134,124 @@ function buildActionStatement(action, options) {
   };
 
   if (methodMap[action.actionType]) {
+    const split = buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, options.runtimeState);
+    if (split) {
+      return [...warnings, ...split.prefixLines, `            await ${split.callTarget}.${methodMap[action.actionType]}();`];
+    }
     return [...warnings, `            await ${effectiveExpression}.${methodMap[action.actionType]}();`];
   }
 
   if (action.actionType === "fill") {
+    const split = buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, options.runtimeState);
+    if (split) {
+      return [...warnings, ...split.prefixLines, `            await ${split.callTarget}.FillAsync("${escapeCSharpString(action.value)}");`];
+    }
     return [...warnings, `            await ${effectiveExpression}.FillAsync("${escapeCSharpString(action.value)}");`];
   }
 
   if (action.actionType === "press") {
+    const split = buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, options.runtimeState);
+    if (split) {
+      return [...warnings, ...split.prefixLines, `            await ${split.callTarget}.PressAsync("${escapeCSharpString(action.value)}");`];
+    }
     return [...warnings, `            await ${effectiveExpression}.PressAsync("${escapeCSharpString(action.value)}");`];
   }
 
   if (action.actionType === "selectOption") {
+    const split = buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, options.runtimeState);
+    if (split) {
+      return [...warnings, ...split.prefixLines, `            await ${split.callTarget}.SelectOptionAsync(new[] { "${escapeCSharpString(action.value)}" });`];
+    }
     return [...warnings, `            await ${effectiveExpression}.SelectOptionAsync(new[] { "${escapeCSharpString(action.value)}" });`];
   }
 
   if (action.actionType === "setInputFiles") {
+    const split = buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, options.runtimeState);
+    if (split) {
+      return [...warnings, ...split.prefixLines, `            await ${split.callTarget}.SetInputFilesAsync("${escapeCSharpString(action.value)}");`];
+    }
     return [...warnings, `            await ${effectiveExpression}.SetInputFilesAsync("${escapeCSharpString(action.value)}");`];
   }
 
   if (action.actionType === "waitFor") {
+    const split = buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, options.runtimeState);
+    if (split) {
+      return [...split.prefixLines, `            await ${split.callTarget}.WaitForAsync();`];
+    }
     return [`            await ${effectiveExpression}.WaitForAsync();`];
   }
 
   return [`            // Unsupported mapping: ${action.raw.trim()}`];
 }
 
+function buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, runtimeState) {
+  if (!locatorBinding || locatorBinding.kind !== "inline" || !action.locator || !runtimeState) {
+    return null;
+  }
+
+  const locatorExpression = buildLocatorExpression(action.locator);
+  const existing = runtimeState.inlineActorLocators.get(locatorExpression);
+  if (existing) {
+    return {
+      prefixLines: [],
+      callTarget: existing
+    };
+  }
+
+  let baseName = toCamelCase(locatorPropertyBaseName(action.locator));
+  if (!baseName || !/^[A-Za-z_]/.test(baseName)) {
+    baseName = "popupLocator";
+  }
+
+  let name = baseName;
+  let suffix = 2;
+  while (runtimeState.usedInlineActorNames.has(name)) {
+    name = `${baseName}${suffix}`;
+    suffix += 1;
+  }
+
+  runtimeState.usedInlineActorNames.add(name);
+  runtimeState.inlineActorLocators.set(locatorExpression, name);
+
+  return {
+    prefixLines: [`            var ${name} = ${effectiveExpression};`],
+    callTarget: name
+  };
+}
+
 function buildCode(actions, options) {
-  const { frameworkContext, dependencies } = collectFrameworkDependencies(actions, options);
-  const locatorRegistry = buildGeneratedLocatorRegistry(actions, frameworkContext);
+  const actorFieldMap = new Map();
+  for (const action of actions) {
+    if (action && action.locator && action.locator.actor) {
+      const actorName = resolveActorName(action.locator.actor);
+      if (actorName !== "page" && !actorFieldMap.has(actorName)) {
+        actorFieldMap.set(actorName, actorToFieldName(actorName));
+      }
+    }
+
+    if (action && action.actionType === "popupResolve" && action.popup && action.popup.pageVar) {
+      const popupActor = resolveActorName(action.popup.pageVar);
+      if (popupActor !== "page" && !actorFieldMap.has(popupActor)) {
+        actorFieldMap.set(popupActor, actorToFieldName(popupActor));
+      }
+    }
+  }
+
+  const { frameworkContext, dependencies } = collectFrameworkDependencies(actions, {
+    ...options,
+    actorFieldMap
+  });
+  const locatorRegistry = buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap);
   const buildOptions = {
     ...options,
     frameworkContext,
     frameworkDependencies: dependencies,
-    locatorBindings: locatorRegistry.actionBindings
+    locatorBindings: locatorRegistry.actionBindings,
+    actorFieldMap,
+    runtimeState: {
+      inlineActorLocators: new Map(),
+      usedInlineActorNames: new Set()
+    }
   };
 
   const usingLines = [
@@ -1103,6 +1272,14 @@ function buildCode(actions, options) {
   const fieldLines = [];
   if (dependencies.useCommonActions) {
     fieldLines.push("        private readonly CommonActionsPage _commonActions;", "");
+  }
+
+  for (const [actorName, fieldName] of [...actorFieldMap.entries()].sort((left, right) => left[0].localeCompare(right[0]))) {
+    fieldLines.push(`        private IPage ${fieldName} = default!;`);
+  }
+
+  if (actorFieldMap.size > 0) {
+    fieldLines.push("");
   }
 
   for (const [className, fieldName] of [...dependencies.pageElementClasses.entries()].sort((left, right) => left[0].localeCompare(right[0]))) {

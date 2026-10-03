@@ -527,6 +527,40 @@ await page.getByRole('group', { name: 'Email and Phone' }) will have below detai
   assert.strictEqual(actions[0].locatorStrategy, "LOCATOR");
 }
 
+function testPopupActorActionsAreSupported() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, `
+await page.getByRole('link', { name: 'Open Popup' }).click();
+const page1Promise = page.waitForEvent('popup');
+await page.getByRole('link', { name: 'Trigger Popup' }).click();
+const page1 = await page1Promise;
+await page1.getByText('Field Value:').click();
+await page1.locator('#txtOverrideValue').fill('1324');
+await page1.getByRole('button', { name: 'OK' }).click();
+`, "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json")
+    });
+
+    assert.ok(result.code.includes("private IPage _page1 = default!;"));
+    assert.ok(result.code.includes("public ILocator FieldValue => _page1.GetByText(\"Field Value:\");"));
+    assert.ok(result.code.includes("public ILocator OverrideValue => _page1.Locator(\"#txtOverrideValue\");"));
+    assert.ok(result.code.includes("public ILocator Ok => _page1.GetByRole(AriaRole.Button, new() { Name = \"OK\" });"));
+    assert.ok(result.code.includes("var page1Promise = Page.WaitForPopupAsync();"));
+    assert.ok(result.code.includes("_page1 = await page1Promise;"));
+    assert.ok(result.code.includes("await FieldValue.ClickAsync();"));
+    assert.ok(result.code.includes("await OverrideValue.FillAsync(\"1324\");"));
+    assert.ok(result.code.includes("await Ok.ClickAsync();"));
+    assert.strictEqual(result.unsupportedActions.length, 0);
+  });
+}
+
 function runAllTests() {
   testClickMapping();
   testFillAndSelectOptionMapping();
@@ -550,6 +584,7 @@ function runAllTests() {
   testFrameworkAwareFallbackForFramesAndTables();
   testFrameworkLocatorReuseRequiresExactExpressionMatch();
   testRecorderAnnotationLinesAreParsedAsActions();
+  testPopupActorActionsAreSupported();
   console.log("CSharpCodeGenerator tests passed");
 }
 
