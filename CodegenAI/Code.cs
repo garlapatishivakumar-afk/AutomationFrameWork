@@ -21,12 +21,40 @@ namespace AutomationFrameWork.CodegenAI
 
         public ConfigReader Config { get; }
 
+        // Locators
+        public ILocator Deals => Page.GetByRole(AriaRole.Link, new() { Name = "Deals", Exact = true });
+        public ILocator DealsCompletionStatus => Page.GetByRole(AriaRole.Link, new() { Name = "Deals Completion Status" });
+        public ILocator TrIDCp1GdTd => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__5']//td[8]");
+        public ILocator TrIDCp1GdTd2 => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__5']//td[6]");
+        public ILocator TrIDCp1GdInputNameCp1GdChRoll => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__7']//input[@name='ctl00$cp1$gd$ctl00$ctl18$chRoll']");
+        public ILocator NextPage => Page.GetByRole(AriaRole.Button, new() { Name = "Next Page" });
+        public ILocator TrIDCp1GdTdA => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__9']//td[2]/a");
+        public ILocator TrIDRgrdReportsTdA => Page.Locator("//tr[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00__1']//td[3]/a");
+        public ILocator Aidghe => Page.Locator("//a[@id='g_ctl08_hE_4']");
+        public ILocator Aidghe2 => Page.Locator("//a[@id='g_ctl08_hE_5']");
+        public ILocator Aidghe3 => Page.Locator("//a[@id='g_ctl08_hE_6']");
+        public ILocator Aidghe4 => Page.Locator("//a[@id='g_ctl08_hE_31']");
+        public ILocator Aidghe5 => Page.Locator("//a[@id='g_ctl08_hE_42']");
+        public ILocator Aidghe6 => Page.Locator("//a[@id='g_ctl08_hE_58']");
+
         public async Task ReplayAsync()
         {
-            // Review: URL at source line uses literal value because no matching appsettings Urls entry was found: https://login.microsoftonline.com/0b14651e-5110-47c7-b458-14565f1d46de/oauth2/v2.0/authorize?response_type=code&client_id=0c480180-fae1-45b2-b898-ac1967301038&scope=openid%20profile%20email&state=djhERkeqhsURh-b9yBoJ6BPDO40UMWQgncbBTcNjGmM%3D&redirect_uri=https://app-cvw-ui-sit-eus2.ase-cms-sit-eus2-01.appserviceenvironment.net/cmsview/login/oauth2/code/azure&nonce=xQ6oKp2OgCefbRHt3Elnw8c1r-_R20EFZwXYrFu1mTI#/Role/ss/EntryPoint/deals
-            await _commonActions.NavigateToURLAsync("https://login.microsoftonline.com/0b14651e-5110-47c7-b458-14565f1d46de/oauth2/v2.0/authorize?response_type=code&client_id=0c480180-fae1-45b2-b898-ac1967301038&scope=openid%20profile%20email&state=djhERkeqhsURh-b9yBoJ6BPDO40UMWQgncbBTcNjGmM%3D&redirect_uri=https://app-cvw-ui-sit-eus2.ase-cms-sit-eus2-01.appserviceenvironment.net/cmsview/login/oauth2/code/azure&nonce=xQ6oKp2OgCefbRHt3Elnw8c1r-_R20EFZwXYrFu1mTI#/Role/ss/EntryPoint/deals");
-            // Review: URL at source line uses literal value because no matching appsettings Urls entry was found: https://login.microsoftonline.com/0b14651e-5110-47c7-b458-14565f1d46de/login
-            await _commonActions.NavigateToURLAsync("https://login.microsoftonline.com/0b14651e-5110-47c7-b458-14565f1d46de/login");
+            // Review: URL at source line uses literal value because no matching appsettings Urls entry was found: https://investorreporting-mb-sit.trimont.com/default.aspx
+            await _commonActions.NavigateToURLAsync("https://investorreporting-mb-sit.trimont.com/default.aspx");
+            await Deals.ClickAsync();
+            await DealsCompletionStatus.ClickAsync();
+            await TrIDCp1GdTd.ClickAsync();
+            await TrIDCp1GdTd2.ClickAsync();
+            await TrIDCp1GdInputNameCp1GdChRoll.CheckAsync();
+            await NextPage.ClickAsync();
+            await TrIDCp1GdTdA.ClickAsync();
+            await TrIDRgrdReportsTdA.ClickAsync();
+            await Aidghe.ClickAsync();
+            await Aidghe2.ClickAsync();
+            await Aidghe3.ClickAsync();
+            await Aidghe4.ClickAsync();
+            await Aidghe5.ClickAsync();
+            await Aidghe6.ClickAsync();
         }
     }
 }

@@ -58,8 +58,8 @@ function testTableLinkRewrittenWithContext() {
   const result = runTransform(input, observations);
   assert.ok(result.code.includes("page.locator("), "Table link should be rewritten to locator");
   assert.ok(
-    result.code.includes("await page.locator(") && result.code.includes(".first().click();"),
-    "Rewritten locator should use the inline page.locator(...).first().action() format"
+    result.code.includes("await page.locator(") && result.code.includes(".click();"),
+    "Rewritten locator should use the inline page.locator(...).action() format"
   );
   assert.strictEqual(result.metadata.transformedActions, 1);
 }
@@ -212,7 +212,7 @@ function testMissingRowIdFallsBackToBusinessValue() {
 
   const result = runTransform(input, observations);
   assert.ok(
-    result.code.includes("//tr[td[normalize-space()='20386']]//td[2]/a"),
+    result.code.includes("//tr[td[text()='20386']]//td[2]/a"),
     "Missing row id should fallback to business-value strategy"
   );
 }
@@ -325,7 +325,7 @@ function testMultipleTablesUsesCorrectTableScope() {
   const result = runTransform(input, observations);
   assert.ok(
     result.code.includes("@data-testid='transactions-grid'") ||
-      result.code.includes("//tr[td[normalize-space()='891411']]//td[3]/a") ||
+      result.code.includes("//tr[td[text()='891411']]//td[3]/a") ||
       result.code.includes("//table[@id='transactions-grid']"),
     "Should use validated table-aware scoped locator when context is available"
   );
@@ -485,7 +485,7 @@ function testStableNumericBusinessValueAccepted() {
 
   const result = runTransform(input, observations);
   assert.ok(
-    result.code.includes("//tr[td[normalize-space()='310952116']]//td[3]/a"),
+    result.code.includes("//tr[td[text()='310952116']]//td[3]/a"),
     "Stable numeric business identifiers should be accepted as row anchors"
   );
 }
@@ -563,7 +563,7 @@ function testSpecificNonTableTextRuleRewritesToUniqueAttribute() {
 
   const result = runTransform(input, observations, "table", { specificRulesFilePath });
   assert.ok(
-    result.code.includes("await page.locator(\"//span[@data-testid='user-display-name']\").first().click();"),
+    result.code.includes("await page.locator(\"//span[@data-testid='user-display-name']\").click();"),
     "Specific non-table rule should rewrite to unique tag+data-testid locator"
   );
   assert.strictEqual(result.metadata.transformedActions, 1);
@@ -639,7 +639,7 @@ function testScopedTextActionRewrittenWithRowIdCandidate() {
 
   const result = runTransform(input, observations);
   assert.ok(
-    result.code.includes("await page.locator(\"//tr[@id='ctl00_ContentPlaceHolder1_AttachmentRadGrid_ctl00__0']//td[5]//span\").first().click();"),
+    result.code.includes("await page.locator(\"//tr[@id='ctl00_ContentPlaceHolder1_AttachmentRadGrid_ctl00__0']//td[5]//span\").click();"),
     "Scoped getByText table action should rewrite to table-tag locator using observed row id and column"
   );
   assert.ok(!result.code.includes("getByText('Attributed')"), "Table rewritten action should not keep getByText locator");
@@ -671,7 +671,7 @@ function testExistingIndexedTableLocatorKeepsIndexWhenNoUniqueAttribute() {
 
   const result = runTransform(input, observations);
   assert.ok(
-    result.code.includes("await page.locator(\"//tr[@id='ctl00_ContentPlaceHolder1_AttachmentRadGrid_ctl00__0']//td[5]\").first().click();"),
+    result.code.includes("await page.locator(\"//tr[@id='ctl00_ContentPlaceHolder1_AttachmentRadGrid_ctl00__0']//td[5]\").click();"),
     "Existing index-based table locator should use index fallback when no unique attribute exists"
   );
   assert.ok(result.code.includes("//td[5]"), "Column index fallback should be allowed when attributes are unavailable");
@@ -703,7 +703,7 @@ function testRowIdPrefersStableCellClassOverIndex() {
 
   const result = runTransform(input, observations);
   assert.ok(
-    result.code.includes("await page.locator(\"//tr[@id='ctl00_ContentPlaceHolder1_PackageRadGrid_ctl00__0']//td[@class='actionIcon viewAttachment']\").first().click();"),
+    result.code.includes("await page.locator(\"//tr[@id='ctl00_ContentPlaceHolder1_PackageRadGrid_ctl00__0']//td[@class='actionIcon viewAttachment']\").click();"),
     "Stable td class should be preferred over td index inside observed row"
   );
   assert.strictEqual(result.metadata.transformedActions, 1);

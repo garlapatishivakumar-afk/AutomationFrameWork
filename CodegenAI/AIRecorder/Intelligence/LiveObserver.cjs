@@ -1,6 +1,28 @@
 const fs = require("fs");
 const path = require("path");
-const { chromium } = require("playwright");
+
+function tryResolveChromiumLauncher() {
+  const candidates = ["playwright", "@playwright/test", "playwright-core"];
+
+  for (const moduleName of candidates) {
+    try {
+      const loaded = require(moduleName);
+      if (loaded && loaded.chromium && typeof loaded.chromium.launch === "function") {
+        return {
+          chromium: loaded.chromium,
+          source: moduleName
+        };
+      }
+    } catch {
+      // Try next candidate package.
+    }
+  }
+
+  return {
+    chromium: null,
+    source: ""
+  };
+}
 
 function parseArgs(argv) {
   const args = {};
@@ -168,9 +190,10 @@ function parseCodeActions(code) {
     }
 
     const roleMatch = line.match(
-      /^await\s+page\.getByRole\((['"`])(\w+)\1,\s*\{\s*name:\s*(['"`])([^'"`]+)\3(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck)\(\);$/
+      /^await\s+page\.getByRole\((['"`])(\w+)\1,\s*\{\s*name:\s*(['"`])([^'"`]+)\3(?:,\s*exact:\s*(true|false))?\s*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);$/
     );
     if (roleMatch) {
+      const positionRaw = roleMatch[6] || "";
       actions.push({
         line: lineNumber,
         raw: lines[i],
@@ -179,7 +202,31 @@ function parseCodeActions(code) {
         role: roleMatch[2],
         name: roleMatch[4],
         exact: roleMatch[5] === "true",
-        method: roleMatch[6],
+        method: roleMatch[8],
+        first: positionRaw === "first()",
+        nth: roleMatch[7] ? Number(roleMatch[7]) : null,
+        scope: "page"
+      });
+      continue;
+    }
+
+    const roleWithoutNameMatch = line.match(
+      /^await\s+page\.getByRole\((['"`])(\w+)\1\)(?:\.filter\(\{\s*hasText:\s*\/\^\$\/\s*\}\))?(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);$/
+    );
+    if (roleWithoutNameMatch) {
+      const positionRaw = roleWithoutNameMatch[3] || "";
+      actions.push({
+        line: lineNumber,
+        raw: lines[i],
+        locatorSource,
+        kind: "roleAction",
+        role: roleWithoutNameMatch[2],
+        name: "",
+        exact: false,
+        method: roleWithoutNameMatch[5],
+        first: positionRaw === "first()",
+        nth: roleWithoutNameMatch[4] ? Number(roleWithoutNameMatch[4]) : null,
+        filterHasTextBlank: line.includes(".filter({ hasText: /^$/ })"),
         scope: "page"
       });
       continue;
@@ -240,9 +287,10 @@ function parseCodeActions(code) {
     }
 
     const scopedRoleMatch = line.match(
-      /^await\s+page\.locator\((['"`])(.+?)\1\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck)\(\);$/
+      /^await\s+page\.locator\((['"`])(.+?)\1\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);$/
     );
     if (scopedRoleMatch) {
+      const positionRaw = scopedRoleMatch[8] || "";
       actions.push({
         line: lineNumber,
         raw: lines[i],
@@ -251,8 +299,33 @@ function parseCodeActions(code) {
         role: scopedRoleMatch[4],
         name: scopedRoleMatch[6],
         exact: scopedRoleMatch[7] === "true",
-        method: scopedRoleMatch[8],
+        method: scopedRoleMatch[10],
+        first: positionRaw === "first()",
+        nth: scopedRoleMatch[9] ? Number(scopedRoleMatch[9]) : null,
         parentSelector: scopedRoleMatch[2],
+        scope: "page"
+      });
+      continue;
+    }
+
+    const scopedRoleFilterMatch = line.match(
+      /^await\s+page\.locator\((['"`])(.+?)\1\)\.getByRole\((['"`])(\w+)\3\)\.filter\(\{\s*hasText:\s*\/\^\$\/\s*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);$/
+    );
+    if (scopedRoleFilterMatch) {
+      const positionRaw = scopedRoleFilterMatch[5] || "";
+      actions.push({
+        line: lineNumber,
+        raw: lines[i],
+        locatorSource,
+        kind: "roleAction",
+        role: scopedRoleFilterMatch[4],
+        name: "",
+        exact: false,
+        method: scopedRoleFilterMatch[7],
+        first: positionRaw === "first()",
+        nth: scopedRoleFilterMatch[6] ? Number(scopedRoleFilterMatch[6]) : null,
+        parentSelector: scopedRoleFilterMatch[2],
+        filterHasTextBlank: true,
         scope: "page"
       });
       continue;
@@ -543,23 +616,45 @@ async function extractContextForLocator(locator, actionDescriptor) {
 }
 
 function buildLocator(base, action) {
+  const applyModifiers = (locator) => {
+    let current = locator;
+    if (action.filterHasTextBlank) {
+      current = current.filter({ hasText: /^\s*$/ });
+    }
+
+    if (Number.isInteger(action.nth) && action.nth >= 0) {
+      current = current.nth(action.nth);
+    } else if (action.first) {
+      current = current.first();
+    }
+
+    return current;
+  };
+
   if (action.kind === "roleAction") {
     const scopedBase = action.parentSelector ? base.locator(action.parentSelector) : base;
-    return scopedBase.getByRole(action.role, {
-      name: action.name,
-      exact: Boolean(action.exact)
-    });
+    const roleOptions = {};
+    if (action.name) {
+      roleOptions.name = action.name;
+      roleOptions.exact = Boolean(action.exact);
+    }
+
+    const roleLocator = action.name
+      ? scopedBase.getByRole(action.role, roleOptions)
+      : scopedBase.getByRole(action.role);
+
+    return applyModifiers(roleLocator);
   }
 
   if (action.kind === "textAction") {
     const scopedBase = action.parentSelector ? base.locator(action.parentSelector) : base;
-    return scopedBase.getByText(action.text, {
+    return applyModifiers(scopedBase.getByText(action.text, {
       exact: Boolean(action.exact)
-    });
+    }));
   }
 
   if (action.kind === "locatorAction") {
-    return base.locator(action.selector);
+    return applyModifiers(base.locator(action.selector));
   }
 
   return null;
@@ -771,7 +866,25 @@ async function observeRecordedFlow(options) {
   const code = safeRead(options.codeFilePath);
   const actions = parseCodeActions(code);
 
-  const browser = await chromium.launch({
+  const observations = {
+    generatedAtUtc: new Date().toISOString(),
+    source: {
+      codeFilePath: options.codeFilePath
+    },
+    actions: []
+  };
+
+  const playwrightRuntime = tryResolveChromiumLauncher();
+  if (!playwrightRuntime.chromium) {
+    observations.warning =
+      "Playwright runtime not found (tried: playwright, @playwright/test, playwright-core). Observation skipped; fallback behavior preserved.";
+    log(options.debug, observations.warning);
+    return observations;
+  }
+
+  log(options.debug, `Using Playwright runtime from '${playwrightRuntime.source}'.`);
+
+  const browser = await playwrightRuntime.chromium.launch({
     headless: !options.showBrowser
   });
 
@@ -782,14 +895,6 @@ async function observeRecordedFlow(options) {
 
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
-
-  const observations = {
-    generatedAtUtc: new Date().toISOString(),
-    source: {
-      codeFilePath: options.codeFilePath
-    },
-    actions: []
-  };
 
   try {
     for (let actionIndex = 0; actionIndex < actions.length; actionIndex++) {

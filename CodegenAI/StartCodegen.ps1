@@ -1,5 +1,5 @@
 param(
-	[string]$TargetUrl = 'https://app-cvw-ui-sit-eus2.ase-cms-sit-eus2-01.appserviceenvironment.net/cmsview#/Role/ss/EntryPoint/deals',
+	[string]$TargetUrl = 'https://investorreporting-mb-sit.trimont.com/default.aspx',
 	[string]$TestIdAttribute = 'data-testid',
 	[string]$TableSelector = 'table',
 	[switch]$SkipLiveObservation,
@@ -26,6 +26,50 @@ $csharpStopSignalFile = Join-Path $PSScriptRoot ".csharp-live-sync.stop"
 $appSettingsFile = Join-Path (Split-Path $PSScriptRoot -Parent) "appsettings.json"
 $maxAgeDays = 4
 $liveCSharpJob = $null
+
+function Invoke-LegacyTableLocatorPipeline {
+	param(
+		[switch]$SkipObservation,
+		[switch]$SkipPostProcess,
+		[switch]$Debug
+	)
+
+	if (-not $SkipObservation) {
+		if (Test-Path $liveObserverScript) {
+			$observerArgs = @(
+				$liveObserverScript,
+				'--code-file', $outputFile,
+				'--output-file', $domObservationFile,
+				'--storage-state-file', $sessionPath
+			)
+
+			if ($Debug) {
+				$observerArgs += @('--debug', 'true')
+			}
+
+			& node @observerArgs
+			if ($LASTEXITCODE -ne 0) {
+				Write-Warning "Live observation failed. Continuing with fallback behavior."
+			}
+		} else {
+			Write-Warning "Live observer not found: $liveObserverScript"
+		}
+	}
+
+	if (-not $SkipPostProcess) {
+		if (Test-Path $postProcessScript) {
+			. $postProcessScript
+			Invoke-CodegenTableLocatorPostProcess `
+				-CodeFilePath $outputFile `
+				-DomFilePath $domObservationFile `
+				-MetadataFilePath $tableLocatorMetadataFile `
+				-TableSelector $TableSelector `
+				-Debug:$Debug
+		} else {
+			Write-Warning "Post processor not found: $postProcessScript"
+		}
+	}
+}
 
 if (-not (Test-Path $sessionScript)) {
 	throw "Session helper not found: $sessionScript"
@@ -88,46 +132,30 @@ if ((-not $SkipLiveObservation) -or (-not $SkipTableLocatorPostProcess)) {
 			$engineArgs += @('--debug', 'true')
 		}
 
-		& node @engineArgs
-		if ($LASTEXITCODE -ne 0) {
-			Write-Warning "Live Table Locator Engine failed. Existing fallback behavior preserved."
+		$engineFailed = $false
+		try {
+			& node @engineArgs
+			if ($LASTEXITCODE -ne 0) {
+				$engineFailed = $true
+			}
+		}
+		catch {
+			$engineFailed = $true
+			Write-Warning "Live Table Locator Engine threw an exception: $($_.Exception.Message)"
+		}
+
+		if ($engineFailed) {
+			Write-Warning "Live Table Locator Engine failed. Running legacy fallback pipeline."
+			Invoke-LegacyTableLocatorPipeline `
+				-SkipObservation:$SkipLiveObservation `
+				-SkipPostProcess:$SkipTableLocatorPostProcess `
+				-Debug:$TableLocatorDebug
 		}
 	} else {
-		if (-not $SkipLiveObservation) {
-			if (Test-Path $liveObserverScript) {
-				$observerArgs = @(
-					$liveObserverScript,
-					'--code-file', $outputFile,
-					'--output-file', $domObservationFile,
-					'--storage-state-file', $sessionPath
-				)
-
-				if ($TableLocatorDebug) {
-					$observerArgs += @('--debug', 'true')
-				}
-
-				& node @observerArgs
-				if ($LASTEXITCODE -ne 0) {
-					Write-Warning "Live observation failed. Continuing with fallback behavior."
-				}
-			} else {
-				Write-Warning "Live observer not found: $liveObserverScript"
-			}
-		}
-
-		if (-not $SkipTableLocatorPostProcess) {
-			if (Test-Path $postProcessScript) {
-				. $postProcessScript
-				Invoke-CodegenTableLocatorPostProcess `
-					-CodeFilePath $outputFile `
-					-DomFilePath $domObservationFile `
-					-MetadataFilePath $tableLocatorMetadataFile `
-					-TableSelector $TableSelector `
-					-Debug:$TableLocatorDebug
-			} else {
-				Write-Warning "Post processor not found: $postProcessScript"
-			}
-		}
+		Invoke-LegacyTableLocatorPipeline `
+			-SkipObservation:$SkipLiveObservation `
+			-SkipPostProcess:$SkipTableLocatorPostProcess `
+			-Debug:$TableLocatorDebug
 	}
 }
 

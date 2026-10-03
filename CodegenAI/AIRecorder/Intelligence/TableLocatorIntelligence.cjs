@@ -65,6 +65,16 @@ function toBoolean(value) {
   return String(value || "").toLowerCase() === "true";
 }
 
+function isIdAnchoredTableLocator(originalLocator) {
+  const source = String(originalLocator || "");
+  return (
+    /#[-\w:.]+/.test(source) ||
+    /\[@id\s*=/.test(source) ||
+    /\[id\s*=/.test(source) ||
+    /\/\/tr\[@id=/.test(source)
+  );
+}
+
 function isDynamicId(value) {
   if (!value) {
     return false;
@@ -79,6 +89,10 @@ function isDynamicId(value) {
     /:[a-z-]*nth-(?:child|of-type)\(\d+\)/i.test(id) ||
     /(^|[_-])(row|cell|item|ctl)\d{1,4}([_-]|$)/i.test(id)
   );
+}
+
+function isKnownStableGridLinkId(value) {
+  return /^g_ctl\d+_hE_\d+$/i.test(String(value || "").trim());
 }
 
 function isNumericLike(value) {
@@ -326,9 +340,9 @@ function isDataGridContext(context) {
   const rowId = String(context.row.id || "");
 
   const strongGridSignal =
-    safeRegex("grid|rgtransactions|rgmastertable|k-grid|datagrid|results").test(tableId) ||
-    safeRegex("grid|rgmastertable|rgclipcells|k-grid|datagrid|results").test(tableClass) ||
-    safeRegex("rgrow|rgaltrow|k-master-row|grid-row").test(rowClass) ||
+    safeRegex("grid|rgtransactions|rgmastertable|k-grid|datagrid|results|gridview").test(tableId) ||
+    safeRegex("grid|rgmastertable|rgclipcells|k-grid|datagrid|results|gridview").test(tableClass) ||
+    safeRegex("rgrow|rgaltrow|k-master-row|grid-row|gridviewscrollitem").test(rowClass) ||
     safeRegex("rgtransactions|grid").test(rowId);
 
   const controlTableSignal =
@@ -379,12 +393,24 @@ function resolveTargetTag(context) {
 
 function buildAttributeLocator(context) {
   const targetTag = resolveTargetTag(context) || "*";
+  const idCount = Number((context.target && context.target.attributeCounts && context.target.attributeCounts.id) || 0);
+
+  // Rule priority for future maintenance:
+  // 1) If the resolved target (last tag) has a unique id in observed DOM, prefer it.
+  // 2) Otherwise prefer test id and then other validated table-aware strategies.
+  // 3) Avoid normalize-space() based locator generation in table strategies.
+  if (hasValue(context.target.id) && idCount === 1) {
+    return `//${targetTag}[@id='${escapeXPathLiteral(context.target.id)}']`;
+  }
 
   if (hasValue(context.target.testId)) {
     return `//${targetTag}[@data-testid='${escapeXPathLiteral(context.target.testId)}']`;
   }
 
-  if (hasValue(context.target.id) && !isDynamicId(context.target.id)) {
+  if (
+    hasValue(context.target.id) &&
+    (!isDynamicId(context.target.id) || isKnownStableGridLinkId(context.target.id))
+  ) {
     return `//${targetTag}[@id='${escapeXPathLiteral(context.target.id)}']`;
   }
 
@@ -426,15 +452,15 @@ function buildTargetSelectorForColumn(context, escapedText, columnIndex) {
   const role = normalize(context.action.role);
 
   if (targetTag === "td" || targetTag === "th") {
-    return `td[${columnIndex}][normalize-space()='${escapedText}']`;
+    return `td[${columnIndex}][text()='${escapedText}']`;
   }
 
   if (targetTag === "a") {
-    return `td[${columnIndex}]//a[normalize-space()='${escapedText}']`;
+    return `td[${columnIndex}]//a[text()='${escapedText}']`;
   }
 
   if (targetTag === "button") {
-    return `td[${columnIndex}]//*[self::button[normalize-space()='${escapedText}'] or self::input[(translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='button' or translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='submit') and (@value='${escapedText}' or @aria-label='${escapedText}')]]`;
+    return `td[${columnIndex}]//*[self::button[text()='${escapedText}'] or self::input[(translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='button' or translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='submit') and (@value='${escapedText}' or @aria-label='${escapedText}')]]`;
   }
 
   if (targetTag === "input" && role === "checkbox") {
@@ -450,10 +476,10 @@ function buildTargetSelectorForColumn(context, escapedText, columnIndex) {
   }
 
   if (targetTag === "span") {
-    return `td[${columnIndex}]//span[normalize-space()='${escapedText}']`;
+    return `td[${columnIndex}]//span[text()='${escapedText}']`;
   }
 
-  return `td[${columnIndex}]//*[normalize-space()='${escapedText}']`;
+  return `td[${columnIndex}]//*[text()='${escapedText}']`;
 }
 
 function buildTargetTagSelectorForColumn(context, columnIndex) {
@@ -496,15 +522,15 @@ function buildTargetSelectorInRow(context, escapedText) {
   const role = normalize(context.action.role);
 
   if (targetTag === "td" || targetTag === "th") {
-    return `td[normalize-space()='${escapedText}']`;
+    return `td[text()='${escapedText}']`;
   }
 
   if (targetTag === "a") {
-    return `.//a[normalize-space()='${escapedText}']`;
+    return `.//a[text()='${escapedText}']`;
   }
 
   if (targetTag === "button") {
-    return `.//*[self::button[normalize-space()='${escapedText}'] or self::input[(translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='button' or translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='submit') and (@value='${escapedText}' or @aria-label='${escapedText}')]]`;
+    return `.//*[self::button[text()='${escapedText}'] or self::input[(translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='button' or translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='submit') and (@value='${escapedText}' or @aria-label='${escapedText}')]]`;
   }
 
   if (targetTag === "input" && role === "checkbox") {
@@ -520,18 +546,18 @@ function buildTargetSelectorInRow(context, escapedText) {
   }
 
   if (targetTag === "span") {
-    return `.//span[normalize-space()='${escapedText}']`;
+    return `.//span[text()='${escapedText}']`;
   }
 
-  return `.//*[normalize-space()='${escapedText}']`;
+  return `.//*[text()='${escapedText}']`;
 }
 
 function buildUniqueTargetAttributeSelectorInRow(context) {
   const targetTag = resolveTargetTag(context) || "*";
   const counts = context.target.attributeCounts || {};
   const candidates = [
-    { key: "data-testid", value: context.target.testId, count: Number(counts.testId || 0) },
     { key: "id", value: context.target.id, count: Number(counts.id || 0) },
+    { key: "data-testid", value: context.target.testId, count: Number(counts.testId || 0) },
     { key: "aria-label", value: context.target.ariaLabel, count: Number(counts.ariaLabel || 0) },
     { key: "name", value: context.target.name, count: Number(counts.name || 0) },
     { key: "title", value: context.target.title, count: Number(counts.title || 0) },
@@ -544,7 +570,14 @@ function buildUniqueTargetAttributeSelectorInRow(context) {
       continue;
     }
 
-    if (candidate.key === "id" && isDynamicId(candidate.value)) {
+    if (candidate.key === "id" && candidate.count === 1) {
+      return {
+        selector: `.//${targetTag}[@id='${escapeXPathLiteral(candidate.value)}']`,
+        reason: "Unique id"
+      };
+    }
+
+    if (candidate.key === "id" && isDynamicId(candidate.value) && !isKnownStableGridLinkId(candidate.value)) {
       continue;
     }
 
@@ -623,7 +656,7 @@ function buildKeyValueRowCandidate(context, escapedText, method) {
 
   return {
     strategy: "TABLE_KEY_VALUE_ROW",
-    locator: `//tr[td[1][normalize-space()='${escapeXPathLiteral(labelValue)}']]//${targetInRow}`,
+    locator: `//tr[td[1][text()='${escapeXPathLiteral(labelValue)}']]//${targetInRow}`,
     score: 11,
     reasonParts: ["Key/value row label", "Observed target inside row"],
     method,
@@ -944,7 +977,7 @@ function buildCandidates(context) {
   if (hasValue(context.row.businessValue) || hasValue(context.action.text)) {
     candidates.push({
       strategy: "TABLE_ROW_BUSINESS_VALUE",
-      locator: `//tr[td[normalize-space()='${escapedBusiness}']]//${stripRelativePrefix(targetInRow)}`,
+      locator: `//tr[td[text()='${escapedBusiness}']]//${stripRelativePrefix(targetInRow)}`,
       score: 9,
       reasonParts: ["Business row value", targetSelector.reason],
       method,
@@ -1059,19 +1092,38 @@ function toConfidence(score) {
 }
 
 function parseActionLine(line) {
-  const scopedRolePattern = /^(\s*)await\s+page\.locator\((['"`])(.+?)\2\)\.getByRole\((['"`])(\w+)\4,\s*\{[^}]*name:\s*(['"`])([^'"`]+)\6[^}]*\}\)\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const scopedRolePattern = /^(\s*)await\s+page\.locator\((['"`])(.+?)\2\)\.getByRole\((['"`])(\w+)\4,\s*\{[^}]*name:\s*(['"`])([^'"`]+)\6[^}]*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
   const scopedRoleMatch = line.match(scopedRolePattern);
   if (scopedRoleMatch) {
     const role = scopedRoleMatch[5];
     const text = scopedRoleMatch[7];
+    const positionRaw = scopedRoleMatch[8] || "";
 
     return {
       indent: scopedRoleMatch[1],
       kind: "role",
       role,
       text,
-      method: scopedRoleMatch[8],
+      method: scopedRoleMatch[10],
+      first: positionRaw === "first()",
+      nth: scopedRoleMatch[9] ? Number(scopedRoleMatch[9]) : null,
       originalLocator: `page.locator('${scopedRoleMatch[3]}').getByRole('${role}', { name: '${text}' })`
+    };
+  }
+
+  const scopedRoleFilterPattern = /^(\s*)await\s+page\.locator\((['"`])(.+?)\2\)\.getByRole\((['"`])(\w+)\4\)\.filter\(\{\s*hasText:\s*\/\^\$\/\s*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const scopedRoleFilterMatch = line.match(scopedRoleFilterPattern);
+  if (scopedRoleFilterMatch) {
+    const positionRaw = scopedRoleFilterMatch[6] || "";
+    return {
+      indent: scopedRoleFilterMatch[1],
+      kind: "role",
+      role: scopedRoleFilterMatch[5],
+      text: "",
+      method: scopedRoleFilterMatch[8],
+      first: positionRaw === "first()",
+      nth: scopedRoleFilterMatch[7] ? Number(scopedRoleFilterMatch[7]) : null,
+      originalLocator: `page.locator('${scopedRoleFilterMatch[3]}').getByRole('${scopedRoleFilterMatch[5]}').filter({ hasText: /^$/ })`
     };
   }
 
@@ -1089,18 +1141,21 @@ function parseActionLine(line) {
     };
   }
 
-  const rolePattern = /^(\s*)await\s+page\.getByRole\((['"`])(\w+)\2,\s*\{[^}]*name:\s*(['"`])([^'"`]+)\4[^}]*\}\)\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
+  const rolePattern = /^(\s*)await\s+page\.getByRole\((['"`])(\w+)\2,\s*\{[^}]*name:\s*(['"`])([^'"`]+)\4[^}]*\}\)(?:\.(first\(\)|nth\((\d+)\)))?\.(click|dblclick|hover|check|uncheck)\(\);\s*$/;
   const match = line.match(rolePattern);
   if (match) {
     const role = match[3];
     const text = match[5];
+    const positionRaw = match[6] || "";
 
     return {
       indent: match[1],
       kind: "role",
       role,
       text,
-      method: match[6],
+      method: match[8],
+      first: positionRaw === "first()",
+      nth: match[7] ? Number(match[7]) : null,
       originalLocator: `page.getByRole('${role}', { name: '${text}' })`
     };
   }
@@ -1159,7 +1214,7 @@ function rewriteAction(lineInfo, bestCandidate) {
       ? `page.locator('${lineInfo.action.frameSelector}').contentFrame().locator("${escapedLocator}")`
       : `page.locator("${escapedLocator}")`;
 
-  return [`${indent}await ${baseExpression}.first().${lineInfo.action.method}();`];
+  return [`${indent}await ${baseExpression}.${lineInfo.action.method}();`];
 }
 
 function transformCode(options) {
@@ -1177,6 +1232,9 @@ function transformCode(options) {
     specificRulesFilePath: specificRules.filePath,
     actions: []
   };
+
+  const preserveIdTableLocators = Boolean(options.preserveIdTableLocators);
+  const rewriteTableGetByTextOnly = Boolean(options.rewriteTableGetByTextOnly);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -1245,6 +1303,38 @@ function transformCode(options) {
           confidence: 0.5,
           reason: "Not detected as table/grid action"
         });
+        continue;
+      }
+
+      if (preserveIdTableLocators && isIdAnchoredTableLocator(action.originalLocator)) {
+        outLines.push(line);
+        metadata.actions.push({
+          line: lineNumber,
+          action: action.method,
+          text: action.text,
+          tableDetected: true,
+          strategy: "PRESERVE_ID_TABLE_LOCATOR",
+          confidence: 1,
+          reason: "Preserved existing id-anchored table locator",
+          uniqueMatch: true
+        });
+        log(options.debug, `Line ${lineNumber}: preserved id-anchored table locator.`);
+        continue;
+      }
+
+      if (rewriteTableGetByTextOnly && action.kind !== "text") {
+        outLines.push(line);
+        metadata.actions.push({
+          line: lineNumber,
+          action: action.method,
+          text: action.text,
+          tableDetected: true,
+          strategy: "PRESERVE_NON_TEXT_TABLE_LOCATOR",
+          confidence: 1,
+          reason: "Only getByText table locators are eligible for transformation",
+          uniqueMatch: true
+        });
+        log(options.debug, `Line ${lineNumber}: preserved non-text table locator by policy.`);
         continue;
       }
 
@@ -1334,7 +1424,9 @@ function runCli() {
     metadataFilePath: args["metadata-file"] || "",
     specificRulesFilePath: args["specific-rules-file"] || "",
     tableSelector: args["table-selector"] || "table",
-    debug: toBoolean(args.debug)
+    debug: toBoolean(args.debug),
+    preserveIdTableLocators: toBoolean(args["preserve-id-table-locators"]),
+    rewriteTableGetByTextOnly: toBoolean(args["rewrite-table-getbytext-only"])
   };
 
   const result = transformCode(options);

@@ -1,16 +1,11 @@
 {
-  "generatedAtUtc": "2026-10-03T18:30:06.155Z",
+  "generatedAtUtc": "2026-10-03T21:44:52.065Z",
   "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.ts",
   "outputFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.cs",
-  "actionCount": 2,
+  "actionCount": 15,
   "frameworkMatches": [
     {
       "sourceLine": 8,
-      "type": "navigation",
-      "target": "CommonActionsPage.NavigateToURLAsync"
-    },
-    {
-      "sourceLine": 9,
       "type": "navigation",
       "target": "CommonActionsPage.NavigateToURLAsync"
     }
@@ -18,16 +13,107 @@
   "sourceMap": [
     {
       "sourceLine": 8,
-      "generatedLine": 27,
+      "generatedLine": 43,
       "actionType": "goto",
       "locatorStrategy": "PAGE_URL",
       "supported": true
     },
     {
       "sourceLine": 9,
-      "generatedLine": 29,
-      "actionType": "goto",
-      "locatorStrategy": "PAGE_URL",
+      "generatedLine": 44,
+      "actionType": "click",
+      "locatorStrategy": "ROLE",
+      "supported": true
+    },
+    {
+      "sourceLine": 10,
+      "generatedLine": 45,
+      "actionType": "click",
+      "locatorStrategy": "ROLE",
+      "supported": true
+    },
+    {
+      "sourceLine": 11,
+      "generatedLine": 46,
+      "actionType": "click",
+      "locatorStrategy": "TABLE_LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 12,
+      "generatedLine": 47,
+      "actionType": "click",
+      "locatorStrategy": "TABLE_LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 13,
+      "generatedLine": 48,
+      "actionType": "check",
+      "locatorStrategy": "TABLE_LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 14,
+      "generatedLine": 49,
+      "actionType": "click",
+      "locatorStrategy": "ROLE",
+      "supported": true
+    },
+    {
+      "sourceLine": 15,
+      "generatedLine": 50,
+      "actionType": "click",
+      "locatorStrategy": "TABLE_LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 16,
+      "generatedLine": 51,
+      "actionType": "click",
+      "locatorStrategy": "TABLE_LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 17,
+      "generatedLine": 52,
+      "actionType": "click",
+      "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 18,
+      "generatedLine": 53,
+      "actionType": "click",
+      "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 20,
+      "generatedLine": 54,
+      "actionType": "click",
+      "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 22,
+      "generatedLine": 55,
+      "actionType": "click",
+      "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 23,
+      "generatedLine": 56,
+      "actionType": "click",
+      "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 25,
+      "generatedLine": 57,
+      "actionType": "click",
+      "locatorStrategy": "LOCATOR",
       "supported": true
     }
   ],

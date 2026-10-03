@@ -12,12 +12,36 @@ function Invoke-CodegenTableLocatorPostProcess {
 		return
 	}
 
-	$scriptDir = Split-Path -Parent $PSCommandPath
-	$projectRoot = Resolve-Path (Join-Path $scriptDir "..\..\")
-	$engineScript = Join-Path $projectRoot "AIRecorder\Intelligence\TableLocatorIntelligence.cjs"
+	function Resolve-TableLocatorEngineScript {
+		param([string]$StartDir)
 
-	if (-not (Test-Path $engineScript)) {
-		Write-Warning "Table locator engine not found: $engineScript"
+		$probe = Resolve-Path $StartDir
+		while ($probe) {
+			$candidate = Join-Path $probe "AIRecorder\Intelligence\TableLocatorIntelligence.cjs"
+			if (Test-Path $candidate) {
+				return $candidate
+			}
+
+			$candidate = Join-Path $probe "Intelligence\TableLocatorIntelligence.cjs"
+			if (Test-Path $candidate) {
+				return $candidate
+			}
+
+			$parent = Split-Path -Parent $probe
+			if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $probe) {
+				break
+			}
+			$probe = $parent
+		}
+
+		return $null
+	}
+
+	$scriptDir = Split-Path -Parent $PSCommandPath
+	$engineScript = Resolve-TableLocatorEngineScript -StartDir $scriptDir
+
+	if ([string]::IsNullOrWhiteSpace($engineScript) -or (-not (Test-Path $engineScript))) {
+		Write-Warning "Table locator engine not found from start directory: $scriptDir"
 		return
 	}
 

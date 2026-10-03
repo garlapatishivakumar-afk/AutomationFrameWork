@@ -92,6 +92,8 @@ async function runLiveTableLocatorEngine(options) {
       metadataFilePath: options.metadataFilePath || "",
       specificRulesFilePath: options.specificRulesFilePath || "",
       tableSelector: options.tableSelector || "table",
+      preserveIdTableLocators: options.preserveIdTableLocators,
+      rewriteTableGetByTextOnly: options.rewriteTableGetByTextOnly,
       debug: options.debug
     });
 
@@ -134,6 +136,8 @@ async function runCli() {
     showBrowser: toBoolean(args["show-browser"]),
     skipObservation: toBoolean(args["skip-observation"]),
     skipRewrite: toBoolean(args["skip-rewrite"]),
+    preserveIdTableLocators: toBoolean(args["preserve-id-table-locators"]),
+    rewriteTableGetByTextOnly: toBoolean(args["rewrite-table-getbytext-only"]),
     waitTimeoutMs: args["wait-timeout-ms"],
     resolveTimeoutMs: args["resolve-timeout-ms"],
     retryIntervalMs: args["retry-interval-ms"]
