@@ -6,7 +6,7 @@ function safeRead(filePath) {
     return "";
   }
 
-  return fs.readFileSync(filePath, "utf8");
+  return fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
 }
 
 function parseArgs(argv) {
@@ -89,9 +89,24 @@ function readConfiguredUrls(appSettingsPath) {
   try {
     const parsed = JSON.parse(safeRead(appSettingsPath) || "{}");
     const urls = parsed && parsed.Urls ? parsed.Urls : {};
-    return Object.entries(urls)
-      .filter((entry) => typeof entry[1] === "string" && entry[1].trim().length > 0)
-      .map(([key, value]) => ({ key, value }));
+    const entries = [];
+
+    for (const [key, value] of Object.entries(urls)) {
+      if (typeof value === "string" && value.trim().length > 0) {
+        entries.push({ key, value, source: "legacy" });
+      }
+    }
+
+    const applications = urls && typeof urls === "object" ? urls.Applications : null;
+    if (applications && typeof applications === "object") {
+      for (const [key, value] of Object.entries(applications)) {
+        if (typeof value === "string" && value.trim().length > 0) {
+          entries.push({ key, value, source: "applications" });
+        }
+      }
+    }
+
+    return entries;
   } catch {
     return [];
   }
@@ -102,8 +117,12 @@ function buildUrlExpression(url, appSettingsPath) {
   const matched = configuredUrls.find((entry) => entry.value === url);
 
   if (matched) {
+    const expression = matched.source === "applications"
+      ? `Config.Urls.TryGetApplication("${escapeCSharpString(matched.key)}")`
+      : `Config.Urls.${matched.key}`;
+
     return {
-      expression: `Config.Urls.${matched.key}`,
+      expression,
       warning: null
     };
   }
@@ -1219,6 +1238,246 @@ function buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, ru
   };
 }
 
+function isTrueFlag(value) {
+  if (value === true) {
+    return true;
+  }
+
+  if (typeof value === "string") {
+    return value.trim().toLowerCase() === "true";
+  }
+
+  return false;
+}
+
+function getActionBindingExpression(action, buildOptions) {
+  if (!action || !action.locator) {
+    return "Page";
+  }
+
+  const locatorBinding = buildOptions.locatorBindings
+    ? buildOptions.locatorBindings.get(action.sourceLine)
+    : null;
+
+  if (locatorBinding && locatorBinding.expression) {
+    return locatorBinding.expression;
+  }
+
+  return buildLocatorExpression(action.locator, buildOptions.actorFieldMap || new Map());
+}
+
+function getPropertyLikeName(expression) {
+  const parsed = String(expression || "").trim();
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(parsed)) {
+    return parsed;
+  }
+  return "";
+}
+
+function toMethodParameterName(propertyName, fallback) {
+  const candidate = toCamelCase(propertyName || fallback || "value");
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(candidate)) {
+    return candidate;
+  }
+  return fallback || "value";
+}
+
+function renderMethodBodyForActions(actions, buildOptions, fillArgBySourceLine) {
+  const lines = [];
+
+  for (const action of actions) {
+    if (action.actionType === "fill" && fillArgBySourceLine && fillArgBySourceLine.has(action.sourceLine)) {
+      const effectiveExpression = getActionBindingExpression(action, buildOptions);
+      const warnings = action.diagnostics.map((message) => `            // Review: ${message}`);
+      lines.push(...warnings);
+      lines.push(`            await FillInputAsync(${effectiveExpression}, ${fillArgBySourceLine.get(action.sourceLine)});`);
+      continue;
+    }
+
+    const generated = buildActionStatement(action, buildOptions);
+    lines.push(...generated);
+  }
+
+  return lines;
+}
+
+function tryBuildEnterpriseMethods(actions, buildOptions) {
+  const popupWaitIndex = actions.findIndex((action) => action.actionType === "popupWait");
+  const popupResolveIndex = popupWaitIndex >= 0
+    ? actions.findIndex((action, index) => index > popupWaitIndex && action.actionType === "popupResolve")
+    : -1;
+
+  if (popupWaitIndex < 0 || popupResolveIndex < 0 || popupResolveIndex <= popupWaitIndex) {
+    return null;
+  }
+
+  const gotoIndexes = actions
+    .map((action, index) => ({ action, index }))
+    .filter((entry) => entry.action.actionType === "goto")
+    .map((entry) => entry.index);
+
+  const lastGotoIndex = gotoIndexes.length > 0 ? gotoIndexes[gotoIndexes.length - 1] : -1;
+  const navigationActions = gotoIndexes.map((index) => actions[index]);
+  const prePopupActions = actions.slice(lastGotoIndex + 1, popupWaitIndex);
+  const popupActions = actions.slice(popupWaitIndex, popupResolveIndex + 1);
+  const postPopupActions = actions.slice(popupResolveIndex + 1);
+
+  const prePopupMarkerIndex = prePopupActions.findIndex((action) => {
+    const expr = getActionBindingExpression(action, buildOptions);
+    return /DealsCompletionStatus/i.test(expr);
+  });
+
+  const openDealsActions = prePopupMarkerIndex >= 0
+    ? prePopupActions.slice(0, prePopupMarkerIndex + 1)
+    : prePopupActions;
+  const openReportActions = prePopupMarkerIndex >= 0
+    ? prePopupActions.slice(prePopupMarkerIndex + 1)
+    : [];
+
+  const saveIndex = postPopupActions.findIndex((action, index) => {
+    if (index !== postPopupActions.length - 1) {
+      return false;
+    }
+    const expr = getActionBindingExpression(action, buildOptions);
+    return action.actionType === "click" && /(\bOk\b|\bSave\b|\bSubmit\b|\bApply\b)/i.test(expr);
+  });
+
+  const saveAction = saveIndex >= 0 ? postPopupActions[saveIndex] : null;
+  const updateActions = saveIndex >= 0 ? postPopupActions.slice(0, saveIndex) : postPopupActions;
+
+  const fillActions = updateActions.filter((action) => action.actionType === "fill");
+  const fillArgBySourceLine = new Map();
+  const fillParameters = [];
+  const fillArguments = [];
+
+  for (let index = 0; index < fillActions.length; index += 1) {
+    const action = fillActions[index];
+    const expression = getActionBindingExpression(action, buildOptions);
+    const propertyName = getPropertyLikeName(expression);
+    const fallbackName = index === 0 ? "value" : `value${index + 1}`;
+    const parameterName = toMethodParameterName(propertyName, fallbackName);
+    fillArgBySourceLine.set(action.sourceLine, parameterName);
+    fillParameters.push(`string ${parameterName}`);
+    fillArguments.push(`"${escapeCSharpString(action.value || "")}"`);
+  }
+
+  const methodBlocks = [];
+  const replayCalls = [];
+
+  if (navigationActions.length > 0) {
+    const firstUrl = String(navigationActions[0].value || "");
+    const navName = /investorreporting/i.test(firstUrl)
+      ? "NavigateToInvestorReportingAsync"
+      : "NavigateToApplicationAsync";
+    methodBlocks.push([
+      `        public async Task ${navName}()`,
+      "        {",
+      ...renderMethodBodyForActions(navigationActions, buildOptions),
+      "        }"
+    ]);
+    replayCalls.push(`            await ${navName}();`);
+  }
+
+  if (openDealsActions.length > 0) {
+    const openDealsMethodName = prePopupMarkerIndex >= 0
+      ? "OpenDealsCompletionStatusAsync"
+      : "ExecutePrePopupActionsAsync";
+    const methodLines = renderMethodBodyForActions(openDealsActions, buildOptions);
+    if (prePopupMarkerIndex >= 0) {
+      methodLines.push("            await Assertions.Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex(\"DealsCompletionStatus\\\\.aspx\", System.Text.RegularExpressions.RegexOptions.IgnoreCase));");
+    }
+    methodBlocks.push([
+      `        public async Task ${openDealsMethodName}()`,
+      "        {",
+      ...methodLines,
+      "        }"
+    ]);
+    replayCalls.push(`            await ${openDealsMethodName}();`);
+  }
+
+  if (openReportActions.length > 0) {
+    methodBlocks.push([
+      "        public async Task OpenSelectedDealReportAsync()",
+      "        {",
+      ...renderMethodBodyForActions(openReportActions, buildOptions),
+      "        }"
+    ]);
+    replayCalls.push("            await OpenSelectedDealReportAsync();");
+  }
+
+  const popupResolve = popupActions.find((action) => action.actionType === "popupResolve");
+  const popupActor = popupResolve && popupResolve.popup && popupResolve.popup.pageVar
+    ? resolveActorName(popupResolve.popup.pageVar)
+    : "page1";
+  const popupField = buildOptions.actorFieldMap.get(popupActor) || actorToFieldName(popupActor);
+
+  const popupMethodLines = renderMethodBodyForActions(popupActions, buildOptions);
+  popupMethodLines.push(`            await ${popupField}.WaitForLoadStateAsync(LoadState.DOMContentLoaded);`);
+
+  const popupVisibleAnchor = updateActions.find((action) => action.locator);
+  if (popupVisibleAnchor) {
+    const anchorExpr = getActionBindingExpression(popupVisibleAnchor, buildOptions);
+    popupMethodLines.push(`            await Assertions.Expect(${anchorExpr}).ToBeVisibleAsync();`);
+  }
+  popupMethodLines.push(`            return ${popupField};`);
+
+  methodBlocks.push([
+    "        public async Task<IPage> OpenOverridePopupAsync()",
+    "        {",
+    ...popupMethodLines,
+    "        }"
+  ]);
+  replayCalls.push("            var popupPage = await OpenOverridePopupAsync();");
+
+  if (updateActions.length > 0) {
+    const updateSignature = fillParameters.length > 0
+      ? `        public async Task UpdateOverrideDetailsAsync(IPage popupPage, ${fillParameters.join(", ")})`
+      : "        public async Task UpdateOverrideDetailsAsync(IPage popupPage)";
+    const updateBody = renderMethodBodyForActions(updateActions, buildOptions, fillArgBySourceLine);
+    methodBlocks.push([
+      updateSignature,
+      "        {",
+      ...updateBody,
+      "        }"
+    ]);
+
+    if (fillArguments.length > 0) {
+      replayCalls.push(`            await UpdateOverrideDetailsAsync(popupPage, ${fillArguments.join(", ")});`);
+    } else {
+      replayCalls.push("            await UpdateOverrideDetailsAsync(popupPage);");
+    }
+  }
+
+  if (saveAction) {
+    const saveBody = renderMethodBodyForActions([saveAction], buildOptions);
+    saveBody.push("            await popupPage.WaitForLoadStateAsync(LoadState.NetworkIdle);");
+    methodBlocks.push([
+      "        public async Task SaveOverrideChangesAsync(IPage popupPage)",
+      "        {",
+      ...saveBody,
+      "        }"
+    ]);
+    replayCalls.push("            await SaveOverrideChangesAsync(popupPage);");
+  }
+
+  const helperMethod = fillActions.length > 0
+    ? [
+        "        private static async Task FillInputAsync(ILocator input, string value)",
+        "        {",
+        "            await input.ClickAsync();",
+        "            await input.FillAsync(value);",
+        "            await Assertions.Expect(input).ToHaveValueAsync(value);",
+        "        }"
+      ]
+    : [];
+
+  return {
+    replayLines: replayCalls,
+    methodBlocks,
+    helperMethod
+  };
+}
+
 function buildCode(actions, options) {
   const actorFieldMap = new Map();
   for (const action of actions) {
@@ -1253,6 +1512,8 @@ function buildCode(actions, options) {
       usedInlineActorNames: new Set()
     }
   };
+
+  const enterpriseMode = isTrueFlag(options.enterpriseMode);
 
   const usingLines = [
     "using System;",
@@ -1326,32 +1587,60 @@ function buildCode(actions, options) {
           ]
         : []
     ),
-    "",
-    "        public async Task ReplayAsync()",
-    "        {"
+    ""
   ];
 
-  const replayMethodStartLine = preBodyLines.length;
-  const bodyLines = [];
   const sourceMap = [];
+  let replayLines = [];
+  let methodBlocks = [];
+  let helperMethod = [];
 
-  for (const action of actions) {
-    const lines = buildActionStatement(action, buildOptions);
-    sourceMap.push({
-      sourceLine: action.sourceLine,
-      generatedLine: replayMethodStartLine + bodyLines.length + lines.length,
-      actionType: action.actionType,
-      locatorStrategy: action.locatorStrategy,
-      supported: action.supported
-    });
-    bodyLines.push(...lines);
+  if (enterpriseMode) {
+    const enterprise = tryBuildEnterpriseMethods(actions, buildOptions);
+    if (enterprise) {
+      replayLines = enterprise.replayLines;
+      methodBlocks = enterprise.methodBlocks;
+      helperMethod = enterprise.helperMethod;
+    }
+  }
+
+  if (replayLines.length === 0) {
+    const replayMethodStartLine = preBodyLines.length + 3;
+    const bodyLines = [];
+    for (const action of actions) {
+      const lines = buildActionStatement(action, buildOptions);
+      sourceMap.push({
+        sourceLine: action.sourceLine,
+        generatedLine: replayMethodStartLine + bodyLines.length + lines.length,
+        actionType: action.actionType,
+        locatorStrategy: action.locatorStrategy,
+        supported: action.supported
+      });
+      bodyLines.push(...lines);
+    }
+    replayLines = bodyLines;
+  } else {
+    for (const action of actions) {
+      sourceMap.push({
+        sourceLine: action.sourceLine,
+        generatedLine: 0,
+        actionType: action.actionType,
+        locatorStrategy: action.locatorStrategy,
+        supported: action.supported
+      });
+    }
   }
 
   return {
     code: [
       ...preBodyLines,
-      ...bodyLines,
+      "        public async Task ReplayAsync()",
+      "        {",
+      ...replayLines,
       "        }",
+      ...(methodBlocks.length > 0 ? [""] : []),
+      ...methodBlocks.flatMap((block, index) => (index === methodBlocks.length - 1 ? block : [...block, ""])),
+      ...(helperMethod.length > 0 ? ["", ...helperMethod] : []),
       "    }",
       "}"
     ].join("\n"),
@@ -1458,7 +1747,8 @@ function runCli() {
     codeFilePath,
     outputFilePath,
     reportFilePath: args["report-file"] || "",
-    appSettingsPath: args["appsettings-file"] || path.join(projectRoot, "appsettings.json")
+    appSettingsPath: args["appsettings-file"] || path.join(projectRoot, "appsettings.json"),
+    enterpriseMode: isTrueFlag(args["enterprise-mode"])
   });
 
   console.log(`[CSharpCodeGenerator] Generated ${path.basename(outputFilePath)} with ${result.actions.length} action(s). unsupported=${result.unsupportedActions.length}`);

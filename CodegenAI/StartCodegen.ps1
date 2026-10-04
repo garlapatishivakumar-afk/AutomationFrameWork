@@ -103,7 +103,7 @@ if (-not $SkipCSharpGeneration) {
 				[string]$StopFile
 			)
 
-			& node $ScriptPath '--code-file' $CodeFile '--output-file' $OutputFile '--report-file' $ReportFile '--appsettings-file' $AppSettings '--stop-signal-file' $StopFile
+			& node $ScriptPath '--code-file' $CodeFile '--output-file' $OutputFile '--report-file' $ReportFile '--appsettings-file' $AppSettings '--stop-signal-file' $StopFile '--enterprise-mode' 'true'
 		} -ArgumentList $csharpLiveSyncScript, $outputFile, $csharpOutputFile, $csharpReportFile, $appSettingsFile, $csharpStopSignalFile
 
 		Write-Host "[LiveCSharp] Started watcher for Code.ts -> Code.cs"
@@ -165,7 +165,8 @@ if (-not $SkipCSharpGeneration -and (Test-Path $csharpGeneratorScript)) {
 		'--code-file', $outputFile,
 		'--output-file', $csharpOutputFile,
 		'--report-file', $csharpReportFile,
-		'--appsettings-file', $appSettingsFile
+		'--appsettings-file', $appSettingsFile,
+		'--enterprise-mode', 'true'
 	)
 
 	& node @csharpArgs

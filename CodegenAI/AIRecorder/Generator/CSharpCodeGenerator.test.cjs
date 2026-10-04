@@ -145,6 +145,29 @@ function testGotoUsesConfiguredUrl() {
   });
 }
 
+function testGotoUsesConfiguredApplicationUrl() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    fs.writeFileSync(path.join(tempDir, "appsettings.json"), JSON.stringify({
+      Urls: {
+        Applications: {
+          InvestorReporting: "https://investorreporting-mb-sit.trimont.com/default.aspx"
+        }
+      }
+    }, null, 2), "utf8");
+    fs.writeFileSync(codeFile, "await page.goto('https://investorreporting-mb-sit.trimont.com/default.aspx');", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json")
+    });
+
+    assert.ok(result.code.includes('await Page.GotoAsync(Config.Urls.TryGetApplication("InvestorReporting"));'));
+  });
+}
+
 function testTableLocatorConversion() {
   const code = "await page.locator(\"//tr[@id='ctl00_cp1_gd_ctl00__0']/td[2]/a\").click();";
   const result = generateCSharpCode({ codeFilePath: "", outputFilePath: "", appSettingsPath: "" });
@@ -565,6 +588,7 @@ function runAllTests() {
   testClickMapping();
   testFillAndSelectOptionMapping();
   testGotoUsesConfiguredUrl();
+  testGotoUsesConfiguredApplicationUrl();
   testTableLocatorConversion();
   testFrameConversion();
   testAssertionConversion();

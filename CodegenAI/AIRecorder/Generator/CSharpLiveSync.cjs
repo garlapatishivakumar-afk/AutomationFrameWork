@@ -72,6 +72,7 @@ function startLiveSync(options) {
   const reportFilePath = path.resolve(options.reportFilePath || buildDefaultReportPath(outputFilePath));
   const stopSignalFile = options.stopSignalFile ? path.resolve(options.stopSignalFile) : null;
   const debounceMs = toNumber(options.debounceMs, 350);
+  const enterpriseMode = options.enterpriseMode === true || String(options.enterpriseMode || "").toLowerCase() === "true";
   const logger = createLogger(options.log !== false);
   const codeFileName = path.basename(codeFilePath);
   const stopFileName = stopSignalFile ? path.basename(stopSignalFile) : null;
@@ -128,7 +129,8 @@ function startLiveSync(options) {
         codeFilePath,
         outputFilePath,
         reportFilePath,
-        appSettingsPath
+        appSettingsPath,
+        enterpriseMode
       });
       lastSourceHash = sourceHash;
       generationCount += 1;
@@ -261,7 +263,8 @@ function runCli() {
     appSettingsPath: args["appsettings-file"] || path.join(process.cwd(), "appsettings.json"),
     stopSignalFile: args["stop-signal-file"] || "",
     debounceMs: args["debounce-ms"] || "350",
-    log: String(args.log || "true").toLowerCase() !== "false"
+    log: String(args.log || "true").toLowerCase() !== "false",
+    enterpriseMode: String(args["enterprise-mode"] || "false").toLowerCase() === "true"
   });
 
   const stopAndExit = async () => {
