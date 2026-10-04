@@ -10,8 +10,6 @@ namespace AutomationFrameWork.CodegenAI
     {
         private readonly CommonActionsPage _commonActions;
 
-        private IPage _page1 = default!;
-
         public CodegenRecordedFlow(IPage page, ConfigReader config)
         {
             Page = page ?? throw new ArgumentNullException(nameof(page));
@@ -24,79 +22,84 @@ namespace AutomationFrameWork.CodegenAI
         public ConfigReader Config { get; }
 
         // Locators
-        public ILocator Deals => Page.GetByRole(AriaRole.Link, new() { Name = "Deals", Exact = true });
-        public ILocator DealsCompletionStatus => Page.GetByRole(AriaRole.Link, new() { Name = "Deals Completion Status" });
-        public ILocator InputIDCp1GdChRoll => Page.Locator("//input[@id='ctl00_cp1_gd_ctl00_ctl18_chRoll']");
-        public ILocator TableIDMaingridTrSpanClassRbTextSpanClassRbText => Page.Locator("//table[@id='maingrid']//tr[.//span[@class='rbText']]//span[@class='rbText']");
-        public ILocator Ok => Page.GetByRole(AriaRole.Link, new() { Name = "OK" });
-        public ILocator TrIDCp1GdTdA => Page.Locator("//tr[@id='ctl00_cp1_gd_ctl00__8']//td[2]/a");
-        public ILocator InputIDRgrdReportsChAction => Page.Locator("//input[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_chAction']");
-        public ILocator InputIDRgrdReportsChAction2 => Page.Locator("//input[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl16_chAction']");
-        public ILocator InputIDRgrdReportsChAction3 => Page.Locator("//input[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl18_chAction']");
-        public ILocator InputIDRgrdReportsChAction4 => Page.Locator("//input[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl20_chAction']");
-        public ILocator AidGenerating => Page.Locator("//a[@id='ctl00_ContentPlaceHolder1_2_generating']");
-        public ILocator InputIDBtnOk => Page.Locator("//input[@id='ctl00_ContentPlaceHolder1_btnOk']");
-        public ILocator AidRgrdReportsLnkView => Page.Locator("//a[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView']");
-        public ILocator Aidghe => Page.Locator("//a[@id='g_ctl03_hE_4']");
-        public ILocator EffectiveFrom => _page1.GetByText("Effective From:");
-        public ILocator EffectiveTo => _page1.GetByText("Effective To:");
-        public ILocator FieldName => _page1.GetByText("Field Name:");
-        public ILocator FieldValue => _page1.GetByText("Field Value:");
-        public ILocator OverrideValue => _page1.GetByText("Override Value:");
+        public ILocator ExternalWires => Page.GetByRole(AriaRole.Link, new() { Name = "External Wires" });
+        public ILocator CreateExternalWire => Page.GetByRole(AriaRole.Link, new() { Name = "Create External Wire" });
+        public ILocator CmgTab1DetailTabPageWfwcInternalWireDetailTxtAmount => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").Locator("#ctl00_ContentPlaceHolder1_CMGTab1_Detail_0_TabPage_ctl00_wfwcInternalWireDetail_ctl00_txtAmount");
+        public ILocator CmgTab1DetailTabPageWfwcInternalWireDetail2CmbRepetitiveCodeInput => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").Locator("#ctl00_ContentPlaceHolder1_CMGTab1_Detail_0_TabPage_ctl00_wfwcInternalWireDetail2_ctl00_cmbRepetitiveCode_Input");
+        public ILocator Dolp733Propertie => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").GetByRole(AriaRole.Cell, new() { Name = "-DOLP733PROPERTIE" });
+        public ILocator CmgTab1DetailTabPageWfwcInternalWireDetail2TxtAccountCity => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").Locator("#ctl00_ContentPlaceHolder1_CMGTab1_Detail_0_TabPage_ctl00_wfwcInternalWireDetail2_ctl00_txtAccountCity");
+        public ILocator CmgTab1DetailTabPageWfwcInternalWireDetail2CmbToAccountStateArrow => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").Locator("#ctl00_ContentPlaceHolder1_CMGTab1_Detail_0_TabPage_ctl00_wfwcInternalWireDetail2_ctl00_cmbToAccountState_Arrow");
+        public ILocator Ar => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").Locator("#ctl00_ContentPlaceHolder1_CMGTab1_Detail_0_TabPage_ctl00_wfwcInternalWireDetail2_ctl00_cmbToAccountState_DropDown").GetByText("AR");
+        public ILocator Save => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").GetByRole(AriaRole.Link, new() { Name = "Save" });
+        public ILocator TransactionID5972746Has => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").GetByText("Transaction ID 5972746 has");
+        public ILocator SubmitNew => Page.FrameLocator("iframe[name=\"rwExternalWire\"]").GetByRole(AriaRole.Link, new() { Name = "Submit & New" });
+        public ILocator TableATextClose => Page.Locator("//table//a[text()='Close']");
+        public ILocator InputIDWfcContentContainerControl1RgExternalWireQueueRadComboBox1WfItemIDInput => Page.Locator("//input[@id='ctl00_ContentPlaceHolder1_WFC_ContentContainerControl1_ctl00_rgExternalWireQueue_ctl00_ctl02_ctl02_RadComboBox1WFItemID_Input']");
+        public ILocator WfcContentContainerControl1RgExternalWireQueueRadComboBox1WfItemIDInput => Page.Locator("#ctl00_ContentPlaceHolder1_WFC_ContentContainerControl1_ctl00_rgExternalWireQueue_ctl00_ctl02_ctl02_RadComboBox1WFItemID_Input");
 
         public async Task ReplayAsync()
         {
-            await NavigateToInvestorReportingAsync();
-            await OpenDealsCompletionStatusAsync();
-            await OpenSelectedDealReportAsync();
-            var popupPage = await OpenOverridePopupAsync();
-            await UpdateOverrideDetailsAsync(popupPage);
+            await NavigateToApplicationAsync();
+            await OpenTargetModuleAsync();
+            await ApplySearchCriteriaAsync();
         }
 
-        public async Task NavigateToInvestorReportingAsync()
+        public async Task NavigateToApplicationAsync()
         {
-            await _commonActions.NavigateToURLAsync(Config.Urls.TryGetApplication("InvestorReporting"));
+            // Review: URL at source line uses literal value because no matching appsettings Urls entry was found: https://cashadministration-mb-sit.trimont.com/WebForms/DashBoard.aspx
+            await _commonActions.NavigateToURLAsync("https://cashadministration-mb-sit.trimont.com/WebForms/DashBoard.aspx");
+            await Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
         }
 
-        public async Task OpenDealsCompletionStatusAsync()
+        public async Task OpenTargetModuleAsync()
         {
-            await Deals.ClickAsync();
-            await DealsCompletionStatus.ClickAsync();
-            await Assertions.Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("DealsCompletionStatus\\.aspx", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+            await Assertions.Expect(ExternalWires).ToBeVisibleAsync();
+            await ExternalWires.ClickAsync();
+            await Assertions.Expect(CreateExternalWire).ToBeVisibleAsync();
+            await CreateExternalWire.ClickAsync();
+            await Assertions.Expect(CmgTab1DetailTabPageWfwcInternalWireDetailTxtAmount).ToBeVisibleAsync();
+            await CmgTab1DetailTabPageWfwcInternalWireDetailTxtAmount.ClickAsync();
         }
 
-        public async Task OpenSelectedDealReportAsync()
+        public async Task ApplySearchCriteriaAsync()
         {
-            await InputIDCp1GdChRoll.CheckAsync();
-            await TableIDMaingridTrSpanClassRbTextSpanClassRbText.ClickAsync();
-            await Ok.ClickAsync();
-            await TrIDCp1GdTdA.ClickAsync();
-            await InputIDRgrdReportsChAction.CheckAsync();
-            await InputIDRgrdReportsChAction2.CheckAsync();
-            await InputIDRgrdReportsChAction3.CheckAsync();
-            await InputIDRgrdReportsChAction4.CheckAsync();
-            await AidGenerating.ClickAsync();
-            await InputIDBtnOk.ClickAsync();
-            await AidRgrdReportsLnkView.ClickAsync();
-        }
-
-        public async Task<IPage> OpenOverridePopupAsync()
-        {
-            var page1Promise = Page.WaitForPopupAsync();
-            await Aidghe.ClickAsync();
-            _page1 = await page1Promise;
-            await _page1.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-            await Assertions.Expect(EffectiveFrom).ToBeVisibleAsync();
-            return _page1;
-        }
-
-        public async Task UpdateOverrideDetailsAsync(IPage popupPage)
-        {
-            await EffectiveFrom.ClickAsync();
-            await EffectiveTo.ClickAsync();
-            await FieldName.ClickAsync();
-            await FieldValue.ClickAsync();
-            await OverrideValue.ClickAsync();
+            await Assertions.Expect(CmgTab1DetailTabPageWfwcInternalWireDetailTxtAmount).ToBeVisibleAsync();
+            // Review: Literal input value preserved from recording. Consider replacing with framework data binding.
+            await CmgTab1DetailTabPageWfwcInternalWireDetailTxtAmount.FillAsync("12");
+            await Assertions.Expect(CmgTab1DetailTabPageWfwcInternalWireDetail2CmbRepetitiveCodeInput).ToBeVisibleAsync();
+            await CmgTab1DetailTabPageWfwcInternalWireDetail2CmbRepetitiveCodeInput.ClickAsync();
+            await Assertions.Expect(CmgTab1DetailTabPageWfwcInternalWireDetail2CmbRepetitiveCodeInput).ToBeVisibleAsync();
+            // Review: Literal input value preserved from recording. Consider replacing with framework data binding.
+            await CmgTab1DetailTabPageWfwcInternalWireDetail2CmbRepetitiveCodeInput.FillAsync("13");
+            await Assertions.Expect(Dolp733Propertie).ToBeVisibleAsync();
+            await Dolp733Propertie.ClickAsync();
+            await Assertions.Expect(CmgTab1DetailTabPageWfwcInternalWireDetail2TxtAccountCity).ToBeVisibleAsync();
+            await CmgTab1DetailTabPageWfwcInternalWireDetail2TxtAccountCity.ClickAsync();
+            await Assertions.Expect(CmgTab1DetailTabPageWfwcInternalWireDetail2TxtAccountCity).ToBeVisibleAsync();
+            // Review: Literal input value preserved from recording. Consider replacing with framework data binding.
+            await CmgTab1DetailTabPageWfwcInternalWireDetail2TxtAccountCity.FillAsync("USA");
+            await Assertions.Expect(CmgTab1DetailTabPageWfwcInternalWireDetail2CmbToAccountStateArrow).ToBeVisibleAsync();
+            await CmgTab1DetailTabPageWfwcInternalWireDetail2CmbToAccountStateArrow.ClickAsync();
+            await Assertions.Expect(Ar).ToBeVisibleAsync();
+            await Ar.ClickAsync();
+            await Assertions.Expect(Save).ToBeVisibleAsync();
+            await Save.ClickAsync();
+            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await Assertions.Expect(TransactionID5972746Has).ToBeVisibleAsync();
+            await TransactionID5972746Has.ClickAsync();
+            await Assertions.Expect(SubmitNew).ToBeVisibleAsync();
+            await SubmitNew.ClickAsync();
+            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await Assertions.Expect(TableATextClose).ToBeVisibleAsync();
+            await TableATextClose.ClickAsync();
+            await Assertions.Expect(InputIDWfcContentContainerControl1RgExternalWireQueueRadComboBox1WfItemIDInput).ToBeVisibleAsync();
+            await InputIDWfcContentContainerControl1RgExternalWireQueueRadComboBox1WfItemIDInput.ClickAsync();
+            await Assertions.Expect(WfcContentContainerControl1RgExternalWireQueueRadComboBox1WfItemIDInput).ToBeVisibleAsync();
+            // Review: Literal input value preserved from recording. Consider replacing with framework data binding.
+            await WfcContentContainerControl1RgExternalWireQueueRadComboBox1WfItemIDInput.FillAsync("5972746");
+            await Assertions.Expect(WfcContentContainerControl1RgExternalWireQueueRadComboBox1WfItemIDInput).ToBeVisibleAsync();
+            // Review: Literal input value preserved from recording. Consider replacing with framework data binding.
+            await WfcContentContainerControl1RgExternalWireQueueRadComboBox1WfItemIDInput.PressAsync("Enter");
         }
     }
 }

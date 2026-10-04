@@ -231,6 +231,10 @@ function parseLocatorExpression(expression) {
       build: (match) => withPosition({ kind: "frameText", frameSelector: match[2], text: match[4], exact: match[5] === "true" }, match[6])
     },
     {
+      regex: /^page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.locator\((['"`])(.+?)\3\)(\.first\(\)|\.last\(\)|\.nth\(\d+\))?$/,
+      build: (match) => withPosition({ kind: "frameLocator", frameSelector: match[2], selector: match[4] }, match[5])
+    },
+    {
       regex: /^page\.locator\((['"`])(.+?)\1\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)(\.first\(\)|\.last\(\)|\.nth\(\d+\))?$/,
       build: (match) => withPosition({ kind: "scopedRole", selector: match[2], role: match[4], name: match[6], exact: match[7] === "true" }, match[8])
     },
@@ -374,6 +378,79 @@ function parseActionLine(rawLine, sourceLine) {
   }
 
   const patterns = [
+    {
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.locator\((['"`])(.+?)\3\)\.getByText\((['"`])([^'"`]+)\5(?:,\s*\{\s*exact:\s*(true|false)\s*\})?\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      build: (matches) => createAction(sourceLine, rawLine, {
+        actionType: matches[8],
+        locatorStrategy: "FRAME_SCOPED_TEXT",
+        locator: {
+          kind: "frameScopedText",
+          actor,
+          frameSelector: matches[2],
+          selector: matches[4],
+          text: matches[6],
+          exact: matches[7] === "true"
+        },
+        targetElement: "frameScopedText",
+        frame: { selector: matches[2] },
+        confidence: 0.9
+      })
+    },
+    {
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.locator\((['"`])(.+?)\3\)\.getByRole\((['"`])(\w+)\5,\s*\{\s*name:\s*(['"`])([^'"`]+)\7(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      build: (matches) => createAction(sourceLine, rawLine, {
+        actionType: matches[10],
+        locatorStrategy: "FRAME_SCOPED_ROLE",
+        locator: {
+          kind: "frameScopedRole",
+          actor,
+          frameSelector: matches[2],
+          selector: matches[4],
+          role: matches[6],
+          name: matches[8],
+          exact: matches[9] === "true"
+        },
+        targetElement: matches[6],
+        frame: { selector: matches[2] },
+        confidence: 0.9
+      })
+    },
+    {
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.locator\((['"`])(.+?)\3\)(\.first\(\)|\.last\(\)|\.nth\(\d+\))?\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
+      build: (matches) => createAction(sourceLine, rawLine, {
+        actionType: matches[6],
+        locatorStrategy: "FRAMELOCATOR",
+        locator: {
+          kind: "frameLocator",
+          actor,
+          frameSelector: matches[2],
+          selector: matches[4],
+          position: parseLocatorPosition(matches[5])
+        },
+        targetElement: "frameLocator",
+        frame: { selector: matches[2] },
+        confidence: 0.9
+      })
+    },
+    {
+      match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.locator\((['"`])(.+?)\3\)(\.first\(\)|\.last\(\)|\.nth\(\d+\))?\.(fill|press|selectOption|setInputFiles)\((['"`])([\s\S]*?)\7\);$/),
+      build: (matches) => createAction(sourceLine, rawLine, {
+        actionType: matches[6],
+        locatorStrategy: "FRAMELOCATOR",
+        locator: {
+          kind: "frameLocator",
+          actor,
+          frameSelector: matches[2],
+          selector: matches[4],
+          position: parseLocatorPosition(matches[5])
+        },
+        targetElement: "frameLocator",
+        value: matches[8],
+        frame: { selector: matches[2] },
+        confidence: 0.9,
+        diagnostics: ["Literal input value preserved from recording. Consider replacing with framework data binding."]
+      })
+    },
     {
       match: normalizedLine.match(/^await\s+page\.locator\((['"`])(.+?)\1\)\.contentFrame\(\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)\.(click|dblclick|hover|check|uncheck|focus)\(\);$/),
       build: (matches) => createAction(sourceLine, rawLine, {
@@ -683,6 +760,20 @@ function buildLocatorExpression(locator, actorFieldMap = new Map()) {
     return applyPosition(`${actorRef}.FrameLocator(\"${escapeCSharpString(locator.frameSelector)}\").GetByText(\"${escapeCSharpString(locator.text)}\"${options})`);
   }
 
+  if (locator.kind === "frameLocator") {
+    return applyPosition(`${actorRef}.FrameLocator(\"${escapeCSharpString(locator.frameSelector)}\").Locator(\"${escapeCSharpString(locator.selector)}\")`);
+  }
+
+  if (locator.kind === "frameScopedText") {
+    const options = locator.exact ? ", new() { Exact = true }" : "";
+    return applyPosition(`${actorRef}.FrameLocator(\"${escapeCSharpString(locator.frameSelector)}\").Locator(\"${escapeCSharpString(locator.selector)}\").GetByText(\"${escapeCSharpString(locator.text)}\"${options})`);
+  }
+
+  if (locator.kind === "frameScopedRole") {
+    const exactPart = locator.exact ? ", Exact = true" : "";
+    return applyPosition(`${actorRef}.FrameLocator(\"${escapeCSharpString(locator.frameSelector)}\").Locator(\"${escapeCSharpString(locator.selector)}\").GetByRole(AriaRole.${inferRoleEnum(locator.role)}, new() { Name = \"${escapeCSharpString(locator.name)}\"${exactPart} })`);
+  }
+
   if (locator.kind === "expression") {
     return convertLocatorExpressionFromTs(locator.expression);
   }
@@ -920,6 +1011,18 @@ function locatorPropertyBaseName(locator) {
 
   if (locator.kind === "frameText") {
     return sanitizeIdentifier(locator.text || "FrameTextLocator");
+  }
+
+  if (locator.kind === "frameLocator") {
+    return sanitizeIdentifier(selectorDerivedName(locator.selector || "FrameLocator"));
+  }
+
+  if (locator.kind === "frameScopedText") {
+    return sanitizeIdentifier(locator.text || "FrameScopedTextLocator");
+  }
+
+  if (locator.kind === "frameScopedRole") {
+    return sanitizeIdentifier(locator.name || locator.role || "FrameScopedRoleLocator");
   }
 
   return "GeneratedLocator";
@@ -1284,21 +1387,198 @@ function toMethodParameterName(propertyName, fallback) {
 
 function renderMethodBodyForActions(actions, buildOptions, fillArgBySourceLine) {
   const lines = [];
+  const includeInteractionWaits = isTrueFlag(buildOptions && buildOptions.enterpriseMode);
+
+  const appendInteractionWaitIfNeeded = (action) => {
+    if (!includeInteractionWaits || !action || !action.locator) {
+      return;
+    }
+
+    if (!["click", "dblclick", "hover", "check", "uncheck", "focus", "fill", "press", "selectOption", "setInputFiles"].includes(action.actionType)) {
+      return;
+    }
+
+    const effectiveExpression = getActionBindingExpression(action, buildOptions);
+    lines.push(`            await Assertions.Expect(${effectiveExpression}).ToBeVisibleAsync();`);
+  };
+
+  const appendPostActionWaitIfNeeded = (action) => {
+    if (!includeInteractionWaits || !action) {
+      return;
+    }
+
+    if (action.actionType === "goto") {
+      lines.push("            await Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);");
+      return;
+    }
+
+    if (action.actionType !== "click") {
+      return;
+    }
+
+    const expression = getActionBindingExpression(action, buildOptions);
+    if (/(Search|Reassign|Submit|Save|Generate|View|Continue|Apply|Next|Finish|Ok|OK)/i.test(expression)) {
+      lines.push("            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);");
+    }
+  };
 
   for (const action of actions) {
+    appendInteractionWaitIfNeeded(action);
+
     if (action.actionType === "fill" && fillArgBySourceLine && fillArgBySourceLine.has(action.sourceLine)) {
       const effectiveExpression = getActionBindingExpression(action, buildOptions);
       const warnings = action.diagnostics.map((message) => `            // Review: ${message}`);
       lines.push(...warnings);
       lines.push(`            await FillInputAsync(${effectiveExpression}, ${fillArgBySourceLine.get(action.sourceLine)});`);
+      appendPostActionWaitIfNeeded(action);
       continue;
     }
 
     const generated = buildActionStatement(action, buildOptions);
     lines.push(...generated);
+    appendPostActionWaitIfNeeded(action);
   }
 
   return lines;
+}
+
+function findFirstIndexByActionType(actions, actionTypes) {
+  return actions.findIndex((action) => actionTypes.includes(action.actionType));
+}
+
+function collectConsecutiveByActionType(actions, startIndex, actionType) {
+  const result = [];
+  let index = startIndex;
+  while (index < actions.length && actions[index].actionType === actionType) {
+    result.push(actions[index]);
+    index += 1;
+  }
+
+  return {
+    actions: result,
+    endIndexExclusive: index
+  };
+}
+
+function tryBuildEnterpriseLinearMethods(actions, buildOptions) {
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return null;
+  }
+
+  const popupExists = actions.some((action) => action.actionType === "popupWait" || action.actionType === "popupResolve");
+  if (popupExists) {
+    return null;
+  }
+
+  const gotoIndexes = actions
+    .map((action, index) => ({ action, index }))
+    .filter((entry) => entry.action.actionType === "goto")
+    .map((entry) => entry.index);
+
+  const lastGotoIndex = gotoIndexes.length > 0 ? gotoIndexes[gotoIndexes.length - 1] : -1;
+  const navigationActions = gotoIndexes.map((index) => actions[index]);
+  const flowActions = actions.slice(lastGotoIndex + 1);
+  if (flowActions.length === 0 && navigationActions.length === 0) {
+    return null;
+  }
+
+  const firstDataEntryIndex = findFirstIndexByActionType(flowActions, ["fill", "selectOption", "press"]);
+  const firstCheckIndex = findFirstIndexByActionType(flowActions, ["check", "uncheck"]);
+
+  let openModuleActions = [];
+  let searchActions = [];
+  let selectRowsActions = [];
+  let finalizeActions = [];
+
+  if (firstDataEntryIndex >= 0) {
+    openModuleActions = flowActions.slice(0, firstDataEntryIndex);
+
+    if (firstCheckIndex >= 0 && firstCheckIndex > firstDataEntryIndex) {
+      searchActions = flowActions.slice(firstDataEntryIndex, firstCheckIndex);
+      const consecutiveChecks = collectConsecutiveByActionType(flowActions, firstCheckIndex, "check");
+      const consecutiveUnchecks = collectConsecutiveByActionType(flowActions, firstCheckIndex, "uncheck");
+      const longer = consecutiveChecks.actions.length >= consecutiveUnchecks.actions.length ? consecutiveChecks : consecutiveUnchecks;
+      selectRowsActions = longer.actions;
+      finalizeActions = flowActions.slice(longer.endIndexExclusive);
+    } else {
+      searchActions = flowActions.slice(firstDataEntryIndex);
+    }
+  } else if (firstCheckIndex >= 0) {
+    openModuleActions = flowActions.slice(0, firstCheckIndex);
+    const consecutiveChecks = collectConsecutiveByActionType(flowActions, firstCheckIndex, "check");
+    selectRowsActions = consecutiveChecks.actions;
+    finalizeActions = flowActions.slice(consecutiveChecks.endIndexExclusive);
+  } else {
+    openModuleActions = flowActions;
+  }
+
+  const methodBlocks = [];
+  const replayCalls = [];
+
+  if (navigationActions.length > 0) {
+    const firstUrl = String(navigationActions[0].value || "");
+    const navName = /investorreporting/i.test(firstUrl)
+      ? "NavigateToInvestorReportingAsync"
+      : "NavigateToApplicationAsync";
+
+    methodBlocks.push([
+      `        public async Task ${navName}()`,
+      "        {",
+      ...renderMethodBodyForActions(navigationActions, buildOptions),
+      "        }"
+    ]);
+    replayCalls.push(`            await ${navName}();`);
+  }
+
+  if (openModuleActions.length > 0) {
+    methodBlocks.push([
+      "        public async Task OpenTargetModuleAsync()",
+      "        {",
+      ...renderMethodBodyForActions(openModuleActions, buildOptions),
+      "        }"
+    ]);
+    replayCalls.push("            await OpenTargetModuleAsync();");
+  }
+
+  if (searchActions.length > 0) {
+    methodBlocks.push([
+      "        public async Task ApplySearchCriteriaAsync()",
+      "        {",
+      ...renderMethodBodyForActions(searchActions, buildOptions),
+      "        }"
+    ]);
+    replayCalls.push("            await ApplySearchCriteriaAsync();");
+  }
+
+  if (selectRowsActions.length > 0) {
+    methodBlocks.push([
+      "        public async Task SelectResultRowsAsync()",
+      "        {",
+      ...renderMethodBodyForActions(selectRowsActions, buildOptions),
+      "        }"
+    ]);
+    replayCalls.push("            await SelectResultRowsAsync();");
+  }
+
+  if (finalizeActions.length > 0) {
+    methodBlocks.push([
+      "        public async Task CompleteBusinessActionAsync()",
+      "        {",
+      ...renderMethodBodyForActions(finalizeActions, buildOptions),
+      "        }"
+    ]);
+    replayCalls.push("            await CompleteBusinessActionAsync();");
+  }
+
+  if (replayCalls.length === 0) {
+    return null;
+  }
+
+  return {
+    replayLines: replayCalls,
+    methodBlocks,
+    helperMethod: []
+  };
 }
 
 function tryBuildEnterpriseMethods(actions, buildOptions) {
@@ -1601,6 +1881,13 @@ function buildCode(actions, options) {
       replayLines = enterprise.replayLines;
       methodBlocks = enterprise.methodBlocks;
       helperMethod = enterprise.helperMethod;
+    } else {
+      const linearEnterprise = tryBuildEnterpriseLinearMethods(actions, buildOptions);
+      if (linearEnterprise) {
+        replayLines = linearEnterprise.replayLines;
+        methodBlocks = linearEnterprise.methodBlocks;
+        helperMethod = linearEnterprise.helperMethod;
+      }
     }
   }
 

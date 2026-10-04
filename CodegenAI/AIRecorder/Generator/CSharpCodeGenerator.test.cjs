@@ -584,6 +584,48 @@ await page1.getByRole('button', { name: 'OK' }).click();
   });
 }
 
+function testEnterpriseModeSplitsNonPopupFlowIntoMethodsWithWaits() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    fs.writeFileSync(path.join(tempDir, "appsettings.json"), JSON.stringify({
+      Urls: {
+        Applications: {
+          DocAdmin: "https://documentadministration-sit.trimont.com/default.aspx"
+        }
+      }
+    }, null, 2), "utf8");
+
+    fs.writeFileSync(codeFile, `
+await page.goto('https://documentadministration-sit.trimont.com/default.aspx');
+await page.getByRole('link', { name: 'Administration' }).click();
+await page.getByRole('link', { name: 'Reassign Packages' }).click();
+await page.locator('#ctl00_ContentPlaceHolder1_ddlSearchUser').selectOption('T10964');
+await page.locator('//input[@id=\'ctl00_ContentPlaceHolder1_btnSearch\']').click();
+await page.locator('#ctl00_ContentPlaceHolder1_rgridPackages_ctl00_ctl04_ReassignCheckSelectCheckBox').check();
+await page.locator('#ctl00_ContentPlaceHolder1_rgridPackages_ctl00_ctl06_ReassignCheckSelectCheckBox').check();
+await page.getByText('Garlapati, Shivakumar', { exact: true }).click();
+await page.locator('#ctl00_ContentPlaceHolder1_ddlUsers').selectOption('T11550');
+await page.locator('//input[@id=\'ctl00_ContentPlaceHolder1_btnReassign\']').click();
+`, "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      enterpriseMode: true
+    });
+
+    assert.ok(result.code.includes("public async Task OpenTargetModuleAsync()"));
+    assert.ok(result.code.includes("public async Task ApplySearchCriteriaAsync()"));
+    assert.ok(result.code.includes("public async Task SelectResultRowsAsync()"));
+    assert.ok(result.code.includes("public async Task CompleteBusinessActionAsync()"));
+    assert.ok(result.code.includes("await Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);"));
+    assert.ok(result.code.includes("await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);"));
+    assert.ok(result.code.includes("await Assertions.Expect(Administration).ToBeVisibleAsync();"));
+  });
+}
+
 function runAllTests() {
   testClickMapping();
   testFillAndSelectOptionMapping();
@@ -609,6 +651,7 @@ function runAllTests() {
   testFrameworkLocatorReuseRequiresExactExpressionMatch();
   testRecorderAnnotationLinesAreParsedAsActions();
   testPopupActorActionsAreSupported();
+  testEnterpriseModeSplitsNonPopupFlowIntoMethodsWithWaits();
   console.log("CSharpCodeGenerator tests passed");
 }
 
