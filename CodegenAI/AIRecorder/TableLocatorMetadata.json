@@ -1,15 +1,15 @@
 {
-  "generatedAtUtc": "2026-10-03T23:29:42.896Z",
+  "generatedAtUtc": "2026-10-06T17:46:44.399Z",
   "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.ts",
   "tableSelector": "table",
-  "analyzedActions": 12,
-  "transformedActions": 3,
+  "analyzedActions": 4,
+  "transformedActions": 0,
   "specificRulesFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\AIRecorder\\Intelligence\\SpecificLocatorRules.json",
   "actions": [
     {
       "line": 9,
       "action": "click",
-      "text": "Deals",
+      "text": "Search",
       "tableDetected": false,
       "strategy": "ROLE",
       "confidence": 0.5,
@@ -18,287 +18,25 @@
     {
       "line": 10,
       "action": "click",
-      "text": "Deals Completion Status",
+      "text": "",
       "tableDetected": false,
       "strategy": "ROLE",
       "confidence": 0.5,
       "reason": "Not detected as table/grid action"
-    },
-    {
-      "line": 11,
-      "action": "click",
-      "elementType": "table-a",
-      "text": "225L16225L",
-      "tableDetected": true,
-      "dataGridDetected": true,
-      "strategy": "TABLE_ROW_ID",
-      "confidence": 0.88,
-      "locator": "//tr[@id='ctl00_cp1_gd_ctl00__8']//td[2]/a",
-      "reason": "Observed row id; Column index fallback (2); Validation: Stable row id and column observed",
-      "uniqueMatch": true,
-      "candidates": [
-        {
-          "strategy": "ROLE",
-          "score": 5,
-          "locator": "page.getByRole('link', { name: '225L16225L' })",
-          "validation": null
-        },
-        {
-          "strategy": "TABLE_ROW_ID",
-          "score": 12,
-          "locator": "//tr[@id='ctl00_cp1_gd_ctl00__8']//td[2]/a",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Stable row id and column observed"
-          }
-        },
-        {
-          "strategy": "TABLE_KEY_VALUE_ROW",
-          "score": 5,
-          "locator": "//tr[td[1][text()='Vinesh Venkatesh']]//a[text()='225L16225L']",
-          "validation": {
-            "valid": false,
-            "unique": false,
-            "matchEstimate": 0,
-            "reason": "Candidate is not unique in table scope"
-          }
-        },
-        {
-          "strategy": "TABLE_ROW_BUSINESS_VALUE",
-          "score": 12,
-          "locator": "//tr[td[text()='30551']]//td[2]/a",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Business row and column are unique in observed DOM"
-          }
-        },
-        {
-          "strategy": "TABLE_CELL",
-          "score": 7,
-          "locator": "//table//tr[td[2]/a]//td[2]/a",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Observed target uniquely resolves within detected column"
-          }
-        }
-      ]
     },
     {
       "line": 12,
       "action": "click",
-      "elementType": "table-a",
-      "text": "",
-      "tableDetected": true,
-      "dataGridDetected": true,
-      "strategy": "TARGET_ID",
-      "confidence": 0.92,
-      "locator": "//a[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView']",
-      "reason": "Stable target id; Validation: Stable target attribute uniquely identifies observed element",
-      "uniqueMatch": true,
-      "candidates": [
-        {
-          "strategy": "ROLE",
-          "score": 5,
-          "locator": "page.locator('#ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView')",
-          "validation": null
-        },
-        {
-          "strategy": "TARGET_ID",
-          "score": 13,
-          "locator": "//a[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView']",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Stable target attribute uniquely identifies observed element"
-          }
-        },
-        {
-          "strategy": "TABLE_ROW_ID",
-          "score": 12,
-          "locator": "//tr[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00__4']//a[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView']",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Stable row id and column observed"
-          }
-        },
-        {
-          "strategy": "TABLE_KEY_VALUE_ROW",
-          "score": 5,
-          "locator": "//tr[td[1][text()='Cash Action Form']]//a[text()='']",
-          "validation": {
-            "valid": false,
-            "unique": false,
-            "matchEstimate": 0,
-            "reason": "Candidate is not unique in table scope"
-          }
-        },
-        {
-          "strategy": "TABLE_ROW_BUSINESS_VALUE",
-          "score": 12,
-          "locator": "//tr[td[text()='Cash Action Form']]//a[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView']",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Business row and column are unique in observed DOM"
-          }
-        },
-        {
-          "strategy": "TABLE_CELL",
-          "score": 7,
-          "locator": "//table//tr[.//a[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView']]//a[@id='ctl00_ContentPlaceHolder1_rgrdReports_ctl00_ctl14_lnkView']",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Observed target uniquely resolves within detected column"
-          }
-        }
-      ]
-    },
-    {
-      "line": 14,
-      "action": "click",
-      "elementType": "table-a",
-      "text": "No Data",
-      "tableDetected": true,
-      "dataGridDetected": true,
-      "strategy": "TARGET_ID",
-      "confidence": 0.92,
-      "locator": "//a[@id='g_ctl02_hE_4']",
-      "reason": "Stable target id; Validation: Stable target attribute uniquely identifies observed element",
-      "uniqueMatch": true,
-      "candidates": [
-        {
-          "strategy": "ROLE",
-          "score": 5,
-          "locator": "page.getByRole('link', { name: 'No Data' })",
-          "validation": null
-        },
-        {
-          "strategy": "TARGET_ID",
-          "score": 13,
-          "locator": "//a[@id='g_ctl02_hE_4']",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Stable target attribute uniquely identifies observed element"
-          }
-        },
-        {
-          "strategy": "TABLE_KEY_VALUE_ROW",
-          "score": 5,
-          "locator": "//tr[td[1][text()='CRF']]//a[text()='No Data']",
-          "validation": {
-            "valid": false,
-            "unique": false,
-            "matchEstimate": 0,
-            "reason": "Candidate is not unique in table scope"
-          }
-        },
-        {
-          "strategy": "TABLE_ROW_BUSINESS_VALUE",
-          "score": 12,
-          "locator": "//tr[td[text()='CRF']]//a[@id='g_ctl02_hE_4']",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Business row and column are unique in observed DOM"
-          }
-        },
-        {
-          "strategy": "COMPOSITE",
-          "score": 8,
-          "locator": "//table[@id='g']//tr[.//a[@id='g_ctl02_hE_4']]//a[@id='g_ctl02_hE_4']",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Scoped table candidate matches unique observed target"
-          }
-        },
-        {
-          "strategy": "TABLE_CELL",
-          "score": 7,
-          "locator": "//table//tr[.//a[@id='g_ctl02_hE_4']]//a[@id='g_ctl02_hE_4']",
-          "validation": {
-            "valid": true,
-            "unique": true,
-            "matchEstimate": 1,
-            "reason": "Observed target uniquely resolves within detected column"
-          }
-        }
-      ]
-    },
-    {
-      "line": 16,
-      "action": "click",
-      "text": "Field Value:",
+      "text": "Search",
       "tableDetected": false,
       "strategy": "ROLE",
       "confidence": 0.5,
       "reason": "Not detected as table/grid action"
     },
     {
-      "line": 17,
+      "line": 13,
       "action": "click",
-      "text": "",
-      "tableDetected": false,
-      "strategy": "ROLE",
-      "confidence": 0.5,
-      "reason": "Not detected as table/grid action"
-    },
-    {
-      "line": 19,
-      "action": "click",
-      "text": "",
-      "tableDetected": false,
-      "strategy": "ROLE",
-      "confidence": 0.5,
-      "reason": "Not detected as table/grid action"
-    },
-    {
-      "line": 20,
-      "action": "click",
-      "text": "",
-      "tableDetected": false,
-      "strategy": "ROLE",
-      "confidence": 0.5,
-      "reason": "Not detected as table/grid action"
-    },
-    {
-      "line": 21,
-      "action": "click",
-      "text": "",
-      "tableDetected": false,
-      "strategy": "ROLE",
-      "confidence": 0.5,
-      "reason": "Not detected as table/grid action"
-    },
-    {
-      "line": 22,
-      "action": "click",
-      "text": "",
-      "tableDetected": false,
-      "strategy": "ROLE",
-      "confidence": 0.5,
-      "reason": "Not detected as table/grid action"
-    },
-    {
-      "line": 24,
-      "action": "click",
-      "text": "OK",
+      "text": "310929478",
       "tableDetected": false,
       "strategy": "ROLE",
       "confidence": 0.5,

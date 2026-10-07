@@ -1,8 +1,8 @@
 {
-  "generatedAtUtc": "2026-10-04T08:10:41.925Z",
+  "generatedAtUtc": "2026-10-06T17:46:44.523Z",
   "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.ts",
   "outputFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.cs",
-  "actionCount": 19,
+  "actionCount": 6,
   "frameworkMatches": [
     {
       "sourceLine": 8,
@@ -29,119 +29,28 @@
       "sourceLine": 10,
       "generatedLine": 0,
       "actionType": "click",
-      "locatorStrategy": "ROLE",
+      "locatorStrategy": "LOCATOR",
       "supported": true
     },
     {
       "sourceLine": 11,
       "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "FRAMELOCATOR",
+      "actionType": "fill",
+      "locatorStrategy": "LOCATOR",
       "supported": true
     },
     {
       "sourceLine": 12,
       "generatedLine": 0,
-      "actionType": "fill",
-      "locatorStrategy": "FRAMELOCATOR",
+      "actionType": "click",
+      "locatorStrategy": "ROLE",
       "supported": true
     },
     {
       "sourceLine": 13,
       "generatedLine": 0,
       "actionType": "click",
-      "locatorStrategy": "FRAMELOCATOR",
-      "supported": true
-    },
-    {
-      "sourceLine": 14,
-      "generatedLine": 0,
-      "actionType": "fill",
-      "locatorStrategy": "FRAMELOCATOR",
-      "supported": true
-    },
-    {
-      "sourceLine": 15,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "FRAME_ROLE",
-      "supported": true
-    },
-    {
-      "sourceLine": 16,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "FRAMELOCATOR",
-      "supported": true
-    },
-    {
-      "sourceLine": 17,
-      "generatedLine": 0,
-      "actionType": "fill",
-      "locatorStrategy": "FRAMELOCATOR",
-      "supported": true
-    },
-    {
-      "sourceLine": 18,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "FRAMELOCATOR",
-      "supported": true
-    },
-    {
-      "sourceLine": 19,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "FRAME_SCOPED_TEXT",
-      "supported": true
-    },
-    {
-      "sourceLine": 20,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "FRAME_ROLE",
-      "supported": true
-    },
-    {
-      "sourceLine": 21,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "FRAME_TEXT",
-      "supported": true
-    },
-    {
-      "sourceLine": 22,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "FRAME_ROLE",
-      "supported": true
-    },
-    {
-      "sourceLine": 23,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "TABLE_LOCATOR",
-      "supported": true
-    },
-    {
-      "sourceLine": 24,
-      "generatedLine": 0,
-      "actionType": "click",
-      "locatorStrategy": "TABLE_LOCATOR",
-      "supported": true
-    },
-    {
-      "sourceLine": 25,
-      "generatedLine": 0,
-      "actionType": "fill",
-      "locatorStrategy": "TABLE_LOCATOR",
-      "supported": true
-    },
-    {
-      "sourceLine": 26,
-      "generatedLine": 0,
-      "actionType": "press",
-      "locatorStrategy": "TABLE_LOCATOR",
+      "locatorStrategy": "ROLE",
       "supported": true
     }
   ],

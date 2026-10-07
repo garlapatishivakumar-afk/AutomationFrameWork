@@ -36,3 +36,9 @@ Rules
 - For textbox/input actions from Code.ts, use reusable common fill methods (do not inline FillAsync everywhere).
 - For dropdown actions from Code.ts, use reusable common dropdown selection methods (do not inline SelectOptionAsync everywhere).
 - Reuse existing common fill/select methods first; create them only once if missing.
+- Split long recorded action chains into enterprise-level methods with single responsibility.
+- If the same action chain repeats in one recording, extract it into one reusable sub-flow method and call it wherever needed.
+- Use PascalCase for method names and keep verb-first business intent naming.
+- Every asynchronous method name must end with Async.
+- For segmented enterprise methods, use deterministic suffixes such as Part1Async, Part2Async.
+- Avoid vague method names (for example Method1Async or ActionAsync); use domain-specific names.

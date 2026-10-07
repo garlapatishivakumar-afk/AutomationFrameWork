@@ -1,5 +1,5 @@
 param(
-	[string]$TargetUrl = 'https://cashadministration-mb-sit.trimont.com/WebForms/DashBoard.aspx',
+	[string]$TargetUrl = 'https://inspections-sit.trimont.com/default.aspx',
 	[string]$TestIdAttribute = 'data-testid',
 	[string]$TableSelector = 'table',
 	[switch]$SkipLiveObservation,

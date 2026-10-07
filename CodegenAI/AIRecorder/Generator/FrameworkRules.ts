@@ -69,6 +69,18 @@ export const FrameworkRules: FrameworkRule[] = [
     },
 
     {
+        id: "MethodNamingConvention",
+        description: "Use PascalCase for method names, append Async for asynchronous methods, and start method names with a clear verb describing intent.",
+        required: true
+    },
+
+    {
+        id: "EnterpriseMethodNamePattern",
+        description: "For enterprise split flows, use domain-oriented orchestration names (for example Navigate/Open/Apply/Select/Complete) and use deterministic PartNAsync suffixes for segmented sub-methods.",
+        required: true
+    },
+
+    {
         id: "POMPattern",
         description: "Keep Page Object Model separation between locators and actions.",
         required: true
@@ -83,6 +95,18 @@ export const FrameworkRules: FrameworkRule[] = [
     {
         id: "SingleResponsibility",
         description: "Each generated method should perform one clear responsibility.",
+        required: true
+    },
+
+    {
+        id: "EnterpriseActionSegmentation",
+        description: "Split long recorded flows into smaller enterprise-level methods and keep each method focused on one business intent.",
+        required: true
+    },
+
+    {
+        id: "ReusableSubFlowExtraction",
+        description: "When action patterns repeat, extract reusable sub-flow methods and call them instead of duplicating action blocks.",
         required: true
     },
 

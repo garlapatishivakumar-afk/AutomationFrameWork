@@ -1388,18 +1388,26 @@ function toMethodParameterName(propertyName, fallback) {
 function renderMethodBodyForActions(actions, buildOptions, fillArgBySourceLine) {
   const lines = [];
   const includeInteractionWaits = isTrueFlag(buildOptions && buildOptions.enterpriseMode);
+  let lastReadinessWaitExpression = null;
 
   const appendInteractionWaitIfNeeded = (action) => {
     if (!includeInteractionWaits || !action || !action.locator) {
       return;
     }
 
-    if (!["click", "dblclick", "hover", "check", "uncheck", "focus", "fill", "press", "selectOption", "setInputFiles"].includes(action.actionType)) {
+    // Playwright already auto-waits for many operations; add explicit readiness checks
+    // only for UI interactions where a visible target is commonly required.
+    if (!["click", "dblclick", "hover", "check", "uncheck", "selectOption", "setInputFiles"].includes(action.actionType)) {
       return;
     }
 
     const effectiveExpression = getActionBindingExpression(action, buildOptions);
-    lines.push(`            await Assertions.Expect(${effectiveExpression}).ToBeVisibleAsync();`);
+    if (!effectiveExpression || effectiveExpression === lastReadinessWaitExpression) {
+      return;
+    }
+
+    lines.push(`            await ${effectiveExpression}.WaitForAsync(new() { State = WaitForSelectorState.Visible });`);
+    lastReadinessWaitExpression = effectiveExpression;
   };
 
   const appendPostActionWaitIfNeeded = (action) => {
@@ -1458,6 +1466,88 @@ function collectConsecutiveByActionType(actions, startIndex, actionType) {
     actions: result,
     endIndexExclusive: index
   };
+}
+
+function shouldSplitAfterActionForEnterprise(action, buildOptions) {
+  if (!action) {
+    return false;
+  }
+
+  if (action.actionType === "goto" || action.actionType === "popupResolve") {
+    return true;
+  }
+
+  if (action.actionType !== "click") {
+    return false;
+  }
+
+  const expression = getActionBindingExpression(action, buildOptions);
+  return /(\bNext\b|\bSearch\b|\bSave\b|\bSubmit\b|\bFinish\b|\bApply\b|\bContinue\b|\bConfirm\b|\bYes\b|\bDone\b|\bCreate\b)/i.test(expression);
+}
+
+function splitActionsForEnterprise(actions, buildOptions) {
+  const maxActionsPerMethod = 8;
+
+  if (!Array.isArray(actions) || actions.length <= maxActionsPerMethod) {
+    return [actions];
+  }
+
+  const chunks = [];
+  let current = [];
+
+  for (const action of actions) {
+    current.push(action);
+
+    const semanticBoundary = shouldSplitAfterActionForEnterprise(action, buildOptions);
+    const reachedSizeBoundary = current.length >= maxActionsPerMethod;
+    if ((semanticBoundary && current.length >= 3) || reachedSizeBoundary) {
+      chunks.push(current);
+      current = [];
+    }
+  }
+
+  if (current.length > 0) {
+    chunks.push(current);
+  }
+
+  return chunks.length > 0 ? chunks : [actions];
+}
+
+function addEnterpriseSegmentMethods(methodBlocks, replayCalls, methodName, actions, buildOptions) {
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return;
+  }
+
+  const chunks = splitActionsForEnterprise(actions, buildOptions);
+
+  if (chunks.length === 1) {
+    methodBlocks.push([
+      `        public async Task ${methodName}()`,
+      "        {",
+      ...renderMethodBodyForActions(chunks[0], buildOptions),
+      "        }"
+    ]);
+    replayCalls.push(`            await ${methodName}();`);
+    return;
+  }
+
+  methodBlocks.push([
+    `        public async Task ${methodName}()`,
+    "        {",
+    ...chunks.map((_, index) => `            await ${methodName}Part${index + 1}Async();`),
+    "        }"
+  ]);
+
+  chunks.forEach((chunk, index) => {
+    methodBlocks.push([
+      `        public async Task ${methodName}Part${index + 1}Async()`,
+      "        {",
+      ...renderMethodBodyForActions(chunk, buildOptions),
+      "        }"
+    ]);
+  });
+
+  replayCalls.push(`            await ${methodName}();`);
 }
 
 function tryBuildEnterpriseLinearMethods(actions, buildOptions) {
@@ -1521,53 +1611,23 @@ function tryBuildEnterpriseLinearMethods(actions, buildOptions) {
       ? "NavigateToInvestorReportingAsync"
       : "NavigateToApplicationAsync";
 
-    methodBlocks.push([
-      `        public async Task ${navName}()`,
-      "        {",
-      ...renderMethodBodyForActions(navigationActions, buildOptions),
-      "        }"
-    ]);
-    replayCalls.push(`            await ${navName}();`);
+    addEnterpriseSegmentMethods(methodBlocks, replayCalls, navName, navigationActions, buildOptions);
   }
 
   if (openModuleActions.length > 0) {
-    methodBlocks.push([
-      "        public async Task OpenTargetModuleAsync()",
-      "        {",
-      ...renderMethodBodyForActions(openModuleActions, buildOptions),
-      "        }"
-    ]);
-    replayCalls.push("            await OpenTargetModuleAsync();");
+    addEnterpriseSegmentMethods(methodBlocks, replayCalls, "OpenTargetModuleAsync", openModuleActions, buildOptions);
   }
 
   if (searchActions.length > 0) {
-    methodBlocks.push([
-      "        public async Task ApplySearchCriteriaAsync()",
-      "        {",
-      ...renderMethodBodyForActions(searchActions, buildOptions),
-      "        }"
-    ]);
-    replayCalls.push("            await ApplySearchCriteriaAsync();");
+    addEnterpriseSegmentMethods(methodBlocks, replayCalls, "ApplySearchCriteriaAsync", searchActions, buildOptions);
   }
 
   if (selectRowsActions.length > 0) {
-    methodBlocks.push([
-      "        public async Task SelectResultRowsAsync()",
-      "        {",
-      ...renderMethodBodyForActions(selectRowsActions, buildOptions),
-      "        }"
-    ]);
-    replayCalls.push("            await SelectResultRowsAsync();");
+    addEnterpriseSegmentMethods(methodBlocks, replayCalls, "SelectResultRowsAsync", selectRowsActions, buildOptions);
   }
 
   if (finalizeActions.length > 0) {
-    methodBlocks.push([
-      "        public async Task CompleteBusinessActionAsync()",
-      "        {",
-      ...renderMethodBodyForActions(finalizeActions, buildOptions),
-      "        }"
-    ]);
-    replayCalls.push("            await CompleteBusinessActionAsync();");
+    addEnterpriseSegmentMethods(methodBlocks, replayCalls, "CompleteBusinessActionAsync", finalizeActions, buildOptions);
   }
 
   if (replayCalls.length === 0) {
@@ -1697,7 +1757,7 @@ function tryBuildEnterpriseMethods(actions, buildOptions) {
   const popupVisibleAnchor = updateActions.find((action) => action.locator);
   if (popupVisibleAnchor) {
     const anchorExpr = getActionBindingExpression(popupVisibleAnchor, buildOptions);
-    popupMethodLines.push(`            await Assertions.Expect(${anchorExpr}).ToBeVisibleAsync();`);
+    popupMethodLines.push(`            await ${anchorExpr}.WaitForAsync(new() { State = WaitForSelectorState.Visible });`);
   }
   popupMethodLines.push(`            return ${popupField};`);
 

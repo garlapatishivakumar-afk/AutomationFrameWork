@@ -168,6 +168,20 @@ For dropdown actions detected from Code.ts, generate calls to reusable common dr
 
 If common fill/select methods already exist, reuse them. If missing, generate them once only and reuse everywhere.
 
+For long action sequences from Code.ts, split business flow into small enterprise-level methods (for example: navigation, module open, criteria input, result action, completion).
+
+If a sequence of actions repeats in the same flow, extract one reusable sub-flow method and call it from Replay/business orchestration methods instead of duplicating the same action block.
+
+Method naming convention rules:
+
+1. Use PascalCase for all method names.
+2. Use verb-first names that describe business intent (for example OpenTargetModuleAsync, ApplySearchCriteriaAsync).
+3. All asynchronous methods must end with Async.
+4. Wrapper/orchestration methods should be action-oriented and high-level.
+5. If a method is split into parts, use deterministic suffixes Part1Async, Part2Async, Part3Async.
+6. Do not use vague names like DoWorkAsync, ActionAsync, Method1Async.
+7. Keep naming consistent with existing framework method style before creating new names.
+
 Read all test data from Excel.
 
 Use async/await.

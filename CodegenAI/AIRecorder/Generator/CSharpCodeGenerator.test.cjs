@@ -622,7 +622,65 @@ await page.locator('//input[@id=\'ctl00_ContentPlaceHolder1_btnReassign\']').cli
     assert.ok(result.code.includes("public async Task CompleteBusinessActionAsync()"));
     assert.ok(result.code.includes("await Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);"));
     assert.ok(result.code.includes("await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);"));
-    assert.ok(result.code.includes("await Assertions.Expect(Administration).ToBeVisibleAsync();"));
+    assert.ok(result.code.includes("await Administration.WaitForAsync(new() { State = WaitForSelectorState.Visible });"));
+    assert.ok(!result.code.includes("await Assertions.Expect(Administration).ToBeVisibleAsync();"));
+  });
+}
+
+function testEnterpriseModeSplitsLongLinearFlowIntoPartMethods() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    fs.writeFileSync(path.join(tempDir, "appsettings.json"), JSON.stringify({
+      Urls: {
+        Applications: {
+          Inspections: "https://inspections-sit.trimont.com/default.aspx"
+        }
+      }
+    }, null, 2), "utf8");
+
+    fs.writeFileSync(codeFile, `
+await page.goto('https://inspections-sit.trimont.com/default.aspx');
+await page.getByRole('link', { name: 'CMBS' }).click();
+await page.getByRole('link', { name: 'Create Order' }).click();
+await page.locator('#ctl00_ContentPlaceHolder1_txtOrderName').click();
+await page.locator('#ctl00_ContentPlaceHolder1_txtOrderName').fill('give random');
+await page.locator("//a[@id='ctl00_ContentPlaceHolder1_ddlLoanType_Arrow']").click();
+await page.locator('#ctl00_ContentPlaceHolder1_ddlLoanType_DropDown').getByText('CMBS').click();
+await page.getByText('Type your comments here').click();
+await page.getByText('Type your comments here').fill('Give random comments every time');
+await page.getByRole('button', { name: 'Next' }).click();
+await page.getByRole('button', { name: 'Search' }).click();
+await page.locator('#ctl00_ContentPlaceHolder1_gvProperties_ctl00_ctl08_btnAdd').click();
+await page.getByRole('button', { name: 'Yes' }).click();
+await page.getByRole('button', { name: 'Save & Submit' }).click();
+await page.getByRole('heading', { name: 'Confirmation:' }).click();
+await page.getByRole('link', { name: 'CMBS' }).click();
+await page.getByRole('link', { name: 'Create Order' }).click();
+await page.locator('#ctl00_ContentPlaceHolder1_txtOrderName').click();
+await page.locator('#ctl00_ContentPlaceHolder1_txtOrderName').fill('give random 2');
+await page.locator("//a[@id='ctl00_ContentPlaceHolder1_ddlLoanType_Arrow']").click();
+await page.locator('#ctl00_ContentPlaceHolder1_ddlLoanType_DropDown').getByText('CMBS').click();
+await page.getByText('Type your comments here').click();
+await page.getByText('Type your comments here').fill('Give random comments every time');
+await page.getByRole('button', { name: 'Next' }).click();
+await page.getByRole('button', { name: 'Search' }).click();
+await page.locator('#ctl00_ContentPlaceHolder1_gvProperties_ctl00_ctl08_btnAdd').click();
+await page.getByRole('button', { name: 'Yes' }).click();
+await page.getByRole('button', { name: 'Save & Submit' }).click();
+await page.getByRole('heading', { name: 'Confirmation:' }).click();
+`, "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      enterpriseMode: true
+    });
+
+    assert.ok(result.code.includes("public async Task ApplySearchCriteriaAsync()"));
+    assert.ok(result.code.includes("public async Task ApplySearchCriteriaAsyncPart1Async()"));
+    assert.ok(result.code.includes("await ApplySearchCriteriaAsyncPart1Async();"));
   });
 }
 
@@ -652,6 +710,7 @@ function runAllTests() {
   testRecorderAnnotationLinesAreParsedAsActions();
   testPopupActorActionsAreSupported();
   testEnterpriseModeSplitsNonPopupFlowIntoMethodsWithWaits();
+  testEnterpriseModeSplitsLongLinearFlowIntoPartMethods();
   console.log("CSharpCodeGenerator tests passed");
 }
 

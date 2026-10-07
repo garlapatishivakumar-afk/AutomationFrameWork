@@ -1,0 +1,371 @@
+CodegenAI
+AI-assisted test automation: record once, generate framework code
+Team Knowledge-Transfer Guide
+Structure  |  How to use  |  What runs in the background  |  File-by-file reference  |  How to build it yourself  |  Interview preparation
+Who this is for
+QA and automation engineers who need to use, maintain or rebuild the CodegenAI setup. Tech stack: Playwright codegen, PowerShell, Node.js (.cjs scripts), C# Playwright framework (SpecFlow / xUnit, Page Object Model) and GitHub Copilot agent.
+Contents
+1. What problem does CodegenAI solve?
+1.1 The two layers
+2. How to use it (daily workflow)
+2.1 Step by step
+2.2 The prompt you give the agent
+2.3 Script switches
+3. What runs in the background
+3.1 Timeline
+3.2 Why each background step exists
+3.3 What the Copilot agent does after your prompt
+3.4 Optional follow-up prompts (after the first generation)
+4. Folder structure
+5. File-by-file reference (active files)
+5.1 Root folder
+5.2 AIRecorder/auth - session handling
+5.3 AIRecorder/Intelligence - observe and improve locators
+5.4 AIRecorder/Generator - TypeScript to C#
+5.5 AIRecorder/Debug - failure analysis engine
+5.6 Prompt and rule files
+5.7 Generated and data files
+6. Worked example from the sample run
+6.1 Locator rewrite inside a table
+6.2 TypeScript line to C# statements
+6.3 Enterprise mode: long flow split into methods
+6.4 Things the review comments tell you
+7. Folders not used in the daily flow
+8. How to build this setup yourself
+Layer 0 - Prerequisites
+Layer 1 - Record with a saved login
+Layer 2 - Give the agent rules
+Layer 3 - Convert to C# draft
+Layer 4 - Live observation and locator quality
+Layer 5 - Test, debug, improve
+Design principles to teach
+9. Troubleshooting and good practice
+10. Interview preparation
+10.1 Project questions
+10.2 General automation questions
+11. KT session checklist
+
+1. What problem does CodegenAI solve?
+Writing UI automation by hand is slow: you inspect each element, write locators, write page methods, write step definitions and a feature file, then fix duplicates and flaky waits. CodegenAI shortens this to three actions:
+1. Record the business flow once in a browser (Playwright codegen).
+2. Clean up the recording automatically with scripts (stable locators, C# draft).
+3. Generate the framework code (Feature, Steps, Page Methods, Page Objects) with a Copilot agent that follows your framework rules.
+
+The key idea: scripts do the mechanical work that must be exact, and the AI agent does the work that needs judgement (reuse, naming, placing code in the right files). Both are guided by rule files, so the output follows your framework instead of generic code.
+
+1.1 The two layers
+Layer | What it is | Uses AI? | Triggered by
+Layer 1 - Recorder pipeline | PowerShell + Node scripts. Records the flow, rewrites fragile locators, converts Code.ts to a C# draft Code.cs. | No. Pure rules and code. | .\StartCodegen.ps1
+Layer 2 - AI agent generation | GitHub Copilot agent (GPT-5.3 Codex) reads Code.ts + FrameworkPrompt.md and writes Feature / Steps / Methods / Objects into the real framework, then builds it. | Yes. | The prompt you paste in Copilot chat
+
+Remember this sentence
+Layer 1 prepares clean input (Code.ts). Layer 2 turns that input into framework code. If the output is wrong, first ask: was the input (Code.ts) bad, or did the agent ignore a rule?
+
+2. How to use it (daily workflow)
+2.1 Step by step
+1. Open StartCodegen.ps1 and set the application URL in the $TargetUrl parameter (or pass -TargetUrl when you run it).
+2. Open a terminal in the project folder and run: .\StartCodegen.ps1
+3. The Playwright browser and the Inspector window open. If your saved session is older than 4 days, log in again; otherwise you are already logged in.
+4. Perform the business flow in the browser. Every click and fill appears in the Inspector and is saved into Code.ts.
+5. Close the browser. Do not close the terminal: post-processing now runs (observation, locator rewrite, C# generation). Wait for Codegen closed.
+6. Open Copilot chat in agent mode and paste the generation prompt (below).
+7. Review what the agent created, let it build the project, and run the scenario.
+
+Example commands:
+.\StartCodegen.ps1 -TargetUrl "https://your-app-sit/default.aspx"
+.\StartCodegen.ps1 -SkipLiveObservation
+.\StartCodegen.ps1 -SkipTableLocatorPostProcess
+.\StartCodegen.ps1 -SkipCSharpGeneration
+.\StartCodegen.ps1 -TableLocatorDebug
+
+2.2 The prompt you give the agent
+Read:
+1. CodegenAI/Code.ts
+2. CodegenAI/AIRecorder/FrameworkPrompt.md
+Generate:
+1. Feature scenarios
+2. Step definitions
+3. Page object locators
+4. Page methods
+5. Reuse existing framework methods whenever possible.
+6. Do not create duplicate step definitions.
+7. Follow the existing framework structure.
+
+FrameworkPrompt.md is where the detailed rules live (URL handling, which feature to append to, waits, assertions, Excel data, locator reuse). The chat prompt only says what to read and what to produce; the rules file says how.
+
+2.3 Script switches
+-TargetUrl: Application URL that codegen opens first.
+-TestIdAttribute: Attribute treated as test id (default data-testid).
+-TableSelector: CSS tag used to detect tables (default table).
+-SkipLiveObservation: Do not replay the flow in a headless browser to collect DOM evidence.
+-SkipTableLocatorPostProcess: Do not rewrite table locators in Code.ts.
+-TableLocatorDebug: Print detailed log lines from the locator engine.
+-SkipCSharpGeneration: Do not start the live watcher and do not create Code.cs.
+
+3. What runs in the background
+3.1 Timeline
+1) Script starts: resolves paths for session, output, scripts and appsettings.json. (StartCodegen.ps1)
+2) Before browser opens: session check and stale cleanup. (auth/SessionManager.ps1)
+3) Builds codegen command with load/save storage. (SessionManager.ps1)
+4) Starts background watcher job for Code.ts -> Code.cs. (StartCodegen.ps1 + Generator/CSharpLiveSync.cjs)
+5) While you record: codegen writes Code.ts; watcher regenerates Code.cs. (CSharpLiveSync.cjs -> CSharpCodeGenerator.cjs)
+6) You close browser: Playwright saves session.json.
+7) After close: headless replay collects DOM evidence. (Intelligence/LiveObserver.cjs)
+8) After close: table locator rewrite updates Code.ts and metadata. (TableLocatorIntelligence.cjs via LiveTableLocatorEngine.cjs)
+9) If step 7-8 fails: fallback legacy pipeline runs and keeps original locators.
+10) Final C# generation writes Code.cs + CSharpGenerationReport.json.
+11) finally block stops/removes watcher job and stop-signal file.
+12) Then Copilot agent generation starts from your prompt.
+
+3.2 Why each background step exists
+- Session reuse avoids repeated SSO login (4-day freshness).
+- Live watcher gives immediate C# draft feedback.
+- Live observation captures real DOM context at each action moment.
+- Table intelligence replaces fragile dynamic locators with stable candidates.
+- C# generator converts TS actions into maintainable Playwright C# and reports unsupported lines.
+
+3.3 What the Copilot agent does after your prompt
+1. Reads Code.ts and rule files.
+2. Checks first goto URL against appsettings.json > Urls.
+3. Lists existing feature files + Create New Feature option.
+4. Appends only new scenarios or creates new feature set based on selection.
+5. Scans existing locators/methods/steps and avoids duplicates.
+6. Generates only missing pieces in proper folders.
+7. Builds solution, fixes compile errors, and summarizes changes.
+
+3.4 Optional follow-up prompts
+ExecutePrompt.md: build and run generated scenarios -> ExecutionSummary.md
+TraceAnalysisPrompt.md: analyze Playwright trace -> waits/assertions improvements
+ImprovementPrompt.md: failure root cause -> reusable fixes
+SelfHealingPrompt.md: safe patch proposal -> PatchProposal.md
+FeaturePrompt.md / FeatureGenerationPrompt.md / ExcelGenerationPrompt.md: focused generation tasks
+
+4. Folder structure
+CodegenAI/
+|- StartCodegen.ps1 (entry)
+|- Code.ts (recorded input)
+|- Code.cs (generated C# draft)
+|- CSharpGenerationReport.json (conversion audit)
+`- AIRecorder/
+   |- auth/
+   |- Intelligence/
+   |- Generator/
+   |- Debug/
+   |- FrameworkPrompt.md
+   |- FrameworkContext.md
+   |- prompt files
+   |- Instruction.docx
+   |- FrameworkIndex.json
+   |- LiveObservations.json
+   |- TableLocatorMetadata.json
+   |- playwright.config.ts
+   `- other folders (roadmap/history, not daily)
+
+Why both C# generator and AI agent exist:
+Code.cs is a faithful mechanical replay draft. Agent output is the real framework deliverable (Feature/Steps/Methods/Objects).
+
+5. File-by-file reference (active files)
+5.1 Root folder
+StartCodegen.ps1: Orchestrator; launches codegen, watcher, intelligence, final generation, and cleanup.
+Code.ts: Recorded Playwright flow; overwritten each run; may be rewritten by table engine.
+Code.cs: Generated C# replay class with locator properties and segmented methods.
+CSharpGenerationReport.json: conversion audit (actionCount, sourceMap, unsupportedActions, validation).
+
+5.2 AIRecorder/auth - session handling
+SessionManager.ps1: validates session, initializes session path, builds codegen args.
+PostProcessCodegen.ps1: fallback wrapper to run table locator intelligence.
+session.helper.ts: TS helper for session validity checks.
+session.json: storage state cookies/local storage; sensitive.
+
+5.3 AIRecorder/Intelligence - observe and improve locators
+LiveObserver.cjs: replays actions headless, resolves elements, captures table/frame/context evidence.
+LiveTableLocatorEngine.cjs: coordinates observation and rewrite; writes summary artifacts.
+TableLocatorIntelligence.cjs: scoring/rule engine for stable locator candidate selection.
+SpecificLocatorRules.json: custom overrides for problematic elements.
+TableLocatorIntelligence.md: design and strategy notes.
+*.test.cjs: tests for observer/engine/intelligence.
+
+5.4 AIRecorder/Generator - TypeScript to C#
+CSharpCodeGenerator.cjs: parses TS lines, generates C#, adds waits, maps URLs to config, validates output.
+CSharpLiveSync.cjs: watches Code.ts and regenerates Code.cs with debounce/hash checks.
+*.test.cjs: generator/watcher tests.
+FrameworkRules.ts, PromptAssembler.ts, PromptTemplates.ts, others: earlier prompt-building support code.
+
+5.5 AIRecorder/Debug - failure analysis engine
+DebugEngine.cjs: run-test loop, evidence collection, classification, proposal, validation, apply/retry.
+FailureCollector.cjs: extracts failure details and stores artifacts.
+BrowserEvidenceCollector.cjs: browser replay to gather candidate elements and page state.
+FailureClassifier.cjs: classifies failures with confidence and recommendations.
+FixProposalEngine.cjs: deterministic safe fix proposals and optional apply/revert.
+DebugAIAnalyzer.cjs, DebugPromptBuilder.cjs: optional AI-assisted analysis.
+ProposalValidator.cjs: validates proposal safety and novelty.
+DebugPayloadRedactor.cjs: redacts sensitive data.
+DebugPointBuilder.cjs, DebugPointManager.cjs: debug-point summaries and debug copy creation.
+DebugHistory.cjs: tracks historical debug outcomes.
+DebugEngine.test.cjs: debug engine tests.
+
+5.6 Prompt and rule files
+FrameworkPrompt.md: main generation rules (URLs, features, reuse, waits, assertions, Excel, locators, method/step quality).
+FrameworkContext.md: framework fact sheet (stack, folders, naming, coding style).
+Instruction.docx: original usage note and hand-off instructions.
+FeaturePrompt.md / FeatureGenerationPrompt.md / ExcelGenerationPrompt.md: focused generation prompts.
+ExecutePrompt.md / TraceAnalysisPrompt.md / ImprovementPrompt.md / SelfHealingPrompt.md: post-generation operations.
+
+5.7 Generated and data files
+LiveObservations.json: evidence per action.
+TableLocatorMetadata.json: rewrite strategies and candidate scoring.
+FrameworkIndex.json: map of page to feature/steps/methods/objects.
+playwright.config.ts: direct Playwright run config for Code.ts.
+BusinessFlow.json, FlowAnalysis.json, DependencyGraph.json, AIResponseExample.json: older analysis artifacts; mostly historical.
+
+6. Worked example from sample run
+Flow: open app -> CMBS -> Create Order -> fill details -> Search -> add property -> Save & Submit.
+6.1 Locator rewrite inside table
+Before: page.locator('#ctl00_ContentPlaceHolder1_ddlLoanType_Arrow')
+After: page.locator("//a[@id='ctl00_ContentPlaceHolder1_ddlLoanType_Arrow']")
+Metadata: strategy=TABLE_FORCED_LOCATOR, confidence=0.64, uniqueMatch=true
+
+6.2 TypeScript line to C# statements
+TS: await page.getByRole('link', { name: 'CMBS' }).click();
+C#: locator property + WaitForAsync + ClickAsync statements
+
+6.3 Enterprise mode
+Long flows are split into smaller methods (Part1Async...PartNAsync) and orchestrated by higher-level methods.
+
+6.4 Review comments meaning
+- Literal input preserved -> move to Excel data.
+- Literal URL warning -> add URL key in appsettings.
+- Mechanical names -> rename to business names.
+- Repeated chains -> extract reusable parameterized method.
+
+7. Folders not used in daily flow
+These are roadmap/history modules and mostly not required in daily usage:
+Integration, Learning, Planner, Review, Decision, DuplicateDetection, Validators, Validation, FrameworkEditor, Editors, Generators, Models, Providers, Services, Knowledge, Engine, plus loose TS utilities.
+
+8. How to build this setup yourself
+Layer 0 - Prerequisites
+Windows/PowerShell, Node.js, .NET SDK, VS/VS Code + Copilot, working C# Playwright framework.
+
+Layer 1 - Record with saved login
+Create StartCodegen + SessionManager; run playwright codegen with save/load storage.
+Checkpoint: record without re-login each time.
+
+Layer 2 - Give agent rules
+Create FrameworkContext + FrameworkPrompt; iterate rules based on mistakes.
+Checkpoint: agent generates compiling framework artifacts without duplicates.
+
+Layer 3 - Convert to C# draft
+Build TS-line parser for common actions, add waits, output validator, report JSON, watcher.
+
+Layer 4 - Observation and locator quality
+Replay headless with saved session, capture evidence, score stable locators, fallback on uncertainty.
+
+Layer 5 - Test, debug, improve
+Add tests, post-generation prompts, optional debug engine with approval gate.
+
+Design principles to teach
+- Deterministic for exactness, AI for judgement.
+- Never block user flow; always keep fallback.
+- Put rules in files, not memory.
+- Append minimal changes; avoid destructive edits.
+- Keep mandatory human review.
+
+9. Troubleshooting and good practice
+Login page every run -> session expired/empty; re-login once.
+Code.cs missing -> skip switch used or generator failed; inspect logs/report.
+Table locators unchanged -> observation skipped or no replay match; run debug mode and inspect LiveObservations.
+Element not found -> popup/iframe/sync issue; inspect frame evidence.
+Duplicate steps -> tighten FrameworkPrompt rules and pre-scan existing steps.
+Hard-coded URL/data -> enforce URL/Excel rules and check review comments.
+Build errors -> ask for smallest fix, avoid renames/deletes.
+
+Security checklist
+1) session.json is secret; git-ignore and never share.
+2) Keep API keys only in environment variables/.env (git-ignored).
+3) Redact internal URLs/user names for external sharing.
+4) Review payloads before any AI call.
+
+10. Interview preparation
+10.1 Project questions
+Q1. Explain CodegenAI in one minute.
+A: Recorder pipeline + AI agent. Record once, stabilize with scripts, generate framework artifacts using rules, then build/run.
+Q2. AI vs non-AI parts?
+A: Recorder/intelligence/converter are deterministic; AI handles reuse/naming/placement judgement.
+Q3. Avoid login each run?
+A: Save/load storage state with freshness checks.
+Q4. What happens after codegen closes?
+A: Replay observation, locator rewrite, final C# generation, watcher cleanup, then agent generation.
+Q5. Why live replay?
+A: Captures real step-time DOM, uniqueness, frame/table context, dynamic attributes.
+Q6. Stable locator decision?
+A: Candidate scoring, dynamic-id penalties, uniqueness validation, safe fallback.
+Q7. Enterprise mode?
+A: Splits long flows into smaller single-responsibility methods.
+Q8. Prevent duplicates?
+A: Rule-driven scanning and exact reuse criteria.
+Q9. URL and data handling?
+A: URLs from config, data from Excel, literals flagged for review.
+Q10. Rule-file evolution?
+A: Each repeated mistake becomes an explicit rule.
+Q11. Limits?
+A: AI non-determinism, noisy recordings, environment dependence, unsupported actions.
+Q12. Handling failure?
+A: classify root cause, use debug engine proposals, approve before apply.
+Q13. Secret safety?
+A: git-ignore secrets, env vars, payload redaction.
+Q14. Next improvements?
+A: better data parameterization, more action support, CI hooks, generator regression suite.
+Q15. Success metrics?
+A: lead time to passing scenario, reuse ratio, duplicate prevention, flakiness trend.
+
+10.2 General automation questions
+Q1. Playwright vs Selenium?
+A: Playwright has modern auto-waiting, context isolation, tracing, unified API.
+Q2. Auto-waiting?
+A: Waits for actionable state before interactions.
+Q3. Locator preference?
+A: Role/label/test-id first; avoid brittle absolute XPath.
+Q4. Browser/context/page?
+A: Engine process, isolated profile, tab.
+Q5. Reuse login?
+A: storage state save/load.
+Q6. iframes/popups/dialogs in C#?
+A: FrameLocator, WaitForPopupAsync, Dialog handlers.
+Q7. Why avoid Thread.Sleep?
+A: slow and flaky; use condition-based waits/assertions.
+Q8. POM?
+A: Separate locators/actions from tests.
+Q9. BDD/Gherkin/SpecFlow?
+A: business-readable scenarios bound to C# step methods.
+Q10. Scenario vs outline?
+A: outline repeats same steps across data rows.
+Q11. Hooks?
+A: before/after setup and cleanup.
+Q12. Data-driven tests?
+A: use Excel/JSON/DB keyed by scenario.
+Q13. Flaky test handling?
+A: fix root cause, stabilize locators and synchronization.
+Q14. Trace content?
+A: timeline, DOM snapshots, network, console, screenshots.
+Q15. async/await in C#?
+A: all browser calls async; always await.
+Q16. CI run?
+A: dotnet test headless + artifact publishing.
+Q17. Reliable table/grid testing?
+A: stable row anchor + scoped cell strategy.
+Q18. AI-generated code risks?
+A: hallucinations/duplicates/hardcoding; mitigate with rules + review + build/test.
+Q19. xUnit vs NUnit vs MSTest?
+A: all valid; xUnit commonly used with fixtures/parallel behavior.
+Q20. Validate AJAX action?
+A: wait response/loader completion then assert UI state.
+Q21. Wait vs assertion?
+A: wait synchronizes; assertion verifies expected outcome (web-first assertions do both).
+
+11. KT session checklist
+- Demo end-to-end once without interruptions.
+- Replay timeline while script runs second pass.
+- Show one Code.ts to Code.cs locator rewrite.
+- Explain 3 key FrameworkPrompt rules and prevented failures.
+- Each team member records a short flow and runs generation.
+- Do one shared review and add one new rule.
