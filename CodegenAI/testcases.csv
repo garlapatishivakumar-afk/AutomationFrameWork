@@ -1,0 +1,3 @@
+TestCaseId,Title,StartUrl,Preconditions,ExpectedResult,Priority,DataHint
+TC01,Create inspection order with valid data,,User is logged in,Order is created and confirmation shown,High,InspectionsCreateOrder
+TC02,Create inspection order with missing mandatory field,,User is logged in,Validation message is shown,Medium,

@@ -7,6 +7,10 @@ const {
   parseRecordedActions,
   validateGeneratedCSharp
 } = require("./CSharpCodeGenerator.cjs");
+const { runAllTests: runLocatorValidatorTests } = require("../Intelligence/LocatorValidator.test.cjs");
+const { runAllTests: runLocatorRepairTests } = require("../Intelligence/LocatorRepair.test.cjs");
+const { runAllTests: runFailureTriageTests } = require("../Intelligence/FailureTriage.test.cjs");
+const { runAllTests: runTestDataContractTests } = require("../Intelligence/TestDataContract.test.cjs");
 
 function withTempFiles(run) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "csharp-codegen-"));
@@ -684,7 +688,941 @@ await page.getByRole('heading', { name: 'Confirmation:' }).click();
   });
 }
 
+function testLocatorValidationFailureBlocksOutputWrite() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const domFile = path.join(tempDir, "LiveObservations.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Submit' }).click();", "utf8");
+    fs.writeFileSync(domFile, JSON.stringify({
+      actions: [
+        {
+          line: 1,
+          matchCount: 0,
+          target: {
+            tagName: "button",
+            id: "btnSubmit",
+            attributes: {
+              id: "btnSubmit"
+            }
+          }
+        }
+      ]
+    }, null, 2), "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      domObservationPath: domFile,
+      enableRepair: false
+    });
+
+    assert.strictEqual(result.locatorValidation.hasFailures, true);
+    assert.strictEqual(fs.existsSync(outputFile), false);
+  });
+}
+
+function testTextVsAttributeEndToEndValidation() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const domFile = path.join(tempDir, "LiveObservations.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, `
+await page.locator("//button[text()='Submit']").click();
+await page.locator("//input[contains(text(),'account')]").click();
+`, "utf8");
+
+    fs.writeFileSync(domFile, JSON.stringify({
+      actions: [
+        {
+          line: 2,
+          matchCount: 1,
+          target: {
+            tagName: "button",
+            id: "btnSubmit",
+            attributes: {
+              id: "btnSubmit"
+            }
+          }
+        },
+        {
+          line: 3,
+          matchCount: 1,
+          target: {
+            tagName: "input",
+            id: "accountNumber",
+            attributes: {
+              id: "accountNumber"
+            }
+          }
+        }
+      ]
+    }, null, 2), "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      domObservationPath: domFile,
+      enableRepair: false
+    });
+
+    assert.strictEqual(result.locatorValidation.hasFailures, true);
+    assert.strictEqual(fs.existsSync(outputFile), false);
+
+    const submitValidation = result.locatorValidation.results.find((x) => x.sourceLine === 2);
+    const accountValidation = result.locatorValidation.results.find((x) => x.sourceLine === 3);
+
+    assert.ok(submitValidation, "Expected validator output for submit locator");
+    assert.ok(accountValidation, "Expected validator output for account locator");
+
+    const submitLv004 = submitValidation.rules.find((x) => x.ruleId === "LV004");
+    const accountLv004 = accountValidation.rules.find((x) => x.ruleId === "LV004");
+
+    assert.ok(submitLv004, "Expected LV004 for submit locator");
+    assert.ok(accountLv004, "Expected LV004 for account locator");
+
+    assert.strictEqual(submitLv004.status, "FAIL");
+    assert.strictEqual(accountLv004.status, "FAIL");
+    assert.strictEqual(submitValidation.suggestedLocator, "//button[@id='btnSubmit']");
+    assert.strictEqual(accountValidation.suggestedLocator, "//input[@id='accountNumber']");
+  });
+}
+
+function testLocatorRepairSingleAttemptPassesAndWritesCode() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const domFile = path.join(tempDir, "LiveObservations.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, `
+  await page.locator("/html/body/div[2]/button").click();
+`, "utf8");
+
+    fs.writeFileSync(domFile, JSON.stringify({
+      actions: [
+        {
+          line: 2,
+          matchCount: 1,
+          target: {
+            tagName: "button",
+            id: "btnSubmit",
+            attributes: {
+              id: "btnSubmit"
+            }
+          }
+        }
+      ]
+    }, null, 2), "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      domObservationPath: domFile
+    });
+
+    assert.strictEqual(result.initialLocatorValidation.hasFailures, true);
+    assert.strictEqual(result.locatorRepair.attempts, 1);
+    assert.strictEqual(result.locatorRepair.repairStatus, "PASS");
+    assert.strictEqual(result.locatorRepair.codeGenerationBlocked, false);
+    assert.strictEqual(result.locatorValidation.hasFailures, false);
+    assert.strictEqual(fs.existsSync(outputFile), true);
+    assert.ok(result.code.includes("//button[@id='btnSubmit']"));
+  });
+}
+
+function testLocatorRepairSingleAttemptFailureKeepsCodeBlocked() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const domFile = path.join(tempDir, "LiveObservations.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, `
+await page.getByRole('button', { name: 'Submit' }).click();
+`, "utf8");
+
+    fs.writeFileSync(domFile, JSON.stringify({
+      actions: [
+        {
+          line: 2,
+          matchCount: 0,
+          target: {
+            tagName: "button",
+            attributes: {}
+          }
+        }
+      ]
+    }, null, 2), "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      domObservationPath: domFile
+    });
+
+    assert.strictEqual(result.initialLocatorValidation.hasFailures, true);
+    assert.strictEqual(result.locatorRepair.attempts, 1);
+    assert.strictEqual(result.locatorRepair.repairStatus, "FAILED");
+    assert.strictEqual(result.locatorValidation.hasFailures, true);
+    assert.strictEqual(result.failureTriage.status, "BLOCKED");
+    assert.strictEqual(result.failureTriage.category, "LOCATOR_REPAIR_FAILED");
+    assert.strictEqual(fs.existsSync(outputFile), false);
+  });
+}
+
+function testLocatorRepairConvertsTestDataRowLocatorToStableDataAttribute() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const domFile = path.join(tempDir, "LiveObservations.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, `
+await page.locator("//tr[td[normalize-space()='20386']]").click();
+`, "utf8");
+
+    fs.writeFileSync(domFile, JSON.stringify({
+      actions: [
+        {
+          line: 2,
+          matchCount: 1,
+          target: {
+            tagName: "tr",
+            attributes: {
+              "data-rowid": "TX-20386"
+            }
+          }
+        }
+      ]
+    }, null, 2), "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      domObservationPath: domFile
+    });
+
+    assert.strictEqual(result.initialLocatorValidation.hasFailures, true);
+    assert.strictEqual(result.locatorRepair.attempts, 1);
+    assert.strictEqual(result.locatorRepair.repairStatus, "PASS");
+    assert.strictEqual(result.locatorValidation.hasFailures, false);
+    assert.ok(result.code.includes("//tr[@data-rowid='TX-20386']"));
+    assert.strictEqual(fs.existsSync(outputFile), true);
+  });
+}
+
+function testLocatorRepairDoesNotApproveInventedAttributes() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const domFile = path.join(tempDir, "LiveObservations.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, `
+await page.locator("//button[text()='Submit']").click();
+`, "utf8");
+
+    fs.writeFileSync(domFile, JSON.stringify({
+      actions: [
+        {
+          line: 2,
+          matchCount: 1,
+          target: {
+            tagName: "button",
+            id: "btnSubmit",
+            attributes: {
+              id: "btnSubmit"
+            }
+          }
+        }
+      ]
+    }, null, 2), "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      domObservationPath: domFile,
+      repairProvider: () => "//button[@data-testid='submit']"
+    });
+
+    assert.strictEqual(result.locatorRepair.attempts, 1);
+    assert.strictEqual(result.locatorRepair.repairStatus, "FAILED");
+    assert.strictEqual(result.locatorValidation.hasFailures, true);
+    const rule = result.locatorValidation.results[0].rules.find((x) => x.ruleId === "LV007");
+    assert.ok(rule);
+    assert.strictEqual(rule.status, "FAIL");
+    assert.strictEqual(fs.existsSync(outputFile), false);
+  });
+}
+
+function testLocatorRepairFailsWhenRepairedLocatorIsNonUnique() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const domFile = path.join(tempDir, "LiveObservations.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, `
+await page.locator("//button[text()='Submit']").click();
+`, "utf8");
+
+    fs.writeFileSync(domFile, JSON.stringify({
+      actions: [
+        {
+          line: 2,
+          matchCount: 7,
+          target: {
+            tagName: "button",
+            attributes: {
+              type: "button"
+            }
+          }
+        }
+      ]
+    }, null, 2), "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      domObservationPath: domFile,
+      repairProvider: () => "//button[@type='button']"
+    });
+
+    assert.strictEqual(result.locatorRepair.attempts, 1);
+    assert.strictEqual(result.locatorRepair.repairStatus, "FAILED");
+    assert.strictEqual(result.locatorValidation.hasFailures, true);
+    const lv012 = result.locatorValidation.results[0].rules.find((x) => x.ruleId === "LV012");
+    assert.ok(lv012);
+    assert.strictEqual(lv012.status, "FAIL");
+    assert.strictEqual(fs.existsSync(outputFile), false);
+  });
+}
+
+function testDataContractPassAllowsGeneration() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      dataContractDefinition: {
+        scenario: "Login",
+        inputs: [
+          { name: "Username", required: true, type: "string" },
+          { name: "Password", required: true, type: "string" }
+        ]
+      },
+      testData: {
+        Username: "testuser",
+        Password: "Password123"
+      }
+    });
+
+    assert.strictEqual(result.dataContract.status, "PASS");
+    assert.strictEqual(result.dataContract.blocking, false);
+    assert.strictEqual(fs.existsSync(outputFile), true);
+  });
+}
+
+function testDataContractWarningAllowsGenerationWithWarnings() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      dataContractDefinition: {
+        scenario: "Login",
+        inputs: [
+          { name: "Username", required: true, type: "string" },
+          { name: "Password", required: true, type: "string" }
+        ]
+      },
+      testData: {
+        Username: "testuser",
+        Password: "Password123",
+        Region: "US"
+      }
+    });
+
+    assert.strictEqual(result.dataContract.status, "WARNING");
+    assert.strictEqual(result.dataContract.blocking, false);
+    assert.ok(Array.isArray(result.validation.warnings));
+    assert.ok(result.validation.warnings.some((x) => x.includes("Extra/unmapped key 'Region'")));
+    assert.strictEqual(fs.existsSync(outputFile), true);
+  });
+}
+
+function testDataContractBlockedStopsGenerationBeforeLocatorFlow() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      dataContractDefinition: {
+        scenario: "Login",
+        inputs: [
+          { name: "Username", required: true, type: "string" },
+          { name: "Password", required: true, type: "string" }
+        ]
+      },
+      testData: {
+        Username: "testuser"
+      }
+    });
+
+    assert.strictEqual(result.dataContract.status, "BLOCKED");
+    assert.strictEqual(result.dataContract.blocking, true);
+    assert.deepStrictEqual(result.dataContract.missingKeys, ["Password"]);
+    assert.strictEqual(result.actions.length, 0);
+    assert.strictEqual(fs.existsSync(outputFile), false);
+  });
+}
+
+function testMethodQualityGatePassAcceptsGeneration() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json")
+    });
+
+    assert.strictEqual(result.methodQualityGate.status, "PASS");
+    assert.strictEqual(result.methodQualityGate.blocking, false);
+    assert.strictEqual(result.validation.success, true);
+    assert.strictEqual(fs.existsSync(outputFile), true);
+  });
+}
+
+function testMethodQualityGateWarningAllowsGenerationAndAddsWarnings() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const reportFile = path.join(tempDir, "CSharpGenerationReport.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.goto('https://investorreporting-mb-sit.trimont.com/default.aspx');", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      reportFilePath: reportFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json")
+    });
+
+    assert.strictEqual(result.methodQualityGate.status, "WARNING");
+    assert.strictEqual(result.methodQualityGate.blocking, false);
+    assert.strictEqual(result.validation.success, true);
+    assert.ok(result.validation.warnings.some((x) => x.includes("MethodQualityGate MQG011")));
+    assert.strictEqual(fs.existsSync(outputFile), true);
+
+    const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+    assert.ok(report.methodQualityGate);
+    assert.strictEqual(report.methodQualityGate.status, "WARNING");
+  });
+}
+
+function testMethodQualityGateBlockedPreventsOverwrite() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const existingContent = "// existing generated content\npublic class Existing {}\n";
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.goto('https://investorreporting-mb-sit.trimont.com/default.aspx');", "utf8");
+    fs.writeFileSync(outputFile, existingContent, "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      methodQualityGateOptions: {
+        blockHardcodedUrl: true
+      }
+    });
+
+    assert.strictEqual(result.methodQualityGate.status, "BLOCKED");
+    assert.strictEqual(result.methodQualityGate.blocking, true);
+    assert.strictEqual(result.validation.success, false);
+    assert.ok(result.validation.errors.some((x) => x.includes("MethodQualityGate MQG011")));
+    assert.strictEqual(fs.readFileSync(outputFile, "utf8"), existingContent);
+  });
+}
+
+function testDataContractAndLocatorGatesRemainAuthoritativeWithMethodQualityGateIntegrated() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const domFile = path.join(tempDir, "LiveObservations.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const dataBlocked = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      dataContractDefinition: {
+        scenario: "Login",
+        inputs: [
+          { name: "Username", required: true, type: "string" },
+          { name: "Password", required: true, type: "string" }
+        ]
+      },
+      testData: {
+        Username: "testuser"
+      },
+      methodQualityGateOptions: {
+        blockHardcodedUrl: true
+      }
+    });
+
+    assert.strictEqual(dataBlocked.dataContract.status, "BLOCKED");
+    assert.strictEqual(dataBlocked.methodQualityGate.status, "PASS");
+    assert.strictEqual(dataBlocked.actions.length, 0);
+
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Submit' }).click();", "utf8");
+    fs.writeFileSync(domFile, JSON.stringify({
+      actions: [
+        {
+          line: 1,
+          matchCount: 0,
+          target: {
+            tagName: "button",
+            id: "btnSubmit",
+            attributes: {
+              id: "btnSubmit"
+            }
+          }
+        }
+      ]
+    }, null, 2), "utf8");
+
+    const locatorBlocked = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      domObservationPath: domFile,
+      enableRepair: false,
+      methodQualityGateOptions: {
+        blockHardcodedUrl: true
+      }
+    });
+
+    assert.strictEqual(locatorBlocked.locatorValidation.hasFailures, true);
+    assert.strictEqual(locatorBlocked.methodQualityGate.status, "PASS");
+    assert.strictEqual(fs.existsSync(outputFile), false);
+  });
+}
+
+function testExecutionReliabilityPassIsReported() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      runtimeEvidence: {
+        failed: false,
+        stdout: "run completed"
+      }
+    });
+
+    assert.strictEqual(result.executionReliability.status, "PASS");
+    assert.strictEqual(result.executionReliability.category, "NONE");
+    assert.strictEqual(result.executionReliability.blocking, false);
+  });
+}
+
+function testExecutionReliabilityWarningIncludesEvidenceAndRecommendation() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const reportFile = path.join(tempDir, "CSharpGenerationReport.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      reportFilePath: reportFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      runtimeEvidence: {
+        failed: true,
+        errorMessage: "expect(locator).toHaveText: expected string but received string",
+        locator: "#status"
+      }
+    });
+
+    assert.strictEqual(result.executionReliability.status, "WARNING");
+    assert.strictEqual(result.executionReliability.category, "ASSERTION_TIMING_MISMATCH");
+    assert.strictEqual(result.executionReliability.severity, "MEDIUM");
+    assert.ok(result.executionReliability.confidence > 0.8);
+    assert.ok(Array.isArray(result.executionReliability.evidence));
+    assert.ok(result.executionReliability.evidence.some((x) => x.includes("Error:")));
+    assert.ok(result.executionReliability.recommendation.includes("assertion timing"));
+
+    const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+    assert.ok(report.executionReliability);
+    assert.strictEqual(report.executionReliability.category, "ASSERTION_TIMING_MISMATCH");
+  });
+}
+
+function testExecutionReliabilityBlockedIncludesCategorySeverityConfidence() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      runtimeEvidence: {
+        failed: true,
+        errorMessage: "Timeout 30000ms exceeded while waiting for selector #Submit to be visible",
+        locator: "#Submit",
+        timeoutMs: 30000
+      }
+    });
+
+    assert.strictEqual(result.executionReliability.status, "BLOCKED");
+    assert.strictEqual(result.executionReliability.blocking, true);
+    assert.strictEqual(result.executionReliability.category, "TIMEOUT_VISIBILITY_RACE");
+    assert.strictEqual(result.executionReliability.severity, "HIGH");
+    assert.ok(result.executionReliability.confidence >= 0.9);
+    assert.ok(result.executionReliability.recommendation.includes("wait strategy"));
+    assert.ok(result.executionReliability.rules.some((x) => x.ruleId === "ERI001"));
+  });
+}
+
+function testMaintainabilityDriftSectionReportedWithInsufficientHistory() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const reportFile = path.join(tempDir, "CSharpGenerationReport.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      reportFilePath: reportFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      includeCurrentRunInDriftHistory: false,
+      maintainabilityHistory: {
+        runs: [
+          { failed: false },
+          { failed: true }
+        ]
+      }
+    });
+
+    assert.ok(result.maintainabilityDrift);
+    assert.strictEqual(result.maintainabilityDrift.status, "WARNING");
+    assert.strictEqual(result.maintainabilityDrift.driftDetected, false);
+    assert.ok(result.maintainabilityDrift.rules.some((x) => x.ruleId === "MDI000"));
+    assert.strictEqual(fs.existsSync(outputFile), true);
+
+    const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+    assert.ok(report.maintainabilityDrift);
+    assert.strictEqual(report.maintainabilityDrift.driftDetected, false);
+  });
+}
+
+function testMaintainabilityDriftHighSeverityFromHistoryHotspot() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const history = {
+      runs: [
+        {
+          timestampUtc: "2026-10-01T10:00:00Z",
+          failed: false,
+          executionReliability: { category: "NONE" },
+          locatorChanges: [{ key: "BeneficiaryAddress" }]
+        },
+        {
+          timestampUtc: "2026-10-02T10:00:00Z",
+          failed: true,
+          executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" },
+          locatorChanges: [{ key: "BeneficiaryAddress" }]
+        },
+        {
+          timestampUtc: "2026-10-03T10:00:00Z",
+          failed: true,
+          executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" },
+          locatorChanges: [{ key: "BeneficiaryAddress" }]
+        },
+        {
+          timestampUtc: "2026-10-04T10:00:00Z",
+          failed: true,
+          executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" },
+          locatorChanges: [{ key: "BeneficiaryAddress" }]
+        },
+        {
+          timestampUtc: "2026-10-05T10:00:00Z",
+          failed: true,
+          executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" },
+          locatorChanges: [{ key: "BeneficiaryAddress" }]
+        },
+        {
+          timestampUtc: "2026-10-06T10:00:00Z",
+          failed: true,
+          executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" },
+          locatorChanges: [{ key: "BeneficiaryAddress" }]
+        }
+      ]
+    };
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      includeCurrentRunInDriftHistory: false,
+      maintainabilityHistory: history
+    });
+
+    assert.strictEqual(result.maintainabilityDrift.status, "WARNING");
+    assert.strictEqual(result.maintainabilityDrift.severity, "HIGH");
+    assert.strictEqual(result.maintainabilityDrift.driftDetected, true);
+    assert.ok(result.maintainabilityDrift.driftScore >= 75);
+    assert.ok(result.maintainabilityDrift.hotspots.some((x) => x.key === "BeneficiaryAddress"));
+    assert.ok(result.maintainabilityDrift.recommendations.length > 0);
+    assert.strictEqual(fs.existsSync(outputFile), true);
+  });
+}
+
+function testMaintainabilityDriftIsReportOnlyAndDoesNotBlockOutput() {
+  withTempFiles((tempDir) => {
+    const codeFile = path.join(tempDir, "Code.ts");
+    const outputFile = path.join(tempDir, "Code.cs");
+    const reportFile = path.join(tempDir, "CSharpGenerationReport.json");
+
+    writeAppSettings(tempDir);
+    fs.writeFileSync(codeFile, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+
+    const history = {
+      runs: [
+        { failed: true, executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" }, locatorChanges: [{ key: "KeyA" }] },
+        { failed: true, executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" }, locatorChanges: [{ key: "KeyA" }] },
+        { failed: true, executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" }, locatorChanges: [{ key: "KeyA" }] },
+        { failed: true, executionReliability: { category: "TIMEOUT_VISIBILITY_RACE" }, locatorChanges: [{ key: "KeyA" }] }
+      ]
+    };
+
+    const result = generateCSharpCode({
+      codeFilePath: codeFile,
+      outputFilePath: outputFile,
+      reportFilePath: reportFile,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      maintainabilityHistory: history
+    });
+
+    assert.strictEqual(result.maintainabilityDrift.blocking, false);
+    assert.strictEqual(fs.existsSync(outputFile), true);
+
+    const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+    assert.ok(report.maintainabilityDrift);
+    assert.strictEqual(report.maintainabilityDrift.blocking, false);
+  });
+}
+
+function testBatchIdentityAndSanitization() {
+  withTempFiles((tempDir) => {
+    writeAppSettings(tempDir);
+    const codeFilePath = path.join(tempDir, "Code.ts");
+    const outputFilePath = path.join(tempDir, "Code.cs");
+    const reportFilePath = path.join(tempDir, "report.json");
+    fs.writeFileSync(codeFilePath, "await page.getByRole('button', { name: 'Login' }).click();", "utf8");
+    const options = { codeFilePath, outputFilePath, reportFilePath, appSettingsPath: path.join(tempDir, "appsettings.json") };
+    const legacy = generateCSharpCode(options);
+    assert.ok(legacy.code.includes("public sealed class CodegenRecordedFlow"));
+    assert.ok(legacy.code.includes("public CodegenRecordedFlow(IPage page, ConfigReader config)"));
+    assert.ok(!legacy.code.includes("// Test case:"));
+    assert.ok(!legacy.code.includes("// Source: Code.ts"));
+    assert.ok(!Object.hasOwn(JSON.parse(fs.readFileSync(reportFilePath, "utf8")), "caseId"));
+    assert.strictEqual(generateCSharpCode({ ...options, className: "CodegenRecordedFlow" }).code, legacy.code);
+    for (const [input, expected] of [["CodegenFlowTC01", "CodegenFlowTC01"], ["12 bad-name!", "_12_bad_name_"], ["class", "_class"], ["void", "_void"]]) {
+      const result = generateCSharpCode({ ...options, className: input, caseId: "TC01", caseTitle: "Create order" });
+      assert.ok(result.code.startsWith("// Test case: TC01 - Create order\n// Source: Code.ts\n"));
+      assert.ok(result.code.includes(`public sealed class ${expected}`));
+      assert.ok(result.code.includes(`public ${expected}(IPage page, ConfigReader config)`));
+      const report = JSON.parse(fs.readFileSync(reportFilePath, "utf8"));
+      assert.strictEqual(report.caseId, "TC01");
+      assert.strictEqual(report.caseTitle, "Create order");
+      assert.strictEqual(report.className, expected);
+      assert.strictEqual(report.unsupportedActionCount, 0);
+    }
+    const escaped = generateCSharpCode({ ...options, caseId: "TC01\nmalicious", caseTitle: "Title\r\nnext" });
+    assert.ok(escaped.code.startsWith("// Test case: TC01 malicious - Title  next\n// Source: Code.ts\n"));
+    assert.strictEqual(generateCSharpCode({ ...options, caseTitle: "Missing closing {" }).validation.success, true);
+  });
+}
+
+function testNestedBatchCliProjectInference() {
+  withTempFiles((tempDir) => {
+    writeAppSettings(tempDir);
+    writeFrameworkFiles(tempDir);
+    const caseDir = path.join(tempDir, "CodegenAI", "Recordings", "Demo", "TC01");
+    fs.mkdirSync(caseDir, { recursive: true });
+    const codeFilePath = path.join(caseDir, "Code.ts");
+    const outputFilePath = path.join(caseDir, "Code.cs");
+    const reportFilePath = path.join(caseDir, "report.json");
+    fs.writeFileSync(codeFilePath, "await page.goto('https://documentadministration-sit.trimont.com/adminReassign.aspx');", "utf8");
+    for (const rootArgs of [["--project-root", tempDir], ["--appsettings-file", path.join(tempDir, "appsettings.json")]]) {
+      require("child_process").execFileSync(process.execPath, [
+        path.join(__dirname, "CSharpCodeGenerator.cjs"),
+        "--code-file", codeFilePath, "--output-file", outputFilePath,
+        "--report-file", reportFilePath, "--class-name", "CodegenFlowTC01",
+        "--case-id", "TC01", "--case-title=--Create order=value", ...rootArgs
+      ]);
+      const code = fs.readFileSync(outputFilePath, "utf8");
+      assert.ok(code.includes("public sealed class CodegenFlowTC01"));
+      assert.ok(code.includes("public CodegenFlowTC01(IPage page, ConfigReader config)"));
+      assert.ok(code.includes("_commonActions.NavigateToURLAsync(Config.Urls.DocAdmin)"));
+      assert.strictEqual(JSON.parse(fs.readFileSync(reportFilePath, "utf8")).caseTitle, "--Create order=value");
+    }
+  });
+}
+
+function testBatchPowerShellOrchestration() {
+  if (process.platform !== "win32") {
+    console.log("Batch PowerShell 5.1 integration checks skipped on non-Windows host");
+    return;
+  }
+  withTempFiles((tempDir) => {
+    const recorderRoot = path.resolve(__dirname, "../..");
+    const batchName = `phase1-test-${process.pid}-${Date.now()}`;
+    const recordingsRoot = path.join(recorderRoot, "Recordings");
+    const batchFolder = path.join(recordingsRoot, batchName);
+    const latestPath = path.join(recordingsRoot, "latest-batch.txt");
+    const oldLatest = fs.existsSync(latestPath) ? fs.readFileSync(latestPath) : null;
+    const sessionPath = path.join(recorderRoot, "AIRecorder", "auth", "session.json");
+    const oldSession = fs.existsSync(sessionPath) ? fs.readFileSync(sessionPath) : null;
+    const csvPath = path.join(tempDir, "testcases.csv");
+    const headers = "TestCaseId,Title,StartUrl,Preconditions,ExpectedResult,Priority,DataHint\n";
+    const validRows = "TC01,First case,,Ready,Done,High,\nTC02,Second case,,Ready,Validated,Medium,\n";
+    const manifest = () => JSON.parse(fs.readFileSync(path.join(batchFolder, "manifest.json"), "utf8"));
+    function run(args, expectedStatus = 0) {
+      const result = require("child_process").spawnSync("powershell.exe", [
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(recorderRoot, "StartCodegen.ps1"),
+        "-BatchFile", csvPath, "-BatchName", batchName, ...args
+      ], { encoding: "utf8", timeout: 60000 });
+      assert.strictEqual(result.status, expectedStatus, `${result.error || ""}\n${result.stdout}\n${result.stderr}`);
+      return `${result.stdout}\n${result.stderr}`;
+    }
+    try {
+      fs.writeFileSync(csvPath, headers + validRows);
+      run(["-DryRun"]);
+      assert.deepStrictEqual(manifest().testCases.map((entry) => entry.status), ["planned", "planned"]);
+      assert.ok(!fs.existsSync(path.join(batchFolder, "TC01", "Code.cs")));
+      assert.strictEqual(fs.readFileSync(latestPath, "utf8"), `Recordings/${batchName}`);
+      for (const id of ["TC01", "TC02"]) {
+        fs.writeFileSync(path.join(batchFolder, id, "Code.ts"), "await page.getByRole('button', { name: 'Login' }).click();");
+      }
+      run(["-GenerateOnly", "-SkipLiveObservation"]);
+      assert.deepStrictEqual(manifest().testCases.map((entry) => entry.status), ["generated", "generated"]);
+      for (const id of ["TC01", "TC02"]) {
+        const code = fs.readFileSync(path.join(batchFolder, id, "Code.cs"), "utf8");
+        assert.ok(code.includes(`public sealed class CodegenFlow${id}`));
+        assert.ok(fs.existsSync(path.join(batchFolder, id, "CSharpGenerationReport.json")));
+        assert.ok(fs.existsSync(path.join(batchFolder, id, "TableLocatorMetadata.json")));
+        assert.ok(!fs.existsSync(path.join(batchFolder, id, "LiveObservations.json")));
+        assert.ok(!fs.existsSync(path.join(batchFolder, id, ".csharp-live-sync.stop")));
+      }
+      const untouchedEntry = manifest().testCases[1];
+      const untouchedFiles = fs.readdirSync(path.join(batchFolder, "TC02")).map((name) => {
+        const file = path.join(batchFolder, "TC02", name);
+        return { file, bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs };
+      });
+      // Omitting SkipLiveObservation still must never open a browser.
+      run(["-GenerateOnly", "-Only", "TC01"]);
+      assert.deepStrictEqual(manifest().testCases[1], untouchedEntry);
+      for (const item of untouchedFiles) {
+        assert.deepStrictEqual(fs.readFileSync(item.file), item.bytes);
+        assert.strictEqual(fs.statSync(item.file).mtimeMs, item.mtime);
+      }
+      fs.writeFileSync(path.join(batchFolder, "TC01", "Code.ts"), "// empty recording\n");
+      run(["-GenerateOnly"], 1);
+      assert.deepStrictEqual(manifest().testCases.map((entry) => entry.status), ["failed: empty recording", "generated"]);
+      fs.unlinkSync(path.join(batchFolder, "TC01", "Code.ts"));
+      run(["-GenerateOnly", "-Only", "TC01"]);
+      assert.strictEqual(manifest().testCases[0].status, "skipped");
+      const beforeInvalid = fs.readFileSync(path.join(batchFolder, "manifest.json"));
+      assert.ok(run(["-DryRun", "-Only", "UNKNOWN"], 1).includes("Unknown -Only TestCaseId"));
+      for (const [rows, message] of [
+        ["TC01,One,,,,,\ntc01,Two,,,,,\n", "Duplicate TestCaseId"],
+        ["../escape,One,,,,,\n", "Invalid TestCaseId"],
+        ["TC01,   ,,,,,\n", "Title is required"],
+        ["TC-01,One,,,,,\nTC_01,Two,,,,,\n", "same C# class"],
+        ["CON,One,,,,,\n", "Reserved Windows folder name"]
+      ]) {
+        fs.writeFileSync(csvPath, headers + rows);
+        assert.ok(run(["-DryRun"], 1).includes(message));
+        assert.deepStrictEqual(fs.readFileSync(path.join(batchFolder, "manifest.json")), beforeInvalid);
+      }
+      assert.deepStrictEqual(fs.existsSync(sessionPath) ? fs.readFileSync(sessionPath) : null, oldSession);
+    } finally {
+      fs.rmSync(batchFolder, { recursive: true, force: true });
+      if (oldLatest) fs.writeFileSync(latestPath, oldLatest);
+      else fs.rmSync(latestPath, { force: true });
+    }
+  });
+  console.log("Batch PowerShell integration tests passed (dry-run, generate-only, merge, failures, validation, session isolation)");
+}
+
 function runAllTests() {
+  testBatchIdentityAndSanitization();
+  testNestedBatchCliProjectInference();
+  testBatchPowerShellOrchestration();
   testClickMapping();
   testFillAndSelectOptionMapping();
   testGotoUsesConfiguredUrl();
@@ -711,6 +1649,30 @@ function runAllTests() {
   testPopupActorActionsAreSupported();
   testEnterpriseModeSplitsNonPopupFlowIntoMethodsWithWaits();
   testEnterpriseModeSplitsLongLinearFlowIntoPartMethods();
+  testLocatorValidationFailureBlocksOutputWrite();
+  testTextVsAttributeEndToEndValidation();
+  testLocatorRepairSingleAttemptPassesAndWritesCode();
+  testLocatorRepairSingleAttemptFailureKeepsCodeBlocked();
+  testLocatorRepairConvertsTestDataRowLocatorToStableDataAttribute();
+  testLocatorRepairDoesNotApproveInventedAttributes();
+  testLocatorRepairFailsWhenRepairedLocatorIsNonUnique();
+  testDataContractPassAllowsGeneration();
+  testDataContractWarningAllowsGenerationWithWarnings();
+  testDataContractBlockedStopsGenerationBeforeLocatorFlow();
+  testMethodQualityGatePassAcceptsGeneration();
+  testMethodQualityGateWarningAllowsGenerationAndAddsWarnings();
+  testMethodQualityGateBlockedPreventsOverwrite();
+  testDataContractAndLocatorGatesRemainAuthoritativeWithMethodQualityGateIntegrated();
+  testExecutionReliabilityPassIsReported();
+  testExecutionReliabilityWarningIncludesEvidenceAndRecommendation();
+  testExecutionReliabilityBlockedIncludesCategorySeverityConfidence();
+  testMaintainabilityDriftSectionReportedWithInsufficientHistory();
+  testMaintainabilityDriftHighSeverityFromHistoryHotspot();
+  testMaintainabilityDriftIsReportOnlyAndDoesNotBlockOutput();
+  runLocatorValidatorTests();
+  runLocatorRepairTests();
+  runFailureTriageTests();
+  runTestDataContractTests();
   console.log("CSharpCodeGenerator tests passed");
 }
 

@@ -1,5 +1,12 @@
 const fs = require("fs");
 const path = require("path");
+const { LocatorValidator, RuleStatus } = require("../Intelligence/LocatorValidator.cjs");
+const { LocatorRepair } = require("../Intelligence/LocatorRepair.cjs");
+const { FailureTriage } = require("../Intelligence/FailureTriage.cjs");
+const { validateDataContract, Status: DataContractStatus } = require("../Intelligence/TestDataContract.cjs");
+const { evaluateMethodQuality, Status: MethodQualityStatus } = require("../Intelligence/MethodQualityGate.cjs");
+const { classifyExecutionReliability } = require("../Intelligence/ExecutionReliabilityIntelligence.cjs");
+const { analyzeMaintainabilityDrift } = require("../Intelligence/MaintainabilityDriftIntelligence.cjs");
 
 function safeRead(filePath) {
   if (!filePath || !fs.existsSync(filePath)) {
@@ -7,6 +14,18 @@ function safeRead(filePath) {
   }
 
   return fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+}
+
+function safeReadJson(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function parseArgs(argv) {
@@ -17,7 +36,9 @@ function parseArgs(argv) {
       continue;
     }
 
-    const [key, inlineValue] = token.split("=");
+    const separator = token.indexOf("=");
+    const key = separator < 0 ? token : token.slice(0, separator);
+    const inlineValue = separator < 0 ? undefined : token.slice(separator + 1);
     const name = key.slice(2);
     if (inlineValue !== undefined) {
       args[name] = inlineValue;
@@ -832,6 +853,111 @@ function inferProjectRoot(options) {
   }
 
   return process.cwd();
+}
+
+function inferLocatorValidationPaths(options) {
+  const projectRoot = inferProjectRoot(options);
+  const fallbackDir = path.join(projectRoot, "CodegenAI", "AIRecorder");
+
+  return {
+    domObservationPath: options.domObservationPath || path.join(fallbackDir, "LiveObservations.json"),
+    tableMetadataPath: options.tableMetadataPath || path.join(fallbackDir, "TableLocatorMetadata.json")
+  };
+}
+
+function buildDefaultDataContractResult() {
+  return {
+    dataContract: {
+      scenario: "",
+      inputs: [],
+      status: DataContractStatus.PASS,
+      blocking: false,
+      missingKeys: [],
+      typeErrors: [],
+      warnings: [],
+      results: []
+    }
+  };
+}
+
+function resolveDataContractValidation(options) {
+  const contractDefinition = options.dataContractDefinition || safeReadJson(options.dataContractPath || "");
+  if (!contractDefinition) {
+    return buildDefaultDataContractResult();
+  }
+
+  const testData = options.testData || safeReadJson(options.testDataPath || "") || {};
+  return validateDataContract(contractDefinition, testData);
+}
+
+function resolveRuntimeEvidence(options) {
+  if (options.runtimeEvidence && typeof options.runtimeEvidence === "object") {
+    return options.runtimeEvidence;
+  }
+
+  return safeReadJson(options.runtimeEvidencePath || "") || {};
+}
+
+function resolveMaintainabilityHistory(options) {
+  if (options.maintainabilityHistory && typeof options.maintainabilityHistory === "object") {
+    return options.maintainabilityHistory;
+  }
+
+  const fileHistory = safeReadJson(options.maintainabilityHistoryPath || "");
+  if (fileHistory && typeof fileHistory === "object") {
+    return fileHistory;
+  }
+
+  return { runs: [] };
+}
+
+function createMaintainabilityRunSnapshot(options, context) {
+  const nowUtc = new Date().toISOString();
+  const locatorChanges = [];
+  const repairItems = context.locatorRepair && Array.isArray(context.locatorRepair.items)
+    ? context.locatorRepair.items
+    : [];
+
+  for (const item of repairItems) {
+    if (!item || !item.repaired) {
+      continue;
+    }
+
+    locatorChanges.push({
+      key: item.key || (item.sourceLine ? `line-${item.sourceLine}` : "locator"),
+      sourceLine: item.sourceLine || null
+    });
+  }
+
+  return {
+    timestampUtc: nowUtc,
+    testName: options.scenarioName || path.basename(options.codeFilePath || "Code.ts", path.extname(options.codeFilePath || "Code.ts")),
+    failed: context.failureTriage && context.failureTriage.status === "BLOCKED",
+    executionReliability: {
+      category: context.executionReliability ? context.executionReliability.category : "NONE",
+      severity: context.executionReliability ? context.executionReliability.severity : "LOW",
+      confidence: context.executionReliability ? context.executionReliability.confidence : 1
+    },
+    locatorChanges
+  };
+}
+
+function buildDefaultMethodQualityGateResult() {
+  return {
+    status: MethodQualityStatus.PASS,
+    blocking: false,
+    score: 100,
+    rules: [],
+    methods: []
+  };
+}
+
+function buildDefaultExecutionReliabilityResult() {
+  return classifyExecutionReliability({});
+}
+
+function buildDefaultMaintainabilityDriftResult() {
+  return analyzeMaintainabilityDrift({ runs: [] });
 }
 
 function collectPageElementRegistry(projectRoot) {
@@ -1818,7 +1944,21 @@ function tryBuildEnterpriseMethods(actions, buildOptions) {
   };
 }
 
+function sanitizeClassName(value) {
+  let name = String(value || "CodegenRecordedFlow").replace(/[^A-Za-z0-9_]/g, "_");
+  if (!/^[A-Za-z_]/.test(name)) {
+    name = `_${name}`;
+  }
+  const keywords = new Set(("abstract as base bool break byte case catch char checked class const continue decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while").split(" "));
+  return keywords.has(name) ? `_${name}` : name;
+}
+
 function buildCode(actions, options) {
+  const className = sanitizeClassName(options.className);
+  const singleLine = (value) => String(value || "").replace(/[\r\n\u0085\u2028\u2029]/g, " ");
+  const headerLines = options.caseId !== undefined || options.caseTitle !== undefined
+    ? [`// Test case: ${singleLine(options.caseId)} - ${singleLine(options.caseTitle)}`, "// Source: Code.ts"]
+    : [];
   const actorFieldMap = new Map();
   for (const action of actions) {
     if (action && action.locator && action.locator.actor) {
@@ -1901,14 +2041,15 @@ function buildCode(actions, options) {
   }
 
   const preBodyLines = [
+    ...headerLines,
     ...usingLines,
     "",
     "namespace AutomationFrameWork.CodegenAI",
     "{",
-    "    public sealed class CodegenRecordedFlow",
+    `    public sealed class ${className}`,
     "    {",
     ...fieldLines,
-    "        public CodegenRecordedFlow(IPage page, ConfigReader config)",
+    `        public ${className}(IPage page, ConfigReader config)`,
     "        {",
     "            Page = page ?? throw new ArgumentNullException(nameof(page));",
     "            Config = config ?? throw new ArgumentNullException(nameof(config));",
@@ -1992,7 +2133,8 @@ function buildCode(actions, options) {
       "}"
     ].join("\n"),
     sourceMap,
-    frameworkMatches: dependencies.frameworkMatches
+    frameworkMatches: dependencies.frameworkMatches,
+    generatedLocators: locatorRegistry.generatedLocators
   };
 }
 
@@ -2036,24 +2178,249 @@ function validateGeneratedCSharp(code, actions) {
 }
 
 function generateCSharpCode(options) {
+  // Keep legacy reports unchanged unless batch identity options are supplied.
+  const caseMetadata = options.className !== undefined || options.caseId !== undefined || options.caseTitle !== undefined
+    ? { caseId: options.caseId || "", caseTitle: options.caseTitle || "", className: sanitizeClassName(options.className) }
+    : {};
   const code = safeRead(options.codeFilePath);
-  const actions = parseRecordedActions(code);
+  const dataContractValidation = resolveDataContractValidation(options);
+  const runtimeEvidence = resolveRuntimeEvidence(options);
+  const executionReliability = classifyExecutionReliability(runtimeEvidence);
+  const maintainabilityHistory = resolveMaintainabilityHistory(options);
+
+  if (dataContractValidation.dataContract.blocking) {
+    const validation = {
+      success: false,
+      errors: ["Data contract blocked generation."],
+      warnings: [...(dataContractValidation.dataContract.warnings || [])]
+    };
+
+    const locatorValidation = {
+      severity: RuleStatus.PASS,
+      hasFailures: false,
+      totalLocators: 0,
+      totalLocatorActions: 0,
+      uniqueLocatorActions: 0,
+      failedLocators: 0,
+      warningLocators: 0,
+      validatedSourceLines: [],
+      results: []
+    };
+
+    const locatorRepair = {
+      attempts: 0,
+      repairStatus: "SKIPPED",
+      repairedAny: false,
+      codeGenerationBlocked: true,
+      items: [],
+      actions: []
+    };
+
+    const triage = new FailureTriage();
+    const failureTriage = triage.classifyFailure({
+      codeFilePath: options.codeFilePath,
+      appSettingsPath: options.appSettingsPath,
+      codeContent: code,
+      validation,
+      locatorValidation,
+      locatorRepair
+    });
+
+    const blockedResult = {
+      ...caseMetadata,
+      generatedAtUtc: new Date().toISOString(),
+      codeFilePath: options.codeFilePath,
+      outputFilePath: options.outputFilePath,
+      actions: [],
+      originalActions: [],
+      unsupportedActions: [],
+      frameworkMatches: [],
+      generatedLocatorProperties: 0,
+      sourceMap: [],
+      dataContract: dataContractValidation.dataContract,
+      methodQualityGate: buildDefaultMethodQualityGateResult(),
+      executionReliability,
+      maintainabilityDrift: buildDefaultMaintainabilityDriftResult(),
+      validation,
+      initialLocatorValidation: locatorValidation,
+      locatorValidation,
+      locatorRepair,
+      failureTriage,
+      code: ""
+    };
+
+    if (options.reportFilePath) {
+      fs.mkdirSync(path.dirname(options.reportFilePath), { recursive: true });
+      fs.writeFileSync(options.reportFilePath, JSON.stringify({
+        ...caseMetadata,
+        generatedAtUtc: blockedResult.generatedAtUtc,
+        codeFilePath: blockedResult.codeFilePath,
+        outputFilePath: blockedResult.outputFilePath,
+        actionCount: 0,
+        ...(Object.keys(caseMetadata).length ? { unsupportedActionCount: 0 } : {}),
+        generatedLocatorProperties: 0,
+        frameworkMatches: [],
+        sourceMap: [],
+        dataContract: blockedResult.dataContract,
+        methodQualityGate: blockedResult.methodQualityGate,
+        executionReliability: blockedResult.executionReliability,
+        maintainabilityDrift: blockedResult.maintainabilityDrift,
+        initialLocatorValidation: blockedResult.initialLocatorValidation,
+        locatorValidation: blockedResult.locatorValidation,
+        locatorRepair: blockedResult.locatorRepair,
+        failureTriage: blockedResult.failureTriage,
+        locatorCoverage: {
+          locatorActionsDetected: 0,
+          locatorActionsValidated: 0,
+          uniqueLocatorActionsValidated: 0,
+          generatedLocatorProperties: 0,
+          validatedSourceLines: []
+        },
+        unsupportedActions: [],
+        validation: blockedResult.validation
+      }, null, 2), "utf8");
+    }
+
+    return blockedResult;
+  }
+
+  const originalActions = parseRecordedActions(code);
+  const locatorPaths = inferLocatorValidationPaths(options);
+  const locatorValidator = new LocatorValidator(locatorPaths);
+  const initialLocatorValidation = locatorValidator.validateActions(originalActions);
+  const repairEnabled = options.enableRepair !== false;
+  const repairEngine = new LocatorRepair({
+    domObservationPath: locatorPaths.domObservationPath,
+    maxAttempts: 1,
+    repairProvider: options.repairProvider
+  });
+
+  let actions = originalActions;
+  let locatorValidation = initialLocatorValidation;
+  let locatorRepair = {
+    attempts: 0,
+    repairStatus: "SKIPPED",
+    repairedAny: false,
+    codeGenerationBlocked: Boolean(initialLocatorValidation.hasFailures),
+    items: [],
+    actions: originalActions
+  };
+
+  if (repairEnabled && initialLocatorValidation.hasFailures) {
+    const proposedRepair = repairEngine.repair(originalActions, initialLocatorValidation);
+    if (proposedRepair.repairedAny) {
+      const repairedValidation = locatorValidator.validateActions(proposedRepair.actions);
+      locatorRepair = repairEngine.finalizeRepairResult(proposedRepair, repairedValidation);
+      actions = proposedRepair.actions;
+      locatorValidation = repairedValidation;
+    } else {
+      locatorRepair = repairEngine.finalizeRepairResult(proposedRepair, initialLocatorValidation);
+    }
+  } else if (!repairEnabled && initialLocatorValidation.hasFailures) {
+    locatorRepair = {
+      ...locatorRepair,
+      repairStatus: "SKIPPED",
+      codeGenerationBlocked: true
+    };
+  }
+
   const builtCode = buildCode(actions, options);
-  const validation = validateGeneratedCSharp(builtCode.code, actions);
+  // Case descriptions are comments, not C# tokens (they may contain braces, etc.).
+  const validationCode = options.caseId !== undefined || options.caseTitle !== undefined
+    ? builtCode.code.split("\n").slice(2).join("\n")
+    : builtCode.code;
+  const validation = validateGeneratedCSharp(validationCode, actions);
+  let methodQualityEvaluation = buildDefaultMethodQualityGateResult();
+
+  if (locatorValidation.hasFailures) {
+    validation.errors.push(
+      `Locator validation failed: ${locatorValidation.failedLocators} locator(s) failed deterministic rules.`
+    );
+  } else if (locatorValidation.warningLocators > 0) {
+    validation.warnings.push(
+      `Locator validation produced ${locatorValidation.warningLocators} warning locator(s).`
+    );
+  }
+
   const unsupportedActions = actions.filter((action) => !action.supported);
+  const triage = new FailureTriage();
+  if (dataContractValidation.dataContract.status === DataContractStatus.WARNING) {
+    validation.warnings.push(...dataContractValidation.dataContract.warnings);
+  }
+
+  if (validation.success && !locatorValidation.hasFailures) {
+    methodQualityEvaluation = evaluateMethodQuality(
+      builtCode.code,
+      options.methodQualityGateOptions || {}
+    );
+  }
+
+  if (methodQualityEvaluation.status === MethodQualityStatus.WARNING) {
+    for (const warningRule of methodQualityEvaluation.rules.filter((rule) => rule.status === MethodQualityStatus.WARNING)) {
+      validation.warnings.push(`MethodQualityGate ${warningRule.ruleId}: ${warningRule.message}`);
+    }
+  }
+
+  if (methodQualityEvaluation.status === MethodQualityStatus.BLOCKED) {
+    validation.success = false;
+    for (const blockedRule of methodQualityEvaluation.rules.filter((rule) => rule.status === MethodQualityStatus.BLOCKED)) {
+      validation.errors.push(`MethodQualityGate ${blockedRule.ruleId}: ${blockedRule.message}`);
+    }
+  }
+
+  const failureTriage = triage.classifyFailure({
+    codeFilePath: options.codeFilePath,
+    appSettingsPath: options.appSettingsPath,
+    codeContent: code,
+    validation,
+    locatorValidation,
+    locatorRepair
+  });
+
+  const currentRunSnapshot = createMaintainabilityRunSnapshot(options, {
+    failureTriage,
+    executionReliability,
+    locatorRepair
+  });
+
+  const maintainabilityRuns = Array.isArray(maintainabilityHistory.runs)
+    ? maintainabilityHistory.runs
+    : [];
+
+  const driftInput = {
+    runs: options.includeCurrentRunInDriftHistory === false
+      ? maintainabilityRuns
+      : [...maintainabilityRuns, currentRunSnapshot]
+  };
+
+  const maintainabilityDrift = analyzeMaintainabilityDrift(driftInput, {
+    minimumRuns: options.driftMinimumRuns
+  });
+
   const result = {
+    ...caseMetadata,
     generatedAtUtc: new Date().toISOString(),
     codeFilePath: options.codeFilePath,
     outputFilePath: options.outputFilePath,
     actions,
+    originalActions,
     unsupportedActions,
     frameworkMatches: builtCode.frameworkMatches,
+    generatedLocatorProperties: Array.isArray(builtCode.generatedLocators) ? builtCode.generatedLocators.length : 0,
     sourceMap: builtCode.sourceMap,
+    dataContract: dataContractValidation.dataContract,
+    methodQualityGate: methodQualityEvaluation,
+    executionReliability,
+    maintainabilityDrift,
     validation,
+    initialLocatorValidation,
+    locatorValidation,
+    locatorRepair,
+    failureTriage,
     code: builtCode.code
   };
 
-  if (options.outputFilePath) {
+  if (options.outputFilePath && !locatorValidation.hasFailures && !methodQualityEvaluation.blocking) {
     fs.mkdirSync(path.dirname(options.outputFilePath), { recursive: true });
     fs.writeFileSync(options.outputFilePath, builtCode.code, "utf8");
   }
@@ -2061,12 +2428,30 @@ function generateCSharpCode(options) {
   if (options.reportFilePath) {
     fs.mkdirSync(path.dirname(options.reportFilePath), { recursive: true });
     fs.writeFileSync(options.reportFilePath, JSON.stringify({
+      ...caseMetadata,
       generatedAtUtc: result.generatedAtUtc,
       codeFilePath: result.codeFilePath,
       outputFilePath: result.outputFilePath,
       actionCount: result.actions.length,
+      ...(Object.keys(caseMetadata).length ? { unsupportedActionCount: result.unsupportedActions.length } : {}),
+      generatedLocatorProperties: result.generatedLocatorProperties,
       frameworkMatches: result.frameworkMatches,
       sourceMap: result.sourceMap,
+      dataContract: result.dataContract,
+      methodQualityGate: result.methodQualityGate,
+      executionReliability: result.executionReliability,
+      maintainabilityDrift: result.maintainabilityDrift,
+      initialLocatorValidation: result.initialLocatorValidation,
+      locatorValidation: result.locatorValidation,
+      locatorRepair: result.locatorRepair,
+      failureTriage: result.failureTriage,
+      locatorCoverage: {
+        locatorActionsDetected: result.actions.filter((action) => Boolean(action.locator)).length,
+        locatorActionsValidated: result.locatorValidation.totalLocatorActions,
+        uniqueLocatorActionsValidated: result.locatorValidation.uniqueLocatorActions,
+        generatedLocatorProperties: result.generatedLocatorProperties,
+        validatedSourceLines: result.locatorValidation.validatedSourceLines
+      },
       unsupportedActions: result.unsupportedActions.map((action) => ({
         sourceLine: action.sourceLine,
         raw: action.raw,
@@ -2089,16 +2474,41 @@ function runCli() {
     process.exit(2);
   }
 
-  const projectRoot = path.resolve(path.dirname(codeFilePath), "..", "..");
+  const projectRoot = inferProjectRoot({
+    projectRoot: args["project-root"],
+    appSettingsPath: args["appsettings-file"],
+    codeFilePath
+  });
   const result = generateCSharpCode({
     codeFilePath,
     outputFilePath,
+    projectRoot,
+    className: args["class-name"],
+    caseId: args["case-id"],
+    caseTitle: args["case-title"],
     reportFilePath: args["report-file"] || "",
     appSettingsPath: args["appsettings-file"] || path.join(projectRoot, "appsettings.json"),
+    dataContractPath: args["data-contract-file"] || "",
+    testDataPath: args["test-data-file"] || "",
+    runtimeEvidencePath: args["runtime-evidence-file"] || "",
+    maintainabilityHistoryPath: args["drift-history-file"] || "",
+    scenarioName: args["scenario-name"] || "",
+    domObservationPath: args["dom-file"] || "",
+    tableMetadataPath: args["metadata-file"] || "",
+    enableRepair: !isTrueFlag(args["disable-repair"]),
     enterpriseMode: isTrueFlag(args["enterprise-mode"])
   });
 
   console.log(`[CSharpCodeGenerator] Generated ${path.basename(outputFilePath)} with ${result.actions.length} action(s). unsupported=${result.unsupportedActions.length}`);
+  if (result.locatorValidation.severity === RuleStatus.WARNING) {
+    console.warn(`[CSharpCodeGenerator] Locator warnings detected: ${result.locatorValidation.warningLocators}`);
+  }
+
+  if (result.locatorValidation.hasFailures) {
+    console.error(`[CSharpCodeGenerator] Locator validation failed with ${result.locatorValidation.failedLocators} failed locator(s).`);
+    process.exit(1);
+  }
+
   if (!result.validation.success) {
     console.error(`[CSharpCodeGenerator] Validation failed: ${result.validation.errors.join(" | ")}`);
     process.exit(1);

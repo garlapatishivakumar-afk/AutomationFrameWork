@@ -150,7 +150,70 @@ async function testStopsOnSignalFile() {
   });
 }
 
+async function testBatchIdentityForwarding() {
+  await withTempDir(async (tempDir) => {
+    writeAppSettings(tempDir);
+    const caseDir = path.join(tempDir, "CodegenAI", "Recordings", "Demo", "TC02");
+    fs.mkdirSync(caseDir, { recursive: true });
+    const codeFilePath = path.join(caseDir, "Code.ts");
+    const outputFilePath = path.join(caseDir, "Code.cs");
+    fs.writeFileSync(codeFilePath, "await page.goto('https://documentadministration-sit.trimont.com/adminReassign.aspx');", "utf8");
+    const liveSync = startLiveSync({
+      codeFilePath, outputFilePath, projectRoot: tempDir,
+      appSettingsPath: path.join(tempDir, "appsettings.json"),
+      className: "CodegenFlowTC02", caseId: "TC02", caseTitle: "Second case",
+      debounceMs: 25, log: false
+    });
+    try {
+      const code = await waitForFileContains(outputFilePath, "public sealed class CodegenFlowTC02", 3000);
+      assert.ok(code.includes("public CodegenFlowTC02(IPage page, ConfigReader config)"));
+      assert.ok(code.startsWith("// Test case: TC02 - Second case\n// Source: Code.ts\n"));
+      assert.ok(code.includes("Config.Urls.DocAdmin"));
+      const report = JSON.parse(fs.readFileSync(path.join(caseDir, "CSharpGenerationReport.json"), "utf8"));
+      assert.strictEqual(report.caseId, "TC02");
+      assert.strictEqual(report.caseTitle, "Second case");
+      assert.strictEqual(report.className, "CodegenFlowTC02");
+    } finally {
+      await liveSync.close();
+    }
+  });
+}
+
+async function testBatchCliForwarding() {
+  await withTempDir(async (tempDir) => {
+    writeAppSettings(tempDir);
+    const caseDir = path.join(tempDir, "CodegenAI", "Recordings", "Demo", "TC03");
+    fs.mkdirSync(caseDir, { recursive: true });
+    const codeFilePath = path.join(caseDir, "Code.ts");
+    const outputFilePath = path.join(caseDir, "Code.cs");
+    const stopSignalFile = path.join(caseDir, ".stop");
+    fs.writeFileSync(codeFilePath, "await page.goto('https://documentadministration-sit.trimont.com/adminReassign.aspx');", "utf8");
+    const child = require("child_process").spawn(process.execPath, [
+      path.join(__dirname, "CSharpLiveSync.cjs"), "--code-file", codeFilePath,
+      "--output-file", outputFilePath, "--stop-signal-file", stopSignalFile,
+      "--project-root", tempDir, "--class-name", "CodegenFlowTC03",
+      "--case-id=TC03", "--case-title=--Title=value", "--log", "false", "--debounce-ms", "25"
+    ], { stdio: "ignore" });
+    const exited = new Promise((resolve) => child.once("exit", resolve));
+    try {
+      const code = await waitForFileContains(outputFilePath, "public sealed class CodegenFlowTC03", 3000);
+      assert.ok(code.startsWith("// Test case: TC03 - --Title=value\n// Source: Code.ts\n"));
+      assert.ok(code.includes("Config.Urls.DocAdmin"));
+      const report = JSON.parse(fs.readFileSync(path.join(caseDir, "CSharpGenerationReport.json"), "utf8"));
+      assert.strictEqual(report.caseTitle, "--Title=value");
+      assert.strictEqual(report.className, "CodegenFlowTC03");
+      fs.writeFileSync(stopSignalFile, "stop");
+      const exitCode = await Promise.race([exited, sleep(3000).then(() => "timeout")]);
+      assert.strictEqual(exitCode, 0);
+    } finally {
+      if (child.exitCode === null) { child.kill(); await exited; }
+    }
+  });
+}
+
 async function runAllTests() {
+  await testBatchCliForwarding();
+  await testBatchIdentityForwarding();
   await testInitialGeneration();
   await testUpdatesOnChange();
   await testDebouncesRapidChanges();

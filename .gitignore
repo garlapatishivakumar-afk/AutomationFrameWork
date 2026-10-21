@@ -14,3 +14,7 @@ FileDownloads/
 # Logs and environment files
 *.log
 .env
+
+# Per-case recordings and saved authentication state
+CodegenAI/Recordings/
+CodegenAI/AIRecorder/auth/session.json

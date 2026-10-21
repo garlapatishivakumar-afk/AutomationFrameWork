@@ -304,6 +304,16 @@ function testNumericOutsideTableRemainsOriginal() {
   assert.strictEqual(result.metadata.transformedActions, 0);
 }
 
+function testCellRoleWithoutObservationStillDetectedAsTable() {
+  const input = "await page.getByRole('cell', { name: '43100001', exact: true }).click();";
+  const result = runTransform(input, {});
+
+  assert.ok(result.code.includes("await page.locator("), "Cell role should be rewritten to locator under table policy");
+  assert.ok(!result.code.includes("getByRole('cell'"), "Cell role action should not remain as getByRole when table rewrite applies");
+  assert.strictEqual(result.metadata.transformedActions, 1);
+  assert.strictEqual(result.metadata.actions[0].tableDetected, true);
+}
+
 function testMultipleTablesUsesCorrectTableScope() {
   const input = "await page.getByRole('link', { name: '891411' }).click();";
   const observations = {
@@ -760,6 +770,7 @@ function runAllTests() {
   testNoStableRowFallsBackToStructural();
   testAnalysisFailureFallback();
   testNumericOutsideTableRemainsOriginal();
+  testCellRoleWithoutObservationStillDetectedAsTable();
   testMultipleTablesUsesCorrectTableScope();
   testTableCellActionRewrittenAsCellTarget();
   testTransientControlTableFallsBack();

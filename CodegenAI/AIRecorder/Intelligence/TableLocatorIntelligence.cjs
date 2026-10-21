@@ -947,7 +947,23 @@ function findObservation(lineNumber, textValue, observations) {
   );
 }
 
-function inferInsideTable(actionText, observation) {
+function inferInsideTable(action, observation) {
+  const role = normalize(action && action.role);
+  if (role === "cell" || role === "gridcell" || role === "row" || role === "columnheader") {
+    return true;
+  }
+
+  const originalLocator = String((action && action.originalLocator) || "");
+  if (
+    /getByRole\('cell'/.test(originalLocator) ||
+    /getByRole\('gridcell'/.test(originalLocator) ||
+    /\/\/tr\[/.test(originalLocator) ||
+    /\/td\[/.test(originalLocator) ||
+    /dgDefMaintInfo|rgrid|grid|rgTransactions|rgMasterTable/i.test(originalLocator)
+  ) {
+    return true;
+  }
+
   if (observation && (observation.insideTable || observation.insideGrid)) {
     return true;
   }
@@ -969,6 +985,7 @@ function buildContext(action, observation, tableSelector, idStabilityIndex) {
 
   const text = hasValue(action.text) ? action.text : (observation && (observation.text || observation.name) ? (observation.text || observation.name) : "");
   const columnIndex = Number(cell.columnIndex || 0);
+  const inferredInsideTable = inferInsideTable(action, observation);
 
   const rowBusinessValue =
     row.businessValue ||
@@ -984,8 +1001,8 @@ function buildContext(action, observation, tableSelector, idStabilityIndex) {
       ...action,
       text
     },
-    insideTable: Boolean(observation && observation.insideTable),
-    inferredInsideTable: inferInsideTable(text, observation),
+    insideTable: Boolean(observation && (observation.insideTable || observation.insideGrid)) || inferredInsideTable,
+    inferredInsideTable,
     tableSelector,
     table: {
       id: table.id || null,

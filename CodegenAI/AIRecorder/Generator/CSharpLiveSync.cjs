@@ -11,7 +11,9 @@ function parseArgs(argv) {
       continue;
     }
 
-    const [key, inlineValue] = token.split("=");
+    const separator = token.indexOf("=");
+    const key = separator < 0 ? token : token.slice(0, separator);
+    const inlineValue = separator < 0 ? undefined : token.slice(separator + 1);
     const name = key.slice(2);
     if (inlineValue !== undefined) {
       args[name] = inlineValue;
@@ -68,7 +70,9 @@ function buildDefaultReportPath(outputFilePath) {
 function startLiveSync(options) {
   const codeFilePath = path.resolve(options.codeFilePath);
   const outputFilePath = path.resolve(options.outputFilePath);
-  const appSettingsPath = path.resolve(options.appSettingsPath);
+  const appSettingsPath = path.resolve(options.appSettingsPath || path.join(options.projectRoot || process.cwd(), "appsettings.json"));
+  const domObservationPath = options.domObservationPath ? path.resolve(options.domObservationPath) : "";
+  const tableMetadataPath = options.tableMetadataPath ? path.resolve(options.tableMetadataPath) : "";
   const reportFilePath = path.resolve(options.reportFilePath || buildDefaultReportPath(outputFilePath));
   const stopSignalFile = options.stopSignalFile ? path.resolve(options.stopSignalFile) : null;
   const debounceMs = toNumber(options.debounceMs, 350);
@@ -130,6 +134,12 @@ function startLiveSync(options) {
         outputFilePath,
         reportFilePath,
         appSettingsPath,
+        domObservationPath,
+        tableMetadataPath,
+        projectRoot: options.projectRoot,
+        className: options.className,
+        caseId: options.caseId,
+        caseTitle: options.caseTitle,
         enterpriseMode
       });
       lastSourceHash = sourceHash;
@@ -260,7 +270,13 @@ function runCli() {
     codeFilePath,
     outputFilePath,
     reportFilePath: args["report-file"] || "",
-    appSettingsPath: args["appsettings-file"] || path.join(process.cwd(), "appsettings.json"),
+    appSettingsPath: args["appsettings-file"] || path.join(args["project-root"] || process.cwd(), "appsettings.json"),
+    projectRoot: args["project-root"],
+    className: args["class-name"],
+    caseId: args["case-id"],
+    caseTitle: args["case-title"],
+    domObservationPath: args["dom-file"] || "",
+    tableMetadataPath: args["metadata-file"] || "",
     stopSignalFile: args["stop-signal-file"] || "",
     debounceMs: args["debounce-ms"] || "350",
     log: String(args.log || "true").toLowerCase() !== "false",
