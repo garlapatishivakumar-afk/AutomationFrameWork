@@ -10,6 +10,7 @@ param(
 	[string]$BatchName = (Get-Date -Format 'yyyyMMdd-HHmmss'),
 	[string[]]$Only,
 	[switch]$GenerateOnly,
+	[switch]$StrictLocators,
 	[switch]$DryRun,
 	[switch]$NoPrompt
 )
@@ -33,6 +34,34 @@ $appSettingsFile = Join-Path (Split-Path $PSScriptRoot -Parent) "appsettings.jso
 $maxAgeDays = 4
 $liveCSharpJob = $null
 
+function Protect-DiagnosticText([string]$Value) {
+	return [regex]::Replace($Value, 'https?://[^\s"''<>`]+', {
+		param($Match)
+		try { $uri = [Uri]$Match.Value; return $uri.GetLeftPart([System.UriPartial]::Path) }
+		catch { return ($Match.Value -split '[?#]')[0] }
+	})
+}
+
+function Protect-ManifestValue($Value) {
+	if ($Value -is [string]) { return (Protect-DiagnosticText $Value) }
+	if ($Value -is [array]) { return ,@($Value | ForEach-Object { Protect-ManifestValue $_ }) }
+	if ($Value -is [pscustomobject]) {
+		$copy = [ordered]@{}
+		foreach ($property in $Value.PSObject.Properties) { $copy[$property.Name] = Protect-ManifestValue $property.Value }
+		return [pscustomobject]$copy
+	}
+	return $Value
+}
+
+function Invoke-CodegenNode([string[]]$Arguments) {
+	# PS 5.1 represents native stderr as ErrorRecords when streams are merged.
+	# Preserve the native exit code, but sanitize both streams before displaying.
+	$ErrorActionPreference = 'Continue'
+	& node @Arguments 2>&1 | ForEach-Object { Write-Host (Protect-DiagnosticText ([string]$_)) }
+	$nativeExitCode = $LASTEXITCODE
+	Set-Variable -Name LASTEXITCODE -Scope 1 -Value $nativeExitCode
+}
+
 function Invoke-LegacyTableLocatorPipeline {
 	param(
 		[switch]$SkipObservation,
@@ -53,7 +82,7 @@ function Invoke-LegacyTableLocatorPipeline {
 				$observerArgs += @('--debug', 'true')
 			}
 
-			& node @observerArgs
+			Invoke-CodegenNode -Arguments $observerArgs
 			if ($LASTEXITCODE -ne 0) {
 				Write-Warning "Live observation failed. Continuing with fallback behavior."
 			}
@@ -103,6 +132,7 @@ function Invoke-CodegenRecording {
 	if ($CaseId) {
 		$identityArgs = @('--class-name', $ClassName, "--case-id=$CaseId", "--case-title=$CaseTitle", '--project-root', (Split-Path $PSScriptRoot -Parent))
 	}
+	if ($StrictLocators) { $identityArgs += @('--strict-locators', 'true') }
 
 try {
 if (-not $GenerateOnly) {
@@ -179,7 +209,7 @@ if ((-not $SkipLiveObservation) -or (-not $SkipTableLocatorPostProcess)) {
 
 		$engineFailed = $false
 		try {
-			& node @engineArgs
+			Invoke-CodegenNode -Arguments $engineArgs
 			if ($LASTEXITCODE -ne 0) {
 				$engineFailed = $true
 			}
@@ -221,7 +251,7 @@ if (-not $SkipCSharpGeneration -and (Test-Path $csharpGeneratorScript)) {
 	if (Test-Path -LiteralPath $csharpReportFile) { Remove-Item -LiteralPath $csharpReportFile -Force -ErrorAction Stop }
 	$generationExitCode = 1
 	try {
-		& node @csharpArgs
+		Invoke-CodegenNode -Arguments $csharpArgs
 		$generationExitCode = $LASTEXITCODE
 	} catch {
 		Write-Warning "C# generator invocation failed: $($_.Exception.Message)"
@@ -234,8 +264,9 @@ if (-not $SkipCSharpGeneration -and (Test-Path $csharpGeneratorScript)) {
 	}
 	if ($generationReport -and (
 		$generationReport.codeGenerationBlocked -eq $true -or
-		$generationReport.locatorRepair.codeGenerationBlocked -eq $true -or
-		$generationReport.locatorValidation.hasFailures -eq $true -or
+		($StrictLocators -and $generationReport.locatorRepair.codeGenerationBlocked -eq $true) -or
+		($StrictLocators -and $generationReport.locatorValidation.hasFailures -eq $true) -or
+		$generationReport.compilation.success -eq $false -or
 		$generationReport.dataContract.blocking -eq $true -or
 		$generationReport.methodQualityGate.blocking -eq $true -or
 		$generationReport.validation.success -eq $false
@@ -368,7 +399,7 @@ if (Test-Path -LiteralPath $manifestPath) {
 function Save-BatchManifest {
 	# Replace atomically so an interrupted write cannot truncate the previous manifest.
 	$tempPath = $manifestPath + '.tmp'
-	$json = $manifest | ConvertTo-Json -Depth 20
+	$json = (Protect-ManifestValue $manifest) | ConvertTo-Json -Depth 30
 	[System.IO.File]::WriteAllText($tempPath, $json, (New-Object System.Text.UTF8Encoding($false)))
 	if (Test-Path -LiteralPath $manifestPath) {
 		[System.IO.File]::Replace($tempPath, $manifestPath, [NullString]::Value)
@@ -380,8 +411,21 @@ function Save-BatchManifest {
 function Publish-SprintArtifacts {
 	Save-BatchManifest
 	if ($DryRun) { return }
-	& node $sprintMergerScript '--manifest-file' $manifestPath | Out-Host
-	if ($LASTEXITCODE -ne 0) {
+	Invoke-CodegenNode -Arguments @($sprintMergerScript, '--manifest-file', $manifestPath)
+	$mergeExitCode = $LASTEXITCODE
+	# The merger projects report diagnostics into issues[]. Keep the in-memory
+	# manifest synchronized so later publishes do not erase those additive fields.
+	if (Test-Path -LiteralPath $manifestPath) {
+		$publishedManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+		foreach ($publishedEntry in $publishedManifest.testCases) {
+			$currentEntry = @($manifest.testCases | Where-Object { $_.id -eq $publishedEntry.id })[0]
+			if ($currentEntry -and $null -ne $publishedEntry.issues) {
+				$currentEntry | Add-Member -NotePropertyName issues -NotePropertyValue @($publishedEntry.issues) -Force
+				$currentEntry | Add-Member -NotePropertyName reviewRequired -NotePropertyValue ([bool]$publishedEntry.reviewRequired) -Force
+			}
+		}
+	}
+	if ($mergeExitCode -ne 0) {
 		$script:sprintMergeFailed = $true
 		Write-Error 'Sprint merge failed. Valid cases were retained where possible; inspect the sprint report.' -ErrorAction Continue
 		$sharedReportPath = Join-Path $batchFolder 'CSharpGenerationReport.json'
@@ -411,6 +455,7 @@ foreach ($row in $selectedRows) {
 		folder = '.'; workFolder = ".work/$id"; codeTs = 'Code.ts'; codeCs = 'Code.cs'
 		report = 'CSharpGenerationReport.json'; tableMetadata = 'TableLocatorMetadata.json'
 		status = 'planned'; actionCount = 0; unsupportedActionCount = 0
+		issues = @(); reviewRequired = $false
 		transformedTableActions = 0; recordedAtUtc = $null
 	}
 	$existing = @($manifest.testCases | Where-Object { $_.id -eq $id })
@@ -449,10 +494,10 @@ $position = 0
 foreach ($row in $selectedRows) {
 	$position++
 	$entry = @($manifest.testCases | Where-Object { $_.id -eq $row.TestCaseId })[0]
-	Write-Host "[$position/$($selectedRows.Count)] $($entry.id) - $($entry.title)"
-	Write-Host "  Preconditions: $($entry.preconditions)"
-	Write-Host "  ExpectedResult: $($entry.expectedResult)"
-	Write-Host "  StartUrl: $($entry.startUrl)"
+	Write-Host (Protect-DiagnosticText "[$position/$($selectedRows.Count)] $($entry.id) - $($entry.title)")
+	Write-Host (Protect-DiagnosticText "  Preconditions: $($entry.preconditions)")
+	Write-Host (Protect-DiagnosticText "  ExpectedResult: $($entry.expectedResult)")
+	Write-Host (Protect-DiagnosticText "  StartUrl: $($entry.startUrl)")
 	if ($DryRun) { Save-BatchManifest; continue }
 	if (-not $NoPrompt -and -not $GenerateOnly) {
 		$answer = Read-Host 'Press Enter to record, s to skip, q to quit'
@@ -490,7 +535,7 @@ foreach ($row in $selectedRows) {
 			if ($null -ne $metadata.transformedActions) { $entry.transformedTableActions = $metadata.transformedActions }
 		}
 	} catch {
-		$entry.status = "failed: $($_.Exception.Message)"
+		$entry.status = Protect-DiagnosticText "failed: $($_.Exception.Message)"
 		# A blocked fresh report still contains useful action counts.
 		if (Test-Path -LiteralPath $reportFile) {
 			try {
@@ -505,7 +550,8 @@ foreach ($row in $selectedRows) {
 	}
 }
 if (-not $DryRun) { Publish-SprintArtifacts }
-$manifest.testCases | Select-Object id, title, status, @{Name='actions';Expression={$_.actionCount}}, @{Name='unsupported';Expression={$_.unsupportedActionCount}} | Format-Table -AutoSize | Out-Host
+(Protect-ManifestValue $manifest).testCases | Select-Object id, @{Name='REVIEW';Expression={[bool]$_.reviewRequired}}, status, @{Name='actions';Expression={$_.actionCount}}, @{Name='unsupported';Expression={$_.unsupportedActionCount}}, title | Format-Table -AutoSize | Out-String -Width 240 | Write-Host
+if (-not $DryRun) { Invoke-CodegenNode -Arguments @($sprintMergerScript, '--review-summary', $manifestPath) }
 Write-Host "Sprint TypeScript: $(Join-Path $batchFolder 'Code.ts')"
 Write-Host "Sprint C#: $(Join-Path $batchFolder 'Code.cs')"
 if ($sprintMergeFailed -or @($manifest.testCases | Where-Object { $_.status -like 'failed:*' }).Count -gt 0) { exit 1 }

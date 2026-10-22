@@ -14,7 +14,7 @@ function runAllTests() {
     fs.writeFileSync(appSettingsPath, JSON.stringify({ Urls: { Start: "https://example.test/start", Middle: "https://example.test/middle", End: "https://example.test/end" } }));
     const generate = (source, enterpriseMode = true, extra = {}) => {
       fs.writeFileSync(codeFilePath, source.join("\n"));
-      return generateCSharpCode({ codeFilePath, outputFilePath, reportFilePath, appSettingsPath, projectRoot: root, enterpriseMode, ...extra });
+      return generateCSharpCode({ codeFilePath, outputFilePath, reportFilePath, appSettingsPath, projectRoot: root, enterpriseMode, strictLocators: true, ...extra });
     };
     const prefix = [
       "await page.goto('https://example.test/start');",

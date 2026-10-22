@@ -3,10 +3,12 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const {
-  generateCSharpCode,
+  generateCSharpCode: generateWithPolicy,
   parseRecordedActions,
   validateGeneratedCSharp
 } = require("./CSharpCodeGenerator.cjs");
+// Preserve all pre-tiered assertions as strict-policy regression coverage.
+const generateCSharpCode = (options) => generateWithPolicy({ ...options, strictLocators: true });
 const { runAllTests: runLocatorValidatorTests } = require("../Intelligence/LocatorValidator.test.cjs");
 const { runAllTests: runLocatorRepairTests } = require("../Intelligence/LocatorRepair.test.cjs");
 const { runAllTests: runFailureTriageTests } = require("../Intelligence/FailureTriage.test.cjs");
@@ -605,12 +607,12 @@ await page.goto('https://documentadministration-sit.trimont.com/default.aspx');
 await page.getByRole('link', { name: 'Administration' }).click();
 await page.getByRole('link', { name: 'Reassign Packages' }).click();
 await page.locator('#ctl00_ContentPlaceHolder1_ddlSearchUser').selectOption('T10964');
-await page.locator('//input[@id=\'ctl00_ContentPlaceHolder1_btnSearch\']').click();
+await page.locator("//input[@id='ctl00_ContentPlaceHolder1_btnSearch']").click();
 await page.locator('#ctl00_ContentPlaceHolder1_rgridPackages_ctl00_ctl04_ReassignCheckSelectCheckBox').check();
 await page.locator('#ctl00_ContentPlaceHolder1_rgridPackages_ctl00_ctl06_ReassignCheckSelectCheckBox').check();
 await page.getByText('Garlapati, Shivakumar', { exact: true }).click();
 await page.locator('#ctl00_ContentPlaceHolder1_ddlUsers').selectOption('T11550');
-await page.locator('//input[@id=\'ctl00_ContentPlaceHolder1_btnReassign\']').click();
+await page.locator("//input[@id='ctl00_ContentPlaceHolder1_btnReassign']").click();
 `, "utf8");
 
     const result = generateCSharpCode({
@@ -1539,7 +1541,17 @@ function testBatchPowerShellOrchestration() {
     return;
   }
   withTempFiles((tempDir) => {
-    const recorderRoot = path.resolve(__dirname, "../..");
+    const recorderRoot = path.join(tempDir, "CodegenAI");
+    fs.mkdirSync(recorderRoot, { recursive: true });
+    fs.copyFileSync(path.resolve(__dirname, "../../StartCodegen.ps1"), path.join(recorderRoot, "StartCodegen.ps1"));
+    const copyTooling = (source, target) => {
+      fs.mkdirSync(target, { recursive: true });
+      for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+        if (entry.isDirectory() && !["node_modules", "auth"].includes(entry.name)) copyTooling(path.join(source, entry.name), path.join(target, entry.name));
+        else if (entry.isFile() && entry.name.endsWith(".cjs")) fs.copyFileSync(path.join(source, entry.name), path.join(target, entry.name));
+      }
+    };
+    copyTooling(path.resolve(__dirname, ".."), path.join(recorderRoot, "AIRecorder"));
     const batchName = `phase1-test-${process.pid}-${Date.now()}`;
     const recordingsRoot = path.join(recorderRoot, "Recordings");
     const batchFolder = path.join(recordingsRoot, batchName);
@@ -1555,8 +1567,8 @@ function testBatchPowerShellOrchestration() {
     function run(args, expectedStatus = 0) {
       const result = require("child_process").spawnSync("powershell.exe", [
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(recorderRoot, "StartCodegen.ps1"),
-        "-BatchFile", csvPath, "-BatchName", batchName, ...args
-      ], { encoding: "utf8", timeout: 60000 });
+        "-BatchFile", csvPath, "-BatchName", batchName, "-StrictLocators", ...args
+      ], { encoding: "utf8", timeout: 60000, env: { ...process.env, NODE_PATH: path.dirname(path.dirname(require.resolve("typescript/package.json"))) } });
       assert.strictEqual(result.status, expectedStatus, `${result.error || ""}\n${result.stdout}\n${result.stderr}`);
       return `${result.stdout}\n${result.stderr}`;
     }
@@ -1787,7 +1799,7 @@ function testGenerationFailureExitCodes() {
     fs.mkdirSync(authDir, { recursive: true });
     fs.copyFileSync(path.resolve(__dirname, "../../StartCodegen.ps1"), path.join(recorder, "StartCodegen.ps1"));
     fs.copyFileSync(path.resolve(__dirname, "../auth/SessionManager.ps1"), path.join(authDir, "SessionManager.ps1"));
-    fs.writeFileSync(path.join(generatorDir, "SprintMerger.cjs"), `const result = require(${JSON.stringify(path.join(__dirname, "SprintMerger.cjs"))}).rebuildSprint(process.argv[process.argv.indexOf('--manifest-file') + 1]); process.exitCode = result.errors.length ? 1 : 0;`);
+    fs.writeFileSync(path.join(generatorDir, "SprintMerger.cjs"), `if (process.argv.includes('--review-summary')) { console.log('review summary'); } else { const result = require(${JSON.stringify(path.join(__dirname, "SprintMerger.cjs"))}).rebuildSprint(process.argv[process.argv.indexOf('--manifest-file') + 1]); process.exitCode = result.errors.length ? 1 : 0; }`);
     writeAppSettings(tempDir);
     const shim = path.join(generatorDir, "CSharpCodeGenerator.cjs");
     const realGenerator = path.join(__dirname, "CSharpCodeGenerator.cjs");
@@ -1799,7 +1811,7 @@ function testGenerationFailureExitCodes() {
     const run = (args, expectedCode) => {
       // Stub only browser recording. The real script, session helper and final
       // generator execute against disposable files; no application is opened.
-      const command = `function npx { $global:LASTEXITCODE = 0 }; & ${quote(path.join(recorder, "StartCodegen.ps1"))} ${args} ; exit $LASTEXITCODE`;
+      const command = `function npx { $global:LASTEXITCODE = 0 }; & ${quote(path.join(recorder, "StartCodegen.ps1"))} -StrictLocators ${args} ; exit $LASTEXITCODE`;
       const result = require("child_process").spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command], { encoding: "utf8", timeout: 60000 });
       assert.strictEqual(result.status, expectedCode, `${result.error || ""}\n${result.stdout}\n${result.stderr}`);
       return `${result.stdout}\n${result.stderr}`;

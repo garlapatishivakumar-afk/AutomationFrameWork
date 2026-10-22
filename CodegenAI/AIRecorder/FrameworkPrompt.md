@@ -63,6 +63,12 @@ download/response events before triggering actions; preserve event/action order.
 Follow FrameworkContext dialog handling. Reuse framework logging/error handling.
 
 ## Assertions and summary
+Read issues[] and reviewRequired for every case. The Pass 1 table must list each
+issue for flagged cases and propose one of: re-record, a stable alternative locator
+(with evidence), or a TODO assertion. Never copy a flagged locator into generated
+code without stating it in the plan, and never claim downstream actions after an
+incomplete replay are verified.
+
 Derive Assertions.Expect checks from each expectedResult using recorded locators
 or literal UI text actually specified there. "Confirmation shown" is not exact UI
 text. Assert relevant navigation, values/selections, messages and popup/grid states

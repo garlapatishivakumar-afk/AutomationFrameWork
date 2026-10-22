@@ -1,7 +1,8 @@
 const fs = require("fs");
 const path = require("path");
-const { randomUUID } = require("crypto");
+const { randomUUID, createHash } = require("crypto");
 const ts = require("typescript");
+const { collectGenerationIssues, formatGenerationIssues, safeDiagnosticText, addReviewHeader, validateGeneratedCSharp } = require("./CSharpCodeGenerator.cjs");
 
 const normalizeText = (value) => String(value || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 const lineAt = (text, offset) => text.slice(0, offset).split("\n").length;
@@ -167,8 +168,9 @@ function mergeCSharp(cases) {
 }
 
 function isBlocked(report) {
-  return Boolean(report && (report.codeGenerationBlocked || report.locatorRepair?.codeGenerationBlocked ||
-    report.locatorValidation?.hasFailures || report.validation?.success === false ||
+  return Boolean(report && (report.codeGenerationBlocked ||
+    (report.strictLocators && (report.locatorRepair?.codeGenerationBlocked || report.locatorValidation?.hasFailures)) || report.validation?.success === false ||
+    report.compilation?.success === false ||
     report.dataContract?.blocking || report.methodQualityGate?.blocking));
 }
 
@@ -177,16 +179,21 @@ function mergeReports(batchId, cases, generatedAtUtc) {
     const report = item.report || {};
     return {
       testCaseId: item.entry.id, title: item.entry.title, status: item.entry.status,
+      reviewRequired: !["planned", "skipped"].includes(item.entry.status) && Boolean(report.reviewRequired ||
+        report.locatorValidation?.hasFailures || report.locatorValidation?.observationCoverage?.status === "INCOMPLETE" ||
+        report.unsupportedActions?.length || report.recordingIssues?.length),
+      issues: ["planned", "skipped"].includes(item.entry.status) ? [] : collectGenerationIssues(report,
+        item.mergeError || (String(item.entry.status).startsWith("failed:") ? item.entry.status : "")),
       included: Boolean(item.included), className: report.className || `CodegenFlow${item.entry.id.replace(/-/g, "_")}`,
       actionCount: report.actionCount || 0, unsupportedActions: report.unsupportedActions || [],
       locatorValidation: report.locatorValidation || null, locatorRepair: report.locatorRepair || null,
       dataContract: report.dataContract || null, methodQualityGate: report.methodQualityGate || null,
-      codeGenerationBlocked: isBlocked(report) || item.entry.status === "failed: generation blocked" || Boolean(item.mergeError),
+      codeGenerationBlocked: isBlocked(report) || String(item.entry.status).startsWith("failed:") || Boolean(item.mergeError),
       validation: item.mergeError ? { success: false, errors: [item.mergeError], warnings: [] } : report.validation || null,
       ...(item.mergeError ? { mergeError: item.mergeError } : {})
     };
   });
-  return { batchId, generatedAtUtc, codeGenerationBlocked: entries.some((entry) => entry.codeGenerationBlocked), cases: entries };
+  return { batchId, generatedAtUtc, reviewRequired: entries.some((entry) => entry.reviewRequired), codeGenerationBlocked: entries.some((entry) => entry.codeGenerationBlocked), cases: entries };
 }
 
 function mergeMetadata(batchId, cases, mappings, generatedAtUtc) {
@@ -213,6 +220,14 @@ function buildSprint(batchId, cases, generatedAtUtc = new Date().toISOString()) 
     if (!["recorded", "generated"].includes(item.entry.status) || isBlocked(item.report) || !item.codeTs || !item.codeCs || !item.report) continue;
     try {
       if (item.report.validation?.success !== true) throw new Error("Case report does not confirm successful validation.");
+      // Recheck actual draft text, not only the previous report, before merging.
+      if (item.report.actionFidelity || item.report.compilation) {
+        const structural = validateGeneratedCSharp(item.codeCs, []);
+        if (!structural.success) throw new Error(structural.errors.join(" | "));
+      }
+      if (item.report.generatedCodeHash && createHash("sha256").update(normalizeText(item.codeCs)).digest("hex") !== item.report.generatedCodeHash) {
+        throw new Error("Generated C# differs from the validated draft; regenerate before merging.");
+      }
       const classInfo = extractCSharpClass(item.codeCs);
       const expectedClass = `CodegenFlow${item.entry.id.replace(/-/g, "_")}`;
       if (classInfo.className !== expectedClass || (item.report.className && item.report.className !== classInfo.className)) {
@@ -231,8 +246,16 @@ function buildSprint(batchId, cases, generatedAtUtc = new Date().toISOString()) 
     }
   }
   const merged = mergeTypeScript(accepted);
+  let mergedCs = mergeCSharp(accepted);
+  // Class extraction deliberately discards comments outside the class. Restore
+  // review markers from report evidence immediately above each included class.
+  for (const item of accepted.filter((item) => item.report.reviewRequired)) {
+    const name = `CodegenFlow${item.entry.id.replace(/-/g, "_")}`;
+    const header = addReviewHeader(`    public sealed class ${name}`, collectGenerationIssues(item.report));
+    mergedCs = mergedCs.replace(`    public sealed class ${name}`, header);
+  }
   return {
-    codeTs: merged.code, codeCs: mergeCSharp(accepted),
+    codeTs: merged.code, codeCs: mergedCs,
     report: mergeReports(batchId, prepared, generatedAtUtc),
     metadata: mergeMetadata(batchId, accepted, merged.mappings, generatedAtUtc),
     errors: prepared.filter((item) => item.mergeError).map((item) => `${item.entry.id}: ${item.mergeError}`)
@@ -287,7 +310,14 @@ function rebuildSprint(manifestPath) {
     }
   });
   const result = buildSprint(manifest.batchId, cases);
+  for (const entry of manifest.testCases) {
+    const report = result.report.cases.find((item) => item.testCaseId === entry.id);
+    entry.issues = report.issues;
+    entry.reviewRequired = report.reviewRequired;
+  }
+  const safeManifest = JSON.parse(JSON.stringify(manifest), (_key, value) => typeof value === "string" ? safeDiagnosticText(value) : value);
   writeArtifactsAtomically(batchFolder, {
+    "manifest.json": (JSON.stringify(safeManifest, null, 2) + "\n").replace(/\n/g, "\r\n"),
     "Code.ts": result.codeTs, "Code.cs": result.codeCs,
     "CSharpGenerationReport.json": JSON.stringify(result.report, null, 2) + "\n",
     "TableLocatorMetadata.json": JSON.stringify(result.metadata, null, 2) + "\n"
@@ -297,16 +327,27 @@ function rebuildSprint(manifestPath) {
 
 if (require.main === module) {
   try {
+    const summaryIndex = process.argv.indexOf("--review-summary");
+    if (summaryIndex >= 0) {
+      const manifest = readOptional(process.argv[summaryIndex + 1], true);
+      const cases = manifest.testCases.filter((entry) => entry.reviewRequired);
+      console.log(`${cases.length} case(s) need review`);
+      for (const entry of cases) for (const line of formatGenerationIssues(entry.id, entry.issues || [])) console.log(line);
+      return;
+    }
     const index = process.argv.indexOf("--manifest-file");
     if (index < 0 || !process.argv[index + 1]) throw new Error("Required argument: --manifest-file <manifest.json>");
     const result = rebuildSprint(process.argv[index + 1]);
+    for (const entry of result.report.cases) {
+      for (const line of formatGenerationIssues(entry.testCaseId, entry.issues)) console.log(line);
+    }
     console.log(`[SprintMerger] Included ${result.report.cases.filter((entry) => entry.included).length} case(s); blocked=${result.report.codeGenerationBlocked}`);
     if (result.errors.length) {
-      console.error(`[SprintMerger] ${result.errors.join(" | ")}`);
+      console.error(`[SprintMerger] ${safeDiagnosticText(result.errors.join(" | "))}`);
       process.exitCode = 1;
     }
   } catch (error) {
-    console.error(`[SprintMerger] ${error.message}`);
+    console.error(`[SprintMerger] ${safeDiagnosticText(error.message)}`);
     process.exitCode = 1;
   }
 }

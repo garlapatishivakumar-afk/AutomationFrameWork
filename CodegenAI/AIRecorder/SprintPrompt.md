@@ -9,6 +9,12 @@ VS Code slash command. SprintPrompt.md wins on workflow; FrameworkPrompt.md wins
 on code rules. Do not commit, switch branches or run tests.
 
 ## Pass 1 - plan only; NO WRITES
+Read issues[] and reviewRequired for every case. The Pass 1 table must list each
+issue for flagged cases and propose one of: re-record, a stable alternative locator
+(with evidence), or a TODO assertion. Never copy a flagged locator into generated
+code without stating it in the plan, and never claim downstream actions after an
+incomplete replay are verified.
+
 Read FrameworkPrompt.md, FrameworkContext.md, all four shared inputs in
 CodegenAI/Recordings/<Batch>/, and the DealsCompletionStatus reference files.
 Scan current Features, bindings, pages, locators and helpers for actual reuse.

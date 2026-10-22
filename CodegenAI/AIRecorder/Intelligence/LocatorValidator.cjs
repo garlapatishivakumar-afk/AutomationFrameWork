@@ -1,4 +1,17 @@
 const fs = require("fs");
+const ts = require("typescript");
+
+// Extract only the receiver, never input-action arguments (which may be secrets).
+function locatorExpression(action) {
+  const source = ts.createSourceFile("action.ts", String(action.raw || ""), ts.ScriptTarget.Latest, true);
+  const statement = source.statements[0];
+  let call = statement && ts.isExpressionStatement(statement) ? statement.expression : null;
+  if (call && ts.isAwaitExpression(call)) call = call.expression;
+  if (call && ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression)) {
+    return call.expression.expression.getText(source);
+  }
+  return getActionLocatorText(action.locator);
+}
 
 const RuleStatus = {
   PASS: "PASS",
@@ -219,10 +232,12 @@ class LocatorValidator {
         const evidence = this.liveByLine.get(line);
         if (!evidence || evidence.observationStatus === "unverified" || evidence.executionStatus === "skipped") {
           firstUntrustedLine = Math.min(firstUntrustedLine, line);
-          gaps.push({ sourceLine: line, reason: evidence?.error || "Recorded action was not replayed by the observer." });
+          gaps.push({ sourceLine: line, reason: evidence?.type === "unsupportedAction"
+            ? `Observer does not support this recorded action. ${evidence.error || ""}`.trim()
+            : evidence?.error || "Recorded action was not replayed by the observer." });
         } else if (evidence.executionStatus === "failed" || evidence.error) {
           firstUntrustedLine = Math.min(firstUntrustedLine, line + 1);
-          gaps.push({ sourceLine: line, reason: "Observer replay failed; later application state is unverified." });
+          gaps.push({ sourceLine: line, reason: evidence.error || evidence.debug?.reason || "Observer replay failed; later application state is unverified." });
         }
       }
     }
@@ -230,6 +245,12 @@ class LocatorValidator {
     const observationCoverage = {
       status: observed.length === 0 ? "UNAVAILABLE" : gaps.length ? "INCOMPLETE" : "AVAILABLE",
       firstUntrustedLine: Number.isFinite(firstUntrustedLine) ? firstUntrustedLine : null,
+      stoppedAtLine: gaps[0]?.sourceLine ?? null,
+      reason: gaps[0]?.reason ?? null,
+      totalActionCount: actions.length,
+      replayedActionCount: observed.filter((item) => item.executionStatus === "succeeded").length,
+      attemptedActionCount: observed.filter((item) => ["succeeded", "failed"].includes(item.executionStatus)).length,
+      skippedActionCount: observed.filter((item) => item.executionStatus === "skipped").length,
       gaps,
       unverifiedSourceLines: actions.filter((action) => action.locator && action.sourceLine >= firstUntrustedLine).map((action) => action.sourceLine)
     };
@@ -302,6 +323,8 @@ class LocatorValidator {
     const cleanedRules = ruleResults.filter(Boolean);
     return {
       locator: locatorText,
+      locatorExpression: locatorExpression(action),
+      observedMatchCount: typeof domAction?.matchCount === "number" ? domAction.matchCount : null,
       sourceLine: action.sourceLine,
       severity: finalSeverity(cleanedRules),
       score: buildScore(cleanedRules),

@@ -3,7 +3,8 @@
 Run these commands from the `CodegenAI` directory in Windows PowerShell 5.1.
 Each case is still recorded and processed separately, but the files to review are
 the sprint's **Code.ts**, **Code.cs** and **manifest.json**. The existing
-single-recording command, paths and failure handling are unchanged.
+single-recording command and paths are unchanged. Generation defaults to tiered
+review handling; add `-StrictLocators` for the previous strict failure policy.
 
 ## Test case CSV
 
@@ -36,8 +37,9 @@ not be a Windows device name. Its default is `yyyyMMdd-HHmmss`.
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -Only TC03
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -GenerateOnly -SkipLiveObservation
+.\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -GenerateOnly -StrictLocators
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Demo -DryRun
-.\StartCodegen.ps1                       # legacy single recording, unchanged
+.\StartCodegen.ps1                       # single recording, tiered review policy
 ```
 
 Add a `TC03` row to the CSV before using the second command. Multiple IDs can
@@ -64,9 +66,10 @@ to the current directory (or absolute).
   `-SkipTableLocatorPostProcess`. Existing DOM/table evidence remains available.
 - C# generation now checks actual emitted action order (`actionFidelity` in each
   case report), including popup/download boundaries. Omitted, duplicated,
-  reordered or unsupported parsed statements block publication instead of
-  producing a successful report with unsupported-action comments. This applies
-  to legacy single recordings too; the previous good internal C# is not overwritten.
+  reordered supported actions block publication. Unsupported actions that leave
+  compilable C# require review by default and throw NotSupportedException if executed;
+  they never silently pass. `-StrictLocators` retains previous unsupported blocking.
+  This applies to single recordings too; structural failures do not overwrite good C#.
   Nested iframe chains and `getByAltText` click/fill actions are supported. Conversion
   fidelity does not prove runtime success: a recorded fill still needs an editable
   target, valid session and application state. No business assertion is invented
@@ -78,7 +81,8 @@ to the current directory (or absolute).
   Reports expose `locatorValidation.observationCoverage`; `INCOMPLETE` means
   downstream locators are **unverified**, not proven valid or invalid. This also
   detects old saved observations that silently omitted recorded inputs. Reliable
-  zero/duplicate matches still block generation. Offline regeneration does not
+  zero/duplicate matches remain FAIL rules: they require review by default and
+  block generation with `-StrictLocators`. Offline regeneration does not
   repair the saved evidence or prove the business flow works; a fresh complete
   observation is needed for that. Observation replays actions against the target
   application, so use suitable test data to avoid duplicate business operations.
@@ -93,11 +97,11 @@ to the current directory (or absolute).
   Raw recordings are retained on generation failure. A failure on one case does not
   remove successful cases from the sprint outputs.
 - After every processed case (including failure/skip), and at the end, the merger
-  rebuilds all four shared artifacts. Only successful cases with both outputs and a
-  valid report are included in Code.ts/Code.cs. The report still includes every
+  rebuilds all four shared artifacts. Structurally valid cases, including review
+  cases, with both outputs and a valid report are included in Code.ts/Code.cs. The report still includes every
   manifest case and its status/diagnostics. Empty merged files mean no eligible cases.
-- Malformed TypeScript, multiple tests in one working file, mismatched class identity,
-  or invalid metadata line references produce `failed: sprint merge error`. Other
+- Malformed TypeScript blocks generation; multiple tests in one working file,
+  mismatched class identity or invalid metadata line references fail the merge. Other
   valid cases are still published. Do not append several tests to one internal file.
 
 ## Output layout
@@ -174,6 +178,8 @@ PowerShell process cannot guarantee cleanup.
       "report": "CSharpGenerationReport.json",
       "tableMetadata": "TableLocatorMetadata.json",
       "status": "planned",
+      "reviewRequired": false,
+      "issues": [],
       "actionCount": 0,
       "unsupportedActionCount": 0,
       "transformedTableActions": 0,
@@ -194,10 +200,10 @@ causes exit code 1 (including retained failures outside `-Only`).
 
 ## Combined report and metadata
 
-The shared report contains `batchId`, `generatedAtUtc`, `codeGenerationBlocked` and
+The shared report contains `batchId`, `generatedAtUtc`, `codeGenerationBlocked`, `reviewRequired` and
 `cases[]`. Each case has `testCaseId`, `title`, `status`, `included`, `className`,
 `actionCount`, `unsupportedActions`, `locatorValidation`, `locatorRepair`,
-`codeGenerationBlocked` and `validation`. Skipped/planned cases have no fresh
+`codeGenerationBlocked`, `reviewRequired`, `issues` and `validation`. Skipped/planned cases have no fresh
 validation evidence (`null`); failed cases retain their diagnostics but no code block.
 The top-level blocked flag is true if any case is blocked, even when other cases
 were generated. A process error can still fail the batch without a blocked report.
@@ -278,3 +284,81 @@ The FeatureTitle value is the `Feature:` text, not the file stem. These are manu
 execution instructions; the sprint prompt must not run them. A build or successful
 generation is not business-flow validation. Resolve TODO assertions (which throw),
 unverified locators, missing login bindings and error-page URLs first.
+
+### Tiered generation policy and recording guards
+
+Default policy B separates review findings from structural failures:
+
+- **Tier 1:** crashes, unparseable TypeScript, invalid C#, undeclared awaited
+  variables, failed compiler/structural validation, failed data/method gates or
+  merge errors exclude the case and exit 1. Real project generation compiles the
+  draft in an external temporary project referencing the framework; compilation
+  failure (including unavailable tooling/dependencies) blocks. Standalone API
+  fixtures with no project report compilation UNAVAILABLE, never PASSED. The merger
+  rechecks structure and the validated draft hash to reject stale/edited C#.
+- **Tier 2:** locator FAIL rules, incomplete replay, compilable unsupported actions
+  and recording guards keep the case in shared TS/C#, with `reviewRequired: true`
+  and `issues[]`. Locator rule outcomes and fidelity findings are not weakened.
+  Validation success means structural validity, NOT successful application replay.
+  Unsupported draft actions explicitly throw until implemented/re-recorded.
+- The final table has a REVIEW column, followed by `N case(s) need review` and
+  each flagged case's issues. Tier-2-only batches exit 0. Each review class has a
+  `// REVIEW REQUIRED: ...` header. No markers are inserted into TypeScript.
+- `-StrictLocators` (generator CLI: `--strict-locators true`) restores previous
+  locator-failure exclusion/exit 1 and unsupported-action blocking. Incomplete
+  replay alone and new recording guards remain review-only, as strict locator
+  enforcement does not turn missing evidence into a failed rule.
+
+Guards inspect original per-case TypeScript during generation, including GenerateOnly:
+
+- `recordingStart`: first page.goto path contains ErrorPages, ServerError or an
+  entire error path segment, case-insensitively. Warn to check app/session and re-record.
+- `suspiciousNavigation`: a later page.goto follows click/fill/press/check with no
+  intervening action, on the same origin as the preceding recorded navigation.
+  It may reload state lost before the next action; flag only, never rewrite/remove.
+  This is recorded-origin evidence, not proof of the live landing origin after redirects.
+- Diagnostics and manifest URL strings contain host/path only, with query and
+  fragment removed. Actual navigation inputs and recorded TS are NOT sanitized or
+  rewritten; keep those private. Manifest URLs are diagnostic, not replay inputs.
+
+Pass 1 must enumerate every issue for flagged cases and propose re-recording, an
+evidence-backed stable locator, or a TODO assertion. It must explicitly disclose
+any planned reuse of a flagged locator and cannot call downstream replay verified.
+
+### Case diagnostics
+
+The generator and merger print `GenerationIssue` lines with case ID, source line,
+locator expression, rule ID and message, followed by a suggested action. `LV012`
+includes expected versus observed match counts when available. A zero count proves
+absence in the observed state, not necessarily an incorrect selector: check the
+preceding navigation and required UI state before fixing/re-recording the selector.
+Other rule failures need selector review or a validator bug report with DOM evidence.
+
+Each manifest test case now has `issues[]` entries with `severity` (`error` or
+`warning`), `kind` (`locatorValidation`, `replayIncomplete`, `unsupportedAction`,
+`recordingStart`, `suspiciousNavigation`, or `generation`), `sourceLine`, `locator`, `ruleId`, and `message`. Unavailable
+line/locator/rule fields are `null`. Planned/skipped cases have an empty array;
+failed cases without a readable report retain a generation-status issue. Issues
+are recomputed from current reports, not accumulated across regenerations. Source
+lines refer to the per-case `.work/<id>/Code.ts`, not the merged sprint file.
+
+`locatorValidation.observationCoverage` adds `stoppedAtLine`, `reason`,
+`totalActionCount`, `replayedActionCount` (explicit successes),
+`attemptedActionCount` (explicit successes plus failures), and `skippedActionCount`.
+Older observations without execution statuses cannot establish these counts;
+zero explicit successes does not prove that nothing ran. `firstUntrustedLine`
+retains its original meaning: the stopping locator can have valid zero-match
+evidence while only later locators are unverified. The original timeout/error is
+preserved; diagnostics do not guess whether a popup, dialog or navigation caused it.
+
+Structurally failed cases remain excluded; review cases are retained. All case
+reports and manifest issues remain available for Pass 1. An existing per-case C#
+file can be stale and is not permission to include the case. No business tests or
+application replay are authorized by generation or these diagnostics.
+
+For read-only investigation, copy the sprint and recorder tooling into an external
+temporary project layout, using the same dependencies. Run the copied entry script
+with `-GenerateOnly -SkipLiveObservation -SkipTableLocatorPostProcess -NoPrompt`
+and the copied CSV. The script derives Recordings from its own location: changing
+the working directory alone does **not** redirect output. Preserve the original
+observations/metadata in the copy; do not use a real session or recapture live data.

@@ -1456,7 +1456,10 @@ function collectFrameworkDependencies(actions, options) {
 function buildActionStatement(action, options) {
   options.emittedSourceLines?.push(action.sourceLine);
   if (!action.supported) {
-    return [`            // Unsupported: ${action.raw.trim()}`];
+    return [
+      `            // Unsupported: ${action.raw.trim()}`,
+      ...(!isTrueFlag(options.strictLocators) ? [`            throw new NotSupportedException("Review required: unsupported recorded action at source line ${action.sourceLine}.");`] : [])
+    ];
   }
 
   if (action.actionType === "download") {
@@ -2411,15 +2414,20 @@ function generateCSharpCode(options) {
     ? { caseId: options.caseId || "", caseTitle: options.caseTitle || "", className: sanitizeClassName(options.className) }
     : {};
   const code = safeRead(options.codeFilePath);
+  const strictLocators = isTrueFlag(options.strictLocators);
+  const parsedSource = ts.createSourceFile("Code.ts", code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const parseErrors = parsedSource.parseDiagnostics.map((diagnostic) =>
+    `Unparseable Code.ts at line ${parsedSource.getLineAndCharacterOfPosition(diagnostic.start || 0).line + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`);
+  const recordingIssues = inspectRecordingGuards(code);
   const dataContractValidation = resolveDataContractValidation(options);
   const runtimeEvidence = resolveRuntimeEvidence(options);
   const executionReliability = classifyExecutionReliability(runtimeEvidence);
   const maintainabilityHistory = resolveMaintainabilityHistory(options);
 
-  if (dataContractValidation.dataContract.blocking) {
+  if (dataContractValidation.dataContract.blocking || parseErrors.length) {
     const validation = {
       success: false,
-      errors: ["Data contract blocked generation."],
+      errors: parseErrors.length ? parseErrors : ["Data contract blocked generation."],
       warnings: [...(dataContractValidation.dataContract.warnings || [])]
     };
 
@@ -2564,12 +2572,18 @@ function generateCSharpCode(options) {
     validation.warnings.push("Observer replay was incomplete. Downstream locators are unverified, not confirmed failures; rerun observation with the updated observer to verify them.");
   }
   if (!builtCode.actionFidelity.success) {
-    validation.success = false;
-    validation.errors.push(...builtCode.actionFidelity.errors);
+    // Keep fidelity rule outcomes intact. Only unsupported-statement findings
+    // become review issues; omission/reordering of supported actions still blocks.
+    const structuralErrors = builtCode.actionFidelity.errors.filter((message) =>
+      strictLocators || !message.startsWith("Action fidelity failed: unsupported statements"));
+    if (structuralErrors.length) {
+      validation.success = false;
+      validation.errors.push(...structuralErrors);
+    }
   }
   let methodQualityEvaluation = buildDefaultMethodQualityGateResult();
 
-  if (locatorValidation.hasFailures) {
+  if (locatorValidation.hasFailures && strictLocators) {
     validation.success = false;
     validation.errors.push(
       `Locator validation failed: ${locatorValidation.failedLocators} locator(s) failed deterministic rules.`
@@ -2586,7 +2600,7 @@ function generateCSharpCode(options) {
     validation.warnings.push(...dataContractValidation.dataContract.warnings);
   }
 
-  if (validation.success && !locatorValidation.hasFailures) {
+  if (validation.success && (!strictLocators || !locatorValidation.hasFailures)) {
     methodQualityEvaluation = evaluateMethodQuality(
       builtCode.code,
       options.methodQualityGateOptions || {}
@@ -2604,6 +2618,14 @@ function generateCSharpCode(options) {
     for (const blockedRule of methodQualityEvaluation.rules.filter((rule) => rule.status === MethodQualityStatus.BLOCKED)) {
       validation.errors.push(`MethodQualityGate ${blockedRule.ruleId}: ${blockedRule.message}`);
     }
+  }
+
+  const compilation = validation.success
+    ? compileGeneratedCSharp(builtCode.code, options)
+    : { status: "SKIPPED", success: null, errors: [] };
+  if (compilation.success === false) {
+    validation.success = false;
+    validation.errors.push(...compilation.errors);
   }
 
   const failureTriage = triage.classifyFailure({
@@ -2637,7 +2659,11 @@ function generateCSharpCode(options) {
 
   const result = {
     ...caseMetadata,
-    codeGenerationBlocked: !validation.success || locatorValidation.hasFailures || Boolean(methodQualityEvaluation.blocking),
+    strictLocators,
+    reviewRequired: locatorValidation.hasFailures || locatorValidation.observationCoverage?.status === "INCOMPLETE" || unsupportedActions.length > 0 || recordingIssues.length > 0,
+    recordingIssues,
+    compilation,
+    codeGenerationBlocked: !validation.success || (strictLocators && locatorValidation.hasFailures) || Boolean(methodQualityEvaluation.blocking),
     generatedAtUtc: new Date().toISOString(),
     codeFilePath: options.codeFilePath,
     outputFilePath: options.outputFilePath,
@@ -2660,15 +2686,28 @@ function generateCSharpCode(options) {
     code: builtCode.code
   };
 
-  if (options.outputFilePath && validation.success && !locatorValidation.hasFailures && !methodQualityEvaluation.blocking) {
+  result.issues = collectGenerationIssues(result);
+  if (result.reviewRequired) {
+    result.code = addReviewHeader(result.code, result.issues);
+    for (const entry of result.sourceMap) if (entry.generatedLine > 0) entry.generatedLine += 1;
+  }
+  result.generatedCodeHash = require("crypto").createHash("sha256").update(result.code).digest("hex");
+
+  if (options.outputFilePath && !result.codeGenerationBlocked) {
     fs.mkdirSync(path.dirname(options.outputFilePath), { recursive: true });
-    fs.writeFileSync(options.outputFilePath, builtCode.code, "utf8");
+    fs.writeFileSync(options.outputFilePath, result.code, "utf8");
   }
 
   if (options.reportFilePath) {
     fs.mkdirSync(path.dirname(options.reportFilePath), { recursive: true });
     fs.writeFileSync(options.reportFilePath, JSON.stringify({
       ...caseMetadata,
+      strictLocators,
+      reviewRequired: result.reviewRequired,
+      recordingIssues: result.recordingIssues,
+      issues: result.issues,
+      compilation: result.compilation,
+      generatedCodeHash: result.generatedCodeHash,
       codeGenerationBlocked: result.codeGenerationBlocked,
       generatedAtUtc: result.generatedAtUtc,
       codeFilePath: result.codeFilePath,
@@ -2706,6 +2745,155 @@ function generateCSharpCode(options) {
   return result;
 }
 
+function safeDiagnosticText(value) {
+  return String(value ?? "").replace(/https?:\/\/[^\s"'<>`]+/gi, (url) => {
+    try { const parsed = new URL(url); return `${parsed.origin}${parsed.pathname}`; }
+    catch { return url.split(/[?#]/)[0]; }
+  });
+}
+
+function inspectRecordingGuards(code) {
+  const file = ts.createSourceFile("Code.ts", code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const issues = [];
+  let lastNavigation = null;
+  let previousAction = null;
+  const visit = (node) => {
+    if (ts.isAwaitExpression(node)) {
+      const call = node.expression;
+      const member = ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) ? call.expression : null;
+      const method = member?.name.text;
+      const sourceLine = file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1;
+      if (member && member.expression.getText(file) === "page" && method === "goto") {
+        let url;
+        try { if (call.arguments[0] && ts.isStringLiteralLike(call.arguments[0])) url = new URL(call.arguments[0].text); } catch { }
+        if (url) {
+          const shown = `${url.origin}${url.pathname}`;
+          if (!lastNavigation && /ErrorPages|ServerError|(?:^|\/)error(?:\/|$)/i.test(url.pathname)) {
+            issues.push({ severity: "warning", kind: "recordingStart", sourceLine, locator: null, ruleId: null,
+              message: `Recording starts on an error page (${shown}). Check the application and the saved session, then re-record.` });
+          }
+          if (lastNavigation && lastNavigation.origin === url.origin && ["click", "fill", "press", "check"].includes(previousAction)) {
+            issues.push({ severity: "warning", kind: "suspiciousNavigation", sourceLine, locator: null, ruleId: null,
+              message: `Navigation immediately after an action (${shown}); this may be a redirect recorded as a navigation. A replay can reload the page and lose state, so the next step may not be found.` });
+          }
+        }
+        lastNavigation = url || { origin: null };
+      }
+      previousAction = method || "unknown";
+      return; // Nested expressions are part of this action, not separate actions.
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return issues;
+}
+
+function addReviewHeader(code, issues) {
+  const details = issues.map((issue) => `line ${issue.sourceLine ?? "n/a"} ${issue.ruleId || issue.kind}`).join("; ");
+  const header = `    // REVIEW REQUIRED: ${issues.length} issue(s): ${safeDiagnosticText(details).replace(/[\r\n\u0085\u2028\u2029]/g, " ")}\n`;
+  return code.replace(/^[ \t]*\/\/ REVIEW REQUIRED:[^\r\n]*\r?\n/gm, "")
+    .replace(/^(\s*public sealed class )/m, (match) => header + match);
+}
+
+// Real project generation gets a compiler gate. Standalone fixture callers without
+// a project retain lightweight validation and explicitly report compilation unavailable.
+function compileGeneratedCSharp(code, options) {
+  const root = inferProjectRoot(options);
+  const project = root && fs.existsSync(root) && fs.readdirSync(root).find((name) => name.endsWith(".csproj"));
+  if (!project) return { status: "UNAVAILABLE", success: null, errors: [] };
+  const os = require("os");
+  const { spawnSync } = require("child_process");
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "codegen-compile-"));
+  const xml = (value) => String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  try {
+    const projectPath = path.join(root, project);
+    const framework = /<TargetFramework>([^<]+)<\/TargetFramework>/.exec(fs.readFileSync(projectPath, "utf8"))?.[1] || "net8.0";
+    fs.writeFileSync(path.join(folder, "Draft.cs"), code);
+    fs.writeFileSync(path.join(folder, "Check.csproj"), `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>${xml(framework)}</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems><NuGetAudit>false</NuGetAudit></PropertyGroup><ItemGroup><Compile Include="Draft.cs"/><ProjectReference Include="${xml(projectPath)}"/></ItemGroup></Project>`);
+    const built = spawnSync("dotnet", ["build", path.join(folder, "Check.csproj"), "--nologo", "-v:q", "-p:NuGetAudit=false"], { encoding: "utf8", timeout: 180000, windowsHide: true });
+    const output = `${built.stdout || ""}\n${built.stderr || ""}`;
+    const errors = [...new Set(output.split(/\r?\n/).filter((line) => /: error\b/.test(line)).map(safeDiagnosticText))];
+    if (built.status !== 0 && !errors.length) {
+      errors.push(built.error?.code === "ENOENT"
+        ? "C# compilation unavailable: dotnet was not found on PATH. Install the project's .NET SDK or add it to PATH, then regenerate. The case remains structurally blocked."
+        : `C# compilation failed: ${built.error?.message || `dotnet exit ${built.status}`}`);
+    }
+    return { status: built.status === 0 ? "PASSED" : "FAILED", success: built.status === 0, errors };
+  } finally { fs.rmSync(folder, { recursive: true, force: true }); }
+}
+
+// Diagnostic projection only: none of these fields participate in blocking gates.
+// Shared by direct generation and the batch merger, including legacy reports.
+function collectGenerationIssues(report = {}, failureMessage = "") {
+  const issues = [];
+  const add = (severity, kind, sourceLine, locator, ruleId, message) => issues.push({
+    severity, kind, sourceLine: sourceLine ?? null, locator: locator ? safeDiagnosticText(locator) : null,
+    ruleId: ruleId || null, message: safeDiagnosticText(message)
+  });
+  for (const result of report.locatorValidation?.results || []) {
+    for (const rule of result.rules || []) {
+      if (rule.status !== "FAIL") continue;
+      const counts = rule.ruleId === "LV012" && typeof result.observedMatchCount === "number"
+        ? ` Expected matches=1; observed=${result.observedMatchCount}.` : "";
+      add("error", "locatorValidation", result.sourceLine, result.locatorExpression || result.locator,
+        rule.ruleId, rule.message + counts);
+    }
+  }
+  const coverage = report.locatorValidation?.observationCoverage;
+  if (coverage?.status === "INCOMPLETE") {
+    const line = coverage.stoppedAtLine ?? coverage.gaps?.[0]?.sourceLine ?? coverage.firstUntrustedLine;
+    const reason = coverage.reason || coverage.gaps?.[0]?.reason || "Observer did not complete replay; reason unavailable.";
+    const locator = report.locatorValidation?.results?.find((item) => item.sourceLine === line);
+    const counts = Number.isInteger(coverage.replayedActionCount)
+      ? `; completed ${coverage.replayedActionCount}/${coverage.totalActionCount} actions; attempted=${coverage.attemptedActionCount}; skipped=${coverage.skippedActionCount}.` : "";
+    add("warning", "replayIncomplete", line, locator?.locatorExpression || locator?.locator, "LV015",
+      `${reason}${counts} Downstream locators are UNVERIFIED.`);
+  }
+  for (const action of report.unsupportedActions || []) {
+    add("error", "unsupportedAction", action.sourceLine, null, null,
+      (Array.isArray(action.diagnostics) ? action.diagnostics.join("; ") : action.diagnostics) || "Recorded action is unsupported by the generator.");
+  }
+  for (const issue of report.recordingIssues || []) {
+    add(issue.severity, issue.kind, issue.sourceLine, issue.locator, issue.ruleId, issue.message);
+  }
+  for (const message of report.validation?.errors || []) {
+    // Do not misclassify the aggregate locator-failure summary as a separate
+    // generator defect when the individual rule failures already explain it.
+    if (/^Locator validation failed:/.test(message) && issues.some((item) => item.kind === "locatorValidation")) continue;
+    add("error", "generation", null, null, null, message);
+  }
+  const explainedStatus = /^failed: generation (blocked|error)$/.test(failureMessage) && issues.some((item) => item.severity === "error");
+  if (failureMessage && !explainedStatus && !issues.some((item) => item.message === failureMessage)) {
+    add("error", "generation", null, null, null, failureMessage);
+  }
+  return issues;
+}
+
+function formatGenerationIssues(caseId, issues) {
+  const oneLine = (text) => safeDiagnosticText(text ?? "n/a").replace(/[\r\n\t]+/g, " ");
+  return issues.flatMap((issue) => {
+    const prefix = `[GenerationIssue] case=${oneLine(caseId || "standalone")} severity=${issue.severity} kind=${issue.kind}`;
+    let action;
+    if (issue.kind === "replayIncomplete") {
+      action = "Cause class 3 (replay/state): inspect the preceding navigation and required popup/dialog/state; re-record if the recording omitted it. Do not infer a selector defect from timeout alone.";
+    } else if (issue.kind === "locatorValidation" && issue.ruleId === "LV012") {
+      action = "Cause class 1 or 3 (unresolved): verify the expected UI state first; fix/re-record the selector only if wrong in that state.";
+    } else if (issue.kind === "locatorValidation") {
+      action = "Cause class 1 or 2 (unresolved): check the selector against the rule; fix it if invalid, or report a validator bug with DOM evidence if valid.";
+    } else if (["recordingStart", "suspiciousNavigation"].includes(issue.kind)) {
+      action = "Check the application/session and recorded navigation; re-record the intended flow. Do not silently delete navigation.";
+    } else if (issue.kind === "unsupportedAction") {
+      action = "Review the unsupported action: the C# draft may omit it. Implement or re-record it before application execution.";
+    } else {
+      action = "Cause class 4 (generation): inspect the reported action/error; report a generator bug for a supported recording. Structural failures remain blocked.";
+    }
+    return [
+      `${prefix} line=${issue.sourceLine ?? "n/a"} locator=${oneLine(issue.locator)} rule=${oneLine(issue.ruleId)}: ${oneLine(issue.message)}`,
+      `[SuggestedAction] case=${oneLine(caseId || "standalone")}: ${action}`
+    ];
+  });
+}
+
 function runCli() {
   const args = parseArgs(process.argv);
   const codeFilePath = args["code-file"];
@@ -2738,34 +2926,48 @@ function runCli() {
     domObservationPath: args["dom-file"] || "",
     tableMetadataPath: args["metadata-file"] || "",
     enableRepair: !isTrueFlag(args["disable-repair"]),
+    strictLocators: isTrueFlag(args["strict-locators"]),
     enterpriseMode: isTrueFlag(args["enterprise-mode"])
   });
 
+  // Review findings are successful output, not native stderr errors in PowerShell 5.1.
+  for (const line of formatGenerationIssues(args["case-id"], collectGenerationIssues(result))) console.log(line);
+
   if (result.locatorValidation.severity === RuleStatus.WARNING) {
-    console.warn(`[CSharpCodeGenerator] Locator warnings detected: ${result.locatorValidation.warningLocators}`);
+    console.log(`[CSharpCodeGenerator] Locator warnings detected: ${result.locatorValidation.warningLocators}`);
   }
 
   if (result.locatorValidation?.observationCoverage?.status === "INCOMPLETE") {
-    console.warn("[CSharpCodeGenerator] Observer replay incomplete: downstream locators are UNVERIFIED. See locatorValidation.observationCoverage; generation success does not confirm application replay success.");
+    console.log("[CSharpCodeGenerator] Observer replay incomplete: downstream locators are UNVERIFIED. See locatorValidation.observationCoverage; generation success does not confirm application replay success.");
   }
 
-  if (result.locatorValidation.hasFailures) {
+  if (result.locatorValidation.hasFailures && isTrueFlag(args["strict-locators"])) {
     console.error(`[CSharpCodeGenerator] Locator validation failed with ${result.locatorValidation.failedLocators} failed locator(s).`);
     process.exit(1);
   }
 
   if (!result.validation.success) {
-    console.error(`[CSharpCodeGenerator] Validation failed: ${result.validation.errors.join(" | ")}`);
+    console.error(`[CSharpCodeGenerator] Validation failed: ${safeDiagnosticText(result.validation.errors.join(" | "))}`);
     process.exit(1);
   }
   console.log(`[CSharpCodeGenerator] Generated ${path.basename(outputFilePath)} with ${result.actions.length} action(s). unsupported=${result.unsupportedActions.length}`);
 }
 
 if (require.main === module) {
-  runCli();
+  try { runCli(); }
+  catch (error) {
+    console.error(`[CSharpCodeGenerator] ${safeDiagnosticText(error.message)}`);
+    process.exitCode = 1;
+  }
 }
 
 module.exports = {
+  safeDiagnosticText,
+  inspectRecordingGuards,
+  addReviewHeader,
+  compileGeneratedCSharp,
+  collectGenerationIssues,
+  formatGenerationIssues,
   validateActionFidelity,
   buildCode,
   generateCSharpCode,
