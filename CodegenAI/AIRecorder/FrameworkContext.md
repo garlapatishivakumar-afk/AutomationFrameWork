@@ -42,3 +42,18 @@ Rules
 - Every asynchronous method name must end with Async.
 - For segmented enterprise methods, use deterministic suffixes such as Part1Async, Part2Async.
 - Avoid vague method names (for example Method1Async or ActionAsync); use domain-specific names.
+
+Locator Generation Rules
+
+- Golden rule: locate by what an element is (tag + stable attribute + stable value), not by what it currently displays.
+- Priority order: stable id, stable data/test attribute in DOM, stable name, stable aria attribute, other stable custom attributes, stable parent-child relationship, relative XPath, text as last resort.
+- Prefer shortest stable unique locator.
+- Do not use text/innerText as primary locator when stable attributes are available.
+- Do not use business/test data values as primary locator keys.
+- Avoid positional locators and absolute XPath unless no stable alternative exists.
+- For dynamic IDs, avoid full volatile IDs and use stable unique segments only after uniqueness validation.
+- Do not depend on unstable framework-generated classes without validation.
+- Use only attributes that exist in captured DOM; never invent attributes.
+- Every locator must be unique; if multiple matches exist, refine using additional stable attributes or stable DOM relationships.
+- Table strategy: identify table via stable attribute, row via stable row attribute, and target relative to row; avoid hardcoded row indexes.
+- If text must be used, treat it as fallback only when static, unique, and not business data.

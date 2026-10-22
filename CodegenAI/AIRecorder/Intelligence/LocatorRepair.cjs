@@ -122,6 +122,7 @@ function applyRepairedLocator(action, repairedLocator) {
   updated.locator = {
     kind: "locator",
     actor: action.locator && action.locator.actor ? action.locator.actor : "page",
+    ...(action.locator?.framePath ? { framePath: action.locator.framePath.map((frame) => ({ ...frame })) } : {}),
     selector: repairedLocator,
     first: false,
     position: null

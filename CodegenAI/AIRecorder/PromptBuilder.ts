@@ -198,6 +198,56 @@ For browser alerts/confirm/prompt in C#, always use this pattern:
 
 Do not generate fire-and-forget dialog calls such as _ = dialog.AcceptAsync().
 
+Locator generation rules (strict):
+
+Golden rule:
+- Locate by what the element is (tag + stable attribute + stable value), not by visible text or test data.
+
+Locator priority:
+1. Stable id
+2. Stable data-* or test-specific attribute that exists in DOM
+3. Stable name
+4. Stable aria-* attribute
+5. Other stable custom attributes
+6. Tag + one or more stable attributes
+7. Stable parent/ancestor + child relationship
+8. Relative XPath with stable DOM relationships
+9. Text/innerText only as a last resort fallback
+
+XPath rules:
+- Prefer tag + attribute value (for example //input[@id='accountNumber']).
+- Do not use text-based XPath when stable attributes exist.
+- Do not use innerText/text()/normalize-space()/contains(.,'text') as primary locator.
+- Do not use test/business data as primary row locator key.
+- Avoid positional XPath (for example //tr[2]/td[3]) unless structurally guaranteed and unavoidable.
+- Do not use absolute XPath from /html/body.
+- For dynamic IDs, use stable unique portions only when uniqueness is validated.
+- Do not depend on unstable/generated classes without validation.
+- Prefer the shortest stable unique locator.
+- Use only attributes that actually exist in captured DOM; never invent attributes.
+
+Table strategy:
+1. Locate table via stable attribute.
+2. Locate row via stable row attribute when available.
+3. Locate target control relative to row.
+4. Avoid row index and displayed business data where possible.
+
+Text fallback policy:
+- Use text only when no stable attribute-based locator exists.
+- Text must be static, non-business data, and unique.
+- If text is used, mark locator as fallback.
+
+Decision checklist before finalizing locator:
+1. Stable id exists?
+2. Stable data/test attribute exists?
+3. Stable name/ARIA exists?
+4. Unique tag+attribute locator possible?
+5. Stable ancestor relationship possible?
+6. XPath actually required?
+7. Text used only as last resort?
+8. Locator unique in DOM?
+9. Any dynamic/test-data-dependent segment left?
+
 Follow the existing Page Object Model framework.
 `
 );

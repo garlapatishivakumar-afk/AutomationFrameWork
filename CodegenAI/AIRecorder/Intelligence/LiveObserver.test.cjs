@@ -38,6 +38,19 @@ async function testTableLinkContext() {
     assert.strictEqual(observed.cell.columnIndex, 3);
     assert.strictEqual(observed.table.id, "rgTransactions");
     assert.strictEqual(observed.row.id, "row1");
+    assert.strictEqual(observed.target.href, "#");
+  });
+}
+
+async function testRoleAttributesCaptured() {
+  await withPage(async (page) => {
+    await page.setContent('<input type="checkbox"><a>No href</a><select multiple><option>One</option></select>');
+    const checkbox = await extractContextForLocator(page.getByRole("checkbox"), {});
+    assert.strictEqual(checkbox.target.type, "checkbox");
+    const anchor = await extractContextForLocator(page.locator("a"), {});
+    assert.strictEqual(anchor.target.href, null);
+    const select = await extractContextForLocator(page.getByRole("listbox"), {});
+    assert.strictEqual(select.target.multiple, true);
   });
 }
 
@@ -195,6 +208,7 @@ await page.locator("//tr[@id='ctl00_ContentPlaceHolder1_PackageRadGrid_ctl00__0'
 }
 
 async function runAllTests() {
+  await testRoleAttributesCaptured();
   testFrameTextActionWithExactIsParsed();
   testScopedRoleActionIsParsed();
   testScopedTextActionIsParsed();

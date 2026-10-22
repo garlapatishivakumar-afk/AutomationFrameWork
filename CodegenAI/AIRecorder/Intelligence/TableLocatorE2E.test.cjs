@@ -63,7 +63,33 @@ test('test', async ({ page }) => {
     "Expected row-id locator selected from DOM context"
   );
 
-  console.log("TableLocator E2E test passed");
+  // A real browser observation of a Telerik empty row must not turn a unique
+  // text target into a positional business-row XPath (Sprint16 regression).
+  const emptyHtml = '<table id="ctl00_Results_ctl00" class="rgMasterTable"><tbody><tr class="rgNoRecords"><td colspan="3"><div>No records to display.</div></td></tr></tbody></table>';
+  const emptyCode = `import { test } from '@playwright/test';
+test('empty results', async ({ page }) => {
+  await page.goto('${buildDataUrl(emptyHtml)}');
+  await page.getByText('No records to display.').click();
+});`;
+  fs.writeFileSync(codeFile, emptyCode, "utf8");
+  const emptyObserved = await observeRecordedFlow({
+    codeFilePath: codeFile, outputFilePath: domFile,
+    storageStateFile: "", showBrowser: false, debug: false
+  });
+  const emptyAction = emptyObserved.actions.find((action) => action.line === 4);
+  assert.strictEqual(emptyAction.matchCount, 1);
+  assert.strictEqual(emptyAction.row.className, "rgNoRecords");
+  assert.strictEqual(emptyAction.target.tagName, "div");
+  fs.writeFileSync(domFile, JSON.stringify(emptyObserved), "utf8");
+  const emptyTransformed = transformCode({
+    codeFilePath: codeFile, domFilePath: domFile,
+    metadataFilePath: "", tableSelector: "table", debug: false
+  });
+  assert.strictEqual(emptyTransformed.code, emptyCode);
+  assert.strictEqual(emptyTransformed.metadata.actions[0].strategy, "PRESERVE_EMPTY_TABLE_TEXT");
+  assert.strictEqual(emptyTransformed.metadata.transformedActions, 0);
+
+  console.log("TableLocator E2E test passed (data rows and empty-results text)");
 }
 
 if (require.main === module) {

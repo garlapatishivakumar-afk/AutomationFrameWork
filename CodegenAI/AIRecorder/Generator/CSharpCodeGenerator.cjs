@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const ts = require("typescript");
 const { LocatorValidator, RuleStatus } = require("../Intelligence/LocatorValidator.cjs");
 const { LocatorRepair } = require("../Intelligence/LocatorRepair.cjs");
 const { FailureTriage } = require("../Intelligence/FailureTriage.cjs");
@@ -177,6 +178,7 @@ function createAction(sourceLine, raw, data) {
     expectedResult: data.expectedResult || null,
     frame: data.frame || null,
     popup: data.popup || null,
+    ...(data.download ? { download: data.download } : {}),
     table: data.table || null,
     confidence: data.confidence === undefined ? 0.7 : data.confidence,
     supported: data.supported !== false,
@@ -232,8 +234,94 @@ function withPosition(locator, positionSegment) {
   return position ? { ...locator, position } : locator;
 }
 
+// Frame boundaries are syntax, not text inside a selector. Retain the leaf
+// locator model so normal locator validation continues to apply.
+function parseStructuredLocator(expression) {
+  const file = ts.createSourceFile("locator.ts", expression + ";", ts.ScriptTarget.Latest, true);
+  if (file.parseDiagnostics.length || file.statements.length !== 1 || !ts.isExpressionStatement(file.statements[0])) return null;
+  const calls = [];
+  let node = file.statements[0].expression;
+  while (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+    calls.unshift({ name: node.expression.name.text, args: node.arguments, node });
+    node = node.expression.expression;
+  }
+  if (!ts.isIdentifier(node) || node.text !== "page") return null;
+  const literal = (call) => call && call.args.length === 1 && ts.isStringLiteralLike(call.args[0]);
+  const framePath = [];
+  let index = 0;
+  while (index < calls.length) {
+    const call = calls[index];
+    if (call.name === "frameLocator" && literal(call)) {
+      framePath.push({ selector: call.args[0].text });
+      index += 1;
+    } else if (call.name === "locator" && literal(call) && calls[index + 1]?.name === "contentFrame" && calls[index + 1].args.length === 0) {
+      framePath.push({ selector: call.args[0].text });
+      index += 2;
+    } else {
+      break;
+    }
+  }
+  const tail = calls.slice(index);
+  if (!tail.length || tail.some((call) => ["contentFrame", "frameLocator"].includes(call.name))) return null;
+  const readOptions = (node, allowed) => {
+    if (!node) return {};
+    if (!ts.isObjectLiteralExpression(node)) return null;
+    const result = {};
+    for (const property of node.properties) {
+      if (!ts.isPropertyAssignment(property)) return null;
+      const key = property.name.text;
+      if (!allowed.includes(key) || Object.hasOwn(result, key)) return null;
+      const value = property.initializer;
+      if (key === "exact" && [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword].includes(value.kind)) {
+        result[key] = value.kind === ts.SyntaxKind.TrueKeyword;
+      } else if (key !== "exact" && ts.isStringLiteralLike(value)) {
+        result[key] = value.text;
+      } else return null;
+    }
+    return result;
+  };
+  let scope;
+  if (tail[0].name === "locator" && ["getByRole", "getByText"].includes(tail[1]?.name)) {
+    if (!literal(tail[0])) return null;
+    scope = tail.shift().args[0].text;
+  }
+  const call = tail.shift();
+  if (!call.args.length || !ts.isStringLiteralLike(call.args[0]) || call.args.length > 2) return null;
+  const kinds = { getByRole: "role", getByText: "text", getByLabel: "label", getByPlaceholder: "placeholder", getByTitle: "title", getByTestId: "testid", getByAltText: "altText", locator: "locator" };
+  const kind = kinds[call.name];
+  if (!kind) return null;
+  if (["locator", "testid"].includes(kind) && call.args.length !== 1) return null;
+  const options = readOptions(call.args[1], kind === "role" ? ["name", "exact"] : ["exact"]);
+  if (!options || (kind === "role" && typeof options.name !== "string")) return null;
+  const value = call.args[0].text;
+  const leaf = kind === "locator" ? { kind, selector: value }
+    : kind === "role" ? { kind, role: value, ...options }
+    : { kind, text: value, ...options };
+  if (scope !== undefined) {
+    leaf.kind = kind === "role" ? "scopedRole" : "scopedText";
+    leaf.selector = scope;
+  }
+  if (tail[0]?.name === "filter" && kind === "locator") {
+    const filter = tail.shift();
+    const options = filter.args.length === 1 && readOptions(filter.args[0], ["hasText"]);
+    if (!options || typeof options.hasText !== "string") return null;
+    leaf.filterText = options.hasText;
+  }
+  if (tail.length > 1) return null;
+  if (tail.length) {
+    const positionCall = tail[0];
+    if (["first", "last"].includes(positionCall.name) && positionCall.args.length === 0) {
+      leaf.position = { type: positionCall.name };
+    } else if (positionCall.name === "nth" && positionCall.args.length === 1 && ts.isNumericLiteral(positionCall.args[0]) && /^\d+$/.test(positionCall.args[0].text)) {
+      leaf.position = { type: "nth", index: Number(positionCall.args[0].text) };
+    } else return null;
+  }
+  return { ...leaf, ...(framePath.length ? { framePath } : {}) };
+}
+
 function parseLocatorExpression(expression) {
   const trimmed = String(expression || "").trim();
+  if (/\.(contentFrame|frameLocator|getByAltText)\(/.test(trimmed)) return parseStructuredLocator(trimmed);
   const patterns = [
     {
       regex: /^page\.frameLocator\((['"`])(.+?)\1\)\.getByRole\((['"`])(\w+)\3,\s*\{\s*name:\s*(['"`])([^'"`]+)\5(?:,\s*exact:\s*(true|false))?\s*\}\)(\.first\(\)|\.last\(\)|\.nth\(\d+\))?$/,
@@ -326,7 +414,7 @@ function tryParseGenericLocatorAction(line, rawLine, sourceLine) {
     targetElement: locator.kind,
     value: actionMatch[4] || null,
     table: locator.selector ? detectTableInfo(locator.selector) : null,
-    frame: locator.frameSelector ? { selector: locator.frameSelector } : null,
+    frame: locator.frameSelector ? { selector: locator.frameSelector } : locator.framePath ? { selector: locator.framePath[0].selector, selectors: locator.framePath.map((frame) => frame.selector) } : null,
     confidence: 0.88,
     diagnostics
   });
@@ -395,6 +483,18 @@ function parseActionLine(rawLine, sourceLine) {
       locator: { kind: "expression", expression: expectVisibleMatch[1].trim() },
       expectedResult: expectVisibleMatch[4] || expectVisibleMatch[2],
       targetElement: "assertion"
+    });
+  }
+
+  if (/\.(contentFrame|frameLocator|getByAltText)\(/.test(normalizedLine)) {
+    const parsed = tryParseGenericLocatorAction(normalizedLine, rawLine, sourceLine);
+    if (parsed) {
+      parsed.locator.actor = actor;
+      return parsed;
+    }
+    return createAction(sourceLine, rawLine, {
+      actionType: "unsupported", locatorStrategy: "UNSUPPORTED", supported: false,
+      confidence: 0, diagnostics: ["Unsupported structured locator. Manual review required."]
     });
   }
 
@@ -600,6 +700,11 @@ function parseActionLine(rawLine, sourceLine) {
 function parseRecordedActions(code) {
   const lines = String(code || "").split(/\r?\n/);
   const actions = [];
+  const pendingEvents = new Map();
+  const unsupportedPromise = (sourceLine, raw) => createAction(sourceLine, raw, {
+    actionType: "unsupported", locatorStrategy: "UNSUPPORTED", supported: false,
+    confidence: 0, diagnostics: ["Unrecognized or incomplete awaited event promise. Manual review required."]
+  });
 
   const normalizeRecordedLine = (line) => {
     const raw = String(line || "");
@@ -618,6 +723,20 @@ function parseRecordedActions(code) {
     const normalizedLine = normalizeRecordedLine(lines[index]);
     const trimmed = normalizedLine.trim();
 
+    const eventWaitMatch = trimmed.match(/^const\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\.waitForEvent\((['"`])([^'"`]+)\3\);$/);
+    if (eventWaitMatch && eventWaitMatch[4] !== "popup") {
+      if (eventWaitMatch[4] === "download") {
+        const action = createAction(index + 1, lines[index], {
+          actionType: "downloadWait", locatorStrategy: "DOWNLOAD_WAIT", targetElement: "download",
+          download: { promiseVar: eventWaitMatch[1], actor: eventWaitMatch[2] }, confidence: 0.95
+        });
+        pendingEvents.set(eventWaitMatch[1], action);
+        actions.push(action);
+      } else {
+        actions.push(unsupportedPromise(index + 1, lines[index]));
+      }
+      continue;
+    }
     const popupWaitMatch = trimmed.match(/^const\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\.waitForEvent\((['"`])popup\3\);$/);
     if (popupWaitMatch) {
       actions.push(createAction(index + 1, lines[index], {
@@ -630,11 +749,27 @@ function parseRecordedActions(code) {
         },
         confidence: 0.95
       }));
+      pendingEvents.set(popupWaitMatch[1], actions[actions.length - 1]);
       continue;
     }
 
     const popupResolveMatch = trimmed.match(/^const\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+([A-Za-z_$][\w$]*)\s*;$/);
     if (popupResolveMatch) {
+      const pending = pendingEvents.get(popupResolveMatch[2]);
+      pendingEvents.delete(popupResolveMatch[2]);
+      if (!pending) {
+        actions.push(unsupportedPromise(index + 1, lines[index]));
+        continue;
+      }
+      if (pending.actionType === "downloadWait") {
+        pending.download.resultVar = sanitizeClassName(popupResolveMatch[1]);
+        pending.download.resolveLine = index + 1;
+        actions.push(createAction(index + 1, lines[index], {
+          actionType: "downloadResolve", locatorStrategy: "DOWNLOAD_RESOLVE", targetElement: "download",
+          download: { ...pending.download }, confidence: 0.95
+        }));
+        continue;
+      }
       actions.push(createAction(index + 1, lines[index], {
         actionType: "popupResolve",
         locatorStrategy: "POPUP_RESOLVE",
@@ -648,13 +783,40 @@ function parseRecordedActions(code) {
       continue;
     }
 
+    if (/^await\s+[A-Za-z_$][\w$]*\s*;?$/.test(trimmed)) {
+      actions.push(unsupportedPromise(index + 1, lines[index]));
+      continue;
+    }
+
     const action = parseActionLine(normalizedLine, index + 1);
     if (action) {
       actions.push(action);
     }
   }
 
-  return actions;
+  return actions.map((action) => action.actionType === "downloadWait" && !action.download.resolveLine
+    ? unsupportedPromise(action.sourceLine, action.raw)
+    : action);
+}
+
+// Keep the event subscription and all triggering actions in one render unit so
+// enterprise method splitting cannot separate a promise from its resolution.
+// The original flat actions remain available for locator validation and reports.
+function groupDownloadActions(actions) {
+  const grouped = [];
+  for (let index = 0; index < actions.length; index += 1) {
+    const action = actions[index];
+    if (action.actionType === "downloadWait" && action.supported) {
+      const end = actions.findIndex((item, position) => position > index && item.sourceLine === action.download.resolveLine);
+      if (end > index) {
+        grouped.push({ ...action, actionType: "download", triggerActions: groupDownloadActions(actions.slice(index + 1, end)) });
+        index = end;
+        continue;
+      }
+    }
+    grouped.push(action);
+  }
+  return grouped;
 }
 
 function convertLocatorExpressionFromTs(expression) {
@@ -723,9 +885,18 @@ function buildLocatorExpression(locator, actorFieldMap = new Map()) {
   };
 
   const actorName = resolveActorName(locator.actor);
-  const actorRef = actorName === "page"
+  let actorRef = actorName === "page"
     ? "Page"
     : (actorFieldMap.get(actorName) || toCSharpActor(actorName));
+
+  for (const frame of locator.framePath || []) {
+    actorRef += `.FrameLocator("${escapeCSharpString(frame.selector)}")`;
+  }
+
+  if (locator.kind === "altText") {
+    const options = locator.exact ? ", new() { Exact = true }" : "";
+    return applyPosition(`${actorRef}.GetByAltText("${escapeCSharpString(locator.text)}"${options})`);
+  }
 
   if (locator.kind === "role") {
     const exactPart = locator.exact ? ", Exact = true" : "";
@@ -743,11 +914,13 @@ function buildLocatorExpression(locator, actorFieldMap = new Map()) {
   }
 
   if (locator.kind === "placeholder") {
-    return applyPosition(`${actorRef}.GetByPlaceholder(\"${escapeCSharpString(locator.text)}\")`);
+    const options = locator.exact ? ", new() { Exact = true }" : "";
+    return applyPosition(`${actorRef}.GetByPlaceholder(\"${escapeCSharpString(locator.text)}\"${options})`);
   }
 
   if (locator.kind === "title") {
-    return applyPosition(`${actorRef}.GetByTitle(\"${escapeCSharpString(locator.text)}\")`);
+    const options = locator.exact ? ", new() { Exact = true }" : "";
+    return applyPosition(`${actorRef}.GetByTitle(\"${escapeCSharpString(locator.text)}\"${options})`);
   }
 
   if (locator.kind === "testid") {
@@ -1103,7 +1276,7 @@ function locatorPropertyBaseName(locator) {
     return sanitizeIdentifier(locator.text || "TextLocator");
   }
 
-  if (locator.kind === "label") {
+  if (locator.kind === "label" || locator.kind === "altText") {
     return sanitizeIdentifier(locator.text || "LabelLocator");
   }
 
@@ -1281,8 +1454,22 @@ function collectFrameworkDependencies(actions, options) {
 }
 
 function buildActionStatement(action, options) {
+  options.emittedSourceLines?.push(action.sourceLine);
   if (!action.supported) {
     return [`            // Unsupported: ${action.raw.trim()}`];
+  }
+
+  if (action.actionType === "download") {
+    const actor = resolveActorName(action.download.actor);
+    const actorRef = actor === "page" ? "Page" : (options.actorFieldMap.get(actor) || toCSharpActor(actor));
+    const lines = [
+      `            var ${action.download.resultVar} = await ${actorRef}.RunAndWaitForDownloadAsync(async () =>`,
+      "            {",
+      ...action.triggerActions.flatMap((trigger) => buildActionStatement(trigger, options).map((line) => `    ${line}`)),
+      "            });"
+    ];
+    options.emittedSourceLines?.push(action.download.resolveLine);
+    return lines;
   }
 
   if (action.actionType === "goto") {
@@ -1560,6 +1747,7 @@ function renderMethodBodyForActions(actions, buildOptions, fillArgBySourceLine) 
     appendInteractionWaitIfNeeded(action);
 
     if (action.actionType === "fill" && fillArgBySourceLine && fillArgBySourceLine.has(action.sourceLine)) {
+      buildOptions.emittedSourceLines?.push(action.sourceLine);
       const effectiveExpression = getActionBindingExpression(action, buildOptions);
       const warnings = action.diagnostics.map((message) => `            // Review: ${message}`);
       lines.push(...warnings);
@@ -1692,7 +1880,7 @@ function tryBuildEnterpriseLinearMethods(actions, buildOptions) {
     .map((entry) => entry.index);
 
   const lastGotoIndex = gotoIndexes.length > 0 ? gotoIndexes[gotoIndexes.length - 1] : -1;
-  const navigationActions = gotoIndexes.map((index) => actions[index]);
+  const navigationActions = actions.slice(0, lastGotoIndex + 1);
   const flowActions = actions.slice(lastGotoIndex + 1);
   if (flowActions.length === 0 && navigationActions.length === 0) {
     return null;
@@ -1779,11 +1967,11 @@ function tryBuildEnterpriseMethods(actions, buildOptions) {
 
   const gotoIndexes = actions
     .map((action, index) => ({ action, index }))
-    .filter((entry) => entry.action.actionType === "goto")
+    .filter((entry) => entry.index < popupWaitIndex && entry.action.actionType === "goto")
     .map((entry) => entry.index);
 
   const lastGotoIndex = gotoIndexes.length > 0 ? gotoIndexes[gotoIndexes.length - 1] : -1;
-  const navigationActions = gotoIndexes.map((index) => actions[index]);
+  const navigationActions = actions.slice(0, lastGotoIndex + 1);
   const prePopupActions = actions.slice(lastGotoIndex + 1, popupWaitIndex);
   const popupActions = actions.slice(popupWaitIndex, popupResolveIndex + 1);
   const postPopupActions = actions.slice(popupResolveIndex + 1);
@@ -1953,7 +2141,25 @@ function sanitizeClassName(value) {
   return keywords.has(name) ? `_${name}` : name;
 }
 
+function validateActionFidelity(actions, emittedSourceLines) {
+  const expectedSourceLines = actions.map((action) => action.sourceLine);
+  const unsupportedSourceLines = actions.filter((action) => !action.supported).map((action) => action.sourceLine);
+  const ordered = expectedSourceLines.length === emittedSourceLines.length &&
+    expectedSourceLines.every((line, index) => line === emittedSourceLines[index]);
+  return {
+    success: ordered && unsupportedSourceLines.length === 0,
+    expectedSourceLines,
+    emittedSourceLines: [...emittedSourceLines],
+    unsupportedSourceLines,
+    errors: [
+      ...(!ordered ? ["Action fidelity failed: emitted actions were omitted, duplicated, or reordered."] : []),
+      ...(unsupportedSourceLines.length ? [`Action fidelity failed: unsupported statements at source lines ${unsupportedSourceLines.join(", ")}.`] : [])
+    ]
+  };
+}
+
 function buildCode(actions, options) {
+  const renderActions = groupDownloadActions(actions);
   const className = sanitizeClassName(options.className);
   const singleLine = (value) => String(value || "").replace(/[\r\n\u0085\u2028\u2029]/g, " ");
   const headerLines = options.caseId !== undefined || options.caseTitle !== undefined
@@ -1987,6 +2193,7 @@ function buildCode(actions, options) {
     frameworkDependencies: dependencies,
     locatorBindings: locatorRegistry.actionBindings,
     actorFieldMap,
+    emittedSourceLines: [],
     runtimeState: {
       inlineActorLocators: new Map(),
       usedInlineActorNames: new Set()
@@ -2077,13 +2284,13 @@ function buildCode(actions, options) {
   let helperMethod = [];
 
   if (enterpriseMode) {
-    const enterprise = tryBuildEnterpriseMethods(actions, buildOptions);
+    const enterprise = tryBuildEnterpriseMethods(renderActions, buildOptions);
     if (enterprise) {
       replayLines = enterprise.replayLines;
       methodBlocks = enterprise.methodBlocks;
       helperMethod = enterprise.helperMethod;
     } else {
-      const linearEnterprise = tryBuildEnterpriseLinearMethods(actions, buildOptions);
+      const linearEnterprise = tryBuildEnterpriseLinearMethods(renderActions, buildOptions);
       if (linearEnterprise) {
         replayLines = linearEnterprise.replayLines;
         methodBlocks = linearEnterprise.methodBlocks;
@@ -2095,15 +2302,20 @@ function buildCode(actions, options) {
   if (replayLines.length === 0) {
     const replayMethodStartLine = preBodyLines.length + 3;
     const bodyLines = [];
-    for (const action of actions) {
+    for (const action of renderActions) {
       const lines = buildActionStatement(action, buildOptions);
-      sourceMap.push({
-        sourceLine: action.sourceLine,
-        generatedLine: replayMethodStartLine + bodyLines.length + lines.length,
-        actionType: action.actionType,
-        locatorStrategy: action.locatorStrategy,
-        supported: action.supported
-      });
+      const mappedActions = action.actionType === "download"
+        ? actions.filter((item) => item.sourceLine >= action.sourceLine && item.sourceLine <= action.download.resolveLine)
+        : [action];
+      for (const mappedAction of mappedActions) {
+        sourceMap.push({
+          sourceLine: mappedAction.sourceLine,
+          generatedLine: replayMethodStartLine + bodyLines.length + lines.length,
+          actionType: mappedAction.actionType,
+          locatorStrategy: mappedAction.locatorStrategy,
+          supported: mappedAction.supported
+        });
+      }
       bodyLines.push(...lines);
     }
     replayLines = bodyLines;
@@ -2133,6 +2345,7 @@ function buildCode(actions, options) {
       "}"
     ].join("\n"),
     sourceMap,
+    actionFidelity: validateActionFidelity(actions, buildOptions.emittedSourceLines),
     frameworkMatches: dependencies.frameworkMatches,
     generatedLocators: locatorRegistry.generatedLocators
   };
@@ -2163,6 +2376,21 @@ function validateGeneratedCSharp(code, actions) {
 
   if (code.includes("TODO_UNRESOLVED")) {
     errors.push("Generated code contains unresolved placeholders.");
+  }
+
+  // Lightweight guard for bare awaited variables, not a substitute for compiling.
+  // Mask literals/comments and track block scope to catch missing declarations
+  // and promises accidentally split into different enterprise methods.
+  const tokens = String(code || "").replace(/@"(?:""|[^"])*"|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g, " ");
+  const scopes = [new Set()];
+  const tokenPattern = /[{}]|\b(?:var|[A-Z][\w]*(?:<[^;{}=]+>)?)\s+([A-Za-z_]\w*)(?=\s*[=;,)])|\bawait\s+([A-Za-z_]\w*)(?=\s*(?:;|\.ConfigureAwait\s*\())/g;
+  for (const match of tokens.matchAll(tokenPattern)) {
+    if (match[0] === "{") scopes.push(new Set());
+    else if (match[0] === "}") { if (scopes.length > 1) scopes.pop(); }
+    else if (match[1]) scopes[scopes.length - 1].add(match[1]);
+    else if (match[2] && !scopes.some((scope) => scope.has(match[2]))) {
+      errors.push(`Awaited variable '${match[2]}' was never declared in the current scope.`);
+    }
   }
 
   const unsupported = actions.filter((action) => !action.supported);
@@ -2228,6 +2456,7 @@ function generateCSharpCode(options) {
 
     const blockedResult = {
       ...caseMetadata,
+      codeGenerationBlocked: true,
       generatedAtUtc: new Date().toISOString(),
       codeFilePath: options.codeFilePath,
       outputFilePath: options.outputFilePath,
@@ -2253,6 +2482,7 @@ function generateCSharpCode(options) {
       fs.mkdirSync(path.dirname(options.reportFilePath), { recursive: true });
       fs.writeFileSync(options.reportFilePath, JSON.stringify({
         ...caseMetadata,
+        codeGenerationBlocked: true,
         generatedAtUtc: blockedResult.generatedAtUtc,
         codeFilePath: blockedResult.codeFilePath,
         outputFilePath: blockedResult.outputFilePath,
@@ -2330,9 +2560,17 @@ function generateCSharpCode(options) {
     ? builtCode.code.split("\n").slice(2).join("\n")
     : builtCode.code;
   const validation = validateGeneratedCSharp(validationCode, actions);
+  if (locatorValidation.observationCoverage?.status === "INCOMPLETE") {
+    validation.warnings.push("Observer replay was incomplete. Downstream locators are unverified, not confirmed failures; rerun observation with the updated observer to verify them.");
+  }
+  if (!builtCode.actionFidelity.success) {
+    validation.success = false;
+    validation.errors.push(...builtCode.actionFidelity.errors);
+  }
   let methodQualityEvaluation = buildDefaultMethodQualityGateResult();
 
   if (locatorValidation.hasFailures) {
+    validation.success = false;
     validation.errors.push(
       `Locator validation failed: ${locatorValidation.failedLocators} locator(s) failed deterministic rules.`
     );
@@ -2399,6 +2637,7 @@ function generateCSharpCode(options) {
 
   const result = {
     ...caseMetadata,
+    codeGenerationBlocked: !validation.success || locatorValidation.hasFailures || Boolean(methodQualityEvaluation.blocking),
     generatedAtUtc: new Date().toISOString(),
     codeFilePath: options.codeFilePath,
     outputFilePath: options.outputFilePath,
@@ -2408,6 +2647,7 @@ function generateCSharpCode(options) {
     frameworkMatches: builtCode.frameworkMatches,
     generatedLocatorProperties: Array.isArray(builtCode.generatedLocators) ? builtCode.generatedLocators.length : 0,
     sourceMap: builtCode.sourceMap,
+    actionFidelity: builtCode.actionFidelity,
     dataContract: dataContractValidation.dataContract,
     methodQualityGate: methodQualityEvaluation,
     executionReliability,
@@ -2420,7 +2660,7 @@ function generateCSharpCode(options) {
     code: builtCode.code
   };
 
-  if (options.outputFilePath && !locatorValidation.hasFailures && !methodQualityEvaluation.blocking) {
+  if (options.outputFilePath && validation.success && !locatorValidation.hasFailures && !methodQualityEvaluation.blocking) {
     fs.mkdirSync(path.dirname(options.outputFilePath), { recursive: true });
     fs.writeFileSync(options.outputFilePath, builtCode.code, "utf8");
   }
@@ -2429,6 +2669,7 @@ function generateCSharpCode(options) {
     fs.mkdirSync(path.dirname(options.reportFilePath), { recursive: true });
     fs.writeFileSync(options.reportFilePath, JSON.stringify({
       ...caseMetadata,
+      codeGenerationBlocked: result.codeGenerationBlocked,
       generatedAtUtc: result.generatedAtUtc,
       codeFilePath: result.codeFilePath,
       outputFilePath: result.outputFilePath,
@@ -2437,6 +2678,7 @@ function generateCSharpCode(options) {
       generatedLocatorProperties: result.generatedLocatorProperties,
       frameworkMatches: result.frameworkMatches,
       sourceMap: result.sourceMap,
+      actionFidelity: result.actionFidelity,
       dataContract: result.dataContract,
       methodQualityGate: result.methodQualityGate,
       executionReliability: result.executionReliability,
@@ -2499,9 +2741,12 @@ function runCli() {
     enterpriseMode: isTrueFlag(args["enterprise-mode"])
   });
 
-  console.log(`[CSharpCodeGenerator] Generated ${path.basename(outputFilePath)} with ${result.actions.length} action(s). unsupported=${result.unsupportedActions.length}`);
   if (result.locatorValidation.severity === RuleStatus.WARNING) {
     console.warn(`[CSharpCodeGenerator] Locator warnings detected: ${result.locatorValidation.warningLocators}`);
+  }
+
+  if (result.locatorValidation?.observationCoverage?.status === "INCOMPLETE") {
+    console.warn("[CSharpCodeGenerator] Observer replay incomplete: downstream locators are UNVERIFIED. See locatorValidation.observationCoverage; generation success does not confirm application replay success.");
   }
 
   if (result.locatorValidation.hasFailures) {
@@ -2513,6 +2758,7 @@ function runCli() {
     console.error(`[CSharpCodeGenerator] Validation failed: ${result.validation.errors.join(" | ")}`);
     process.exit(1);
   }
+  console.log(`[CSharpCodeGenerator] Generated ${path.basename(outputFilePath)} with ${result.actions.length} action(s). unsupported=${result.unsupportedActions.length}`);
 }
 
 if (require.main === module) {
@@ -2520,6 +2766,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  validateActionFidelity,
   buildCode,
   generateCSharpCode,
   parseRecordedActions,

@@ -217,14 +217,37 @@ if (-not $SkipCSharpGeneration -and (Test-Path $csharpGeneratorScript)) {
 	)
 	$csharpArgs += $identityArgs
 
-	& node @csharpArgs
-	if ($LASTEXITCODE -ne 0) {
-		if ($CaseId) { throw "C# generation exited with code $LASTEXITCODE" }
-		Write-Warning "C# generation failed. Raw Code.ts and existing post-processing outputs were preserved."
+	# Never mistake an earlier report for the result of this final generation.
+	if (Test-Path -LiteralPath $csharpReportFile) { Remove-Item -LiteralPath $csharpReportFile -Force -ErrorAction Stop }
+	$generationExitCode = 1
+	try {
+		& node @csharpArgs
+		$generationExitCode = $LASTEXITCODE
+	} catch {
+		Write-Warning "C# generator invocation failed: $($_.Exception.Message)"
+	}
+	$generationReport = $null
+	try {
+		$generationReport = Get-Content -LiteralPath $csharpReportFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+	} catch {
+		Write-Warning 'Final C# generation did not produce a readable report.'
+	}
+	if ($generationReport -and (
+		$generationReport.codeGenerationBlocked -eq $true -or
+		$generationReport.locatorRepair.codeGenerationBlocked -eq $true -or
+		$generationReport.locatorValidation.hasFailures -eq $true -or
+		$generationReport.dataContract.blocking -eq $true -or
+		$generationReport.methodQualityGate.blocking -eq $true -or
+		$generationReport.validation.success -eq $false
+	)) {
+		throw 'generation blocked'
+	}
+	if ($generationExitCode -ne 0 -or -not $generationReport -or $generationReport.validation.success -ne $true -or -not (Test-Path -LiteralPath $csharpOutputFile)) {
+		throw 'generation error'
 	}
 } elseif (-not $SkipCSharpGeneration) {
-	if ($CaseId) { throw "C# generator not found: $csharpGeneratorScript" }
 	Write-Warning "C# generator not found: $csharpGeneratorScript"
+	throw 'generation error'
 }
 }
 finally {
@@ -256,13 +279,21 @@ if (-not $BatchFile) {
 	if (-not (Test-Path $sessionScript)) { throw "Session helper not found: $sessionScript" }
 	. $sessionScript
 	Initialize-CodegenSession -SessionPath $sessionPath -MaxAgeDays $maxAgeDays
-	Invoke-CodegenRecording -CodeFile $outputFile -CsFile $csharpOutputFile -ReportFile $csharpReportFile `
-		-DomFile $domObservationFile -MetadataFile $tableLocatorMetadataFile -StopFile $csharpStopSignalFile -TargetUrl $TargetUrl
+	try {
+		Invoke-CodegenRecording -CodeFile $outputFile -CsFile $csharpOutputFile -ReportFile $csharpReportFile `
+			-DomFile $domObservationFile -MetadataFile $tableLocatorMetadataFile -StopFile $csharpStopSignalFile -TargetUrl $TargetUrl
+	} catch {
+		Write-Error "Codegen failed: $($_.Exception.Message). Review $csharpReportFile; an existing Code.cs may be stale." -ErrorAction Continue
+		exit 1
+	}
 	return
 }
 
 # All validation precedes session initialization, browser launch and folder creation.
 $ErrorActionPreference = 'Stop'
+$sprintMergerScript = Join-Path $PSScriptRoot 'AIRecorder\Generator\SprintMerger.cjs'
+$sprintMergeFailed = $false
+if (-not $DryRun -and -not (Test-Path -LiteralPath $sprintMergerScript)) { throw "Sprint merger not found: $sprintMergerScript" }
 if ($GenerateOnly -and $SkipCSharpGeneration) { throw '-GenerateOnly cannot be combined with -SkipCSharpGeneration.' }
 if ($BatchName -notmatch '^[A-Za-z0-9_-]+$') { throw 'BatchName must contain only letters, digits, underscores or hyphens.' }
 function Test-ReservedFolderName([string]$Name) {
@@ -301,9 +332,37 @@ $manifest = [pscustomobject][ordered]@{
 	targetUrl = $TargetUrl
 	testCases = @()
 }
-if ($Only -and (Test-Path -LiteralPath $manifestPath)) {
-	$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-	if ($manifest.batchId -ne $BatchName -or $null -eq $manifest.testCases) { throw 'Existing manifest has an invalid shape or batchId.' }
+if (Test-Path -LiteralPath $manifestPath) {
+	# Validate before any writes, including full replans and dry runs. Never repair
+	# incompatible path fields implicitly or trust the presence of working files.
+	try { $existingManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json }
+	catch { throw 'Invalid batch manifest: cannot parse JSON. No outputs were changed.' }
+	if ($existingManifest.batchId -cne $BatchName -or $existingManifest.testCases -isnot [array]) {
+		throw 'Invalid batch manifest: expected matching batchId and a testCases array. No outputs were changed.'
+	}
+	$manifestIds = @{}
+	$manifestClasses = @{}
+	foreach ($existingEntry in $existingManifest.testCases) {
+		if ($null -eq $existingEntry -or $existingEntry.id -isnot [string] -or
+			$existingEntry.id -notmatch '^[A-Za-z0-9_-]+$' -or (Test-ReservedFolderName $existingEntry.id) -or
+			$manifestIds.ContainsKey($existingEntry.id)) {
+			throw 'Invalid batch manifest: invalid or duplicate case ID. No outputs were changed.'
+		}
+		$manifestIds[$existingEntry.id] = $true
+		$manifestClass = 'CodegenFlow' + ($existingEntry.id -replace '-', '_')
+		if ($manifestClasses.ContainsKey($manifestClass)) { throw 'Invalid batch manifest: duplicate case class. No outputs were changed.' }
+		$manifestClasses[$manifestClass] = $true
+		if ($existingEntry.title -isnot [string] -or [string]::IsNullOrWhiteSpace($existingEntry.title) -or
+			$existingEntry.status -isnot [string] -or $existingEntry.status -cnotmatch '^(planned|recorded|generated|skipped|failed: .+)$') {
+			throw 'Invalid batch manifest: missing or invalid case title/status. No outputs were changed.'
+		}
+		if ($existingEntry.workFolder -cne ".work/$($existingEntry.id)" -or $existingEntry.folder -cne '.' -or
+			$existingEntry.codeTs -cne 'Code.ts' -or $existingEntry.codeCs -cne 'Code.cs' -or
+			$existingEntry.report -cne 'CSharpGenerationReport.json' -or $existingEntry.tableMetadata -cne 'TableLocatorMetadata.json') {
+			throw "Invalid batch manifest: $($existingEntry.id) requires workFolder '.work/$($existingEntry.id)' and shared sprint output paths. No outputs were changed."
+		}
+	}
+	if ($Only) { $manifest = $existingManifest }
 }
 
 function Save-BatchManifest {
@@ -318,6 +377,28 @@ function Save-BatchManifest {
 	}
 }
 
+function Publish-SprintArtifacts {
+	Save-BatchManifest
+	if ($DryRun) { return }
+	& node $sprintMergerScript '--manifest-file' $manifestPath | Out-Host
+	if ($LASTEXITCODE -ne 0) {
+		$script:sprintMergeFailed = $true
+		Write-Error 'Sprint merge failed. Valid cases were retained where possible; inspect the sprint report.' -ErrorAction Continue
+		$sharedReportPath = Join-Path $batchFolder 'CSharpGenerationReport.json'
+		if (Test-Path -LiteralPath $sharedReportPath) {
+			$sharedReport = Get-Content -LiteralPath $sharedReportPath -Raw | ConvertFrom-Json
+			foreach ($caseReport in $sharedReport.cases) {
+				if ($caseReport.mergeError) {
+					$failedEntry = @($manifest.testCases | Where-Object { $_.id -eq $caseReport.testCaseId })[0]
+					$failedEntry.status = 'failed: sprint merge error'
+					$failedEntry | Add-Member -NotePropertyName mergeError -NotePropertyValue $caseReport.mergeError -Force
+				}
+			}
+			Save-BatchManifest
+		}
+	}
+}
+
 New-Item -ItemType Directory -Path $batchFolder -Force | Out-Null
 foreach ($row in $selectedRows) {
 	$id = [string]$row.TestCaseId
@@ -327,8 +408,8 @@ foreach ($row in $selectedRows) {
 		id = $id; title = $row.Title; startUrl = $caseUrl
 		preconditions = $row.Preconditions; expectedResult = $row.ExpectedResult
 		priority = $row.Priority; dataHint = $row.DataHint
-		folder = $id; codeTs = "$id/Code.ts"; codeCs = "$id/Code.cs"
-		report = "$id/CSharpGenerationReport.json"; tableMetadata = "$id/TableLocatorMetadata.json"
+		folder = '.'; workFolder = ".work/$id"; codeTs = 'Code.ts'; codeCs = 'Code.cs'
+		report = 'CSharpGenerationReport.json'; tableMetadata = 'TableLocatorMetadata.json'
 		status = 'planned'; actionCount = 0; unsupportedActionCount = 0
 		transformedTableActions = 0; recordedAtUtc = $null
 	}
@@ -339,10 +420,20 @@ foreach ($row in $selectedRows) {
 	for ($i = 0; $i -lt $entries.Count; $i++) { if ($entries[$i].id -eq $id) { $index = $i; break } }
 	if ($index -ge 0) { $entries[$index] = $entry } else { $entries += $entry }
 	$manifest.testCases = $entries
-	New-Item -ItemType Directory -Path (Join-Path $batchFolder $id) -Force | Out-Null
+	if (-not $DryRun) {
+		New-Item -ItemType Directory -Path (Join-Path $batchFolder $entry.workFolder) -Force | Out-Null
+	}
 }
+# The manifest is the merger's ordering authority. Preserve all unselected case
+# metadata, but order current CSV rows first (including after an -Only update).
+$orderedEntries = @()
+foreach ($row in $rows) { $orderedEntries += @($manifest.testCases | Where-Object { $_.id -eq $row.TestCaseId }) }
+$orderedEntries += @($manifest.testCases | Where-Object { -not $ids.ContainsKey($_.id) })
+$manifest.testCases = $orderedEntries
 Save-BatchManifest
-[System.IO.File]::WriteAllText((Join-Path $recordingsRoot 'latest-batch.txt'), "Recordings/$BatchName", (New-Object System.Text.UTF8Encoding($false)))
+if (-not $DryRun) {
+	[System.IO.File]::WriteAllText((Join-Path $recordingsRoot 'latest-batch.txt'), "Recordings/$BatchName", (New-Object System.Text.UTF8Encoding($false)))
+}
 
 if (-not $DryRun -and -not $GenerateOnly) {
 	if (-not (Test-Path $sessionScript)) { throw "Session helper not found: $sessionScript" }
@@ -365,20 +456,23 @@ foreach ($row in $selectedRows) {
 	if ($DryRun) { Save-BatchManifest; continue }
 	if (-not $NoPrompt -and -not $GenerateOnly) {
 		$answer = Read-Host 'Press Enter to record, s to skip, q to quit'
-		if ($answer -eq 'q') { Save-BatchManifest; break }
-		if ($answer -eq 's') { $entry.status = 'skipped'; Save-BatchManifest; continue }
+		if ($answer -eq 'q') { Publish-SprintArtifacts; break }
+		if ($answer -eq 's') { $entry.status = 'skipped'; Publish-SprintArtifacts; continue }
 	}
-	$caseFolder = Join-Path $batchFolder $entry.id
+	$caseFolder = Join-Path $batchFolder $entry.workFolder
 	$codeFile = Join-Path $caseFolder 'Code.ts'
 	$reportFile = Join-Path $caseFolder 'CSharpGenerationReport.json'
 	$metadataFile = Join-Path $caseFolder 'TableLocatorMetadata.json'
 	if ($GenerateOnly -and -not (Test-Path -LiteralPath $codeFile)) {
 		$entry.status = 'skipped'
 		Write-Warning "No Code.ts for $($entry.id); skipping regeneration."
-		Save-BatchManifest
+		Publish-SprintArtifacts
 		continue
 	}
 	try {
+		# Only fresh generation evidence may authorize inclusion in shared output.
+		# This also excludes stale C# when recording with -SkipCSharpGeneration.
+		if (Test-Path -LiteralPath $reportFile) { Remove-Item -LiteralPath $reportFile -Force }
 		Invoke-CodegenRecording -CodeFile $codeFile -CsFile (Join-Path $caseFolder 'Code.cs') `
 			-ReportFile $reportFile -DomFile (Join-Path $caseFolder 'LiveObservations.json') `
 			-MetadataFile $metadataFile -StopFile (Join-Path $caseFolder '.csharp-live-sync.stop') `
@@ -397,11 +491,22 @@ foreach ($row in $selectedRows) {
 		}
 	} catch {
 		$entry.status = "failed: $($_.Exception.Message)"
-		Write-Warning "$($entry.id): $($entry.status)"
+		# A blocked fresh report still contains useful action counts.
+		if (Test-Path -LiteralPath $reportFile) {
+			try {
+				$failedReport = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
+				if ($null -ne $failedReport.actionCount) { $entry.actionCount = $failedReport.actionCount }
+				$entry.unsupportedActionCount = @($failedReport.unsupportedActions).Count
+			} catch { } # Preserve the original failure if the diagnostic report is invalid.
+		}
+		Write-Error "$($entry.id): $($entry.status). Review $reportFile; an existing Code.cs may be stale." -ErrorAction Continue
 	} finally {
-		Save-BatchManifest
+		Publish-SprintArtifacts
 	}
 }
+if (-not $DryRun) { Publish-SprintArtifacts }
 $manifest.testCases | Select-Object id, title, status, @{Name='actions';Expression={$_.actionCount}}, @{Name='unsupported';Expression={$_.unsupportedActionCount}} | Format-Table -AutoSize | Out-Host
-if (@($manifest.testCases | Where-Object { $_.status -like 'failed:*' }).Count -gt 0) { exit 1 }
+Write-Host "Sprint TypeScript: $(Join-Path $batchFolder 'Code.ts')"
+Write-Host "Sprint C#: $(Join-Path $batchFolder 'Code.cs')"
+if ($sprintMergeFailed -or @($manifest.testCases | Where-Object { $_.status -like 'failed:*' }).Count -gt 0) { exit 1 }
 exit 0

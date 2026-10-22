@@ -183,6 +183,66 @@ export const FrameworkRules: FrameworkRule[] = [
     },
 
     {
+        id: "LocatorAttributePriority",
+        description: "Generate locators using this priority: stable id, stable data/test attributes, stable name, stable aria attributes, other stable custom attributes, then stable DOM relationship. Use text only as last resort.",
+        required: true
+    },
+
+    {
+        id: "NoPrimaryTextLocator",
+        description: "Do not use innerText/text() as primary locator when stable attribute-based locator exists.",
+        required: true
+    },
+
+    {
+        id: "NoTestDataLocator",
+        description: "Do not use business/test data values as primary locator keys for rows/cells/actions.",
+        required: true
+    },
+
+    {
+        id: "NoAbsoluteOrPositionalXPath",
+        description: "Avoid absolute XPath and brittle positional XPath indexes unless structurally guaranteed and no stable alternative exists.",
+        required: true
+    },
+
+    {
+        id: "StableXPathOnly",
+        description: "When XPath is required, prefer shortest unique relative XPath using tag + stable attributes + stable values.",
+        required: true
+    },
+
+    {
+        id: "DynamicIdHandling",
+        description: "For dynamic IDs, do not use full volatile IDs blindly; use stable unique segments only when uniqueness is validated.",
+        required: true
+    },
+
+    {
+        id: "TableLocatorStrategy",
+        description: "For tables, identify table by stable attribute, row by stable row attribute, then target element relative to row. Avoid row indexes and displayed business data where possible.",
+        required: true
+    },
+
+    {
+        id: "LocatorUniquenessValidation",
+        description: "Every generated locator must uniquely match the intended element. Refine with stable attributes or stable parent-child relationships if multiple matches are found.",
+        required: true
+    },
+
+    {
+        id: "NoInventedAttributes",
+        description: "Use only attributes present in the captured DOM. Do not invent data-testid, automation-id, or other attributes.",
+        required: true
+    },
+
+    {
+        id: "ClassStabilityCheck",
+        description: "Do not rely on framework-generated or unstable class names without validation.",
+        required: true
+    },
+
+    {
         id: "NoMagicStrings",
         description: "Avoid unexplained magic strings; use constants or known framework sources.",
         required: false

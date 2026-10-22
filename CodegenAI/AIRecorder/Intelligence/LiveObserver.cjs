@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const ts = require("typescript");
 
 function tryResolveChromiumLauncher() {
   const candidates = ["playwright", "@playwright/test", "playwright-core"];
@@ -165,18 +166,76 @@ async function waitForPostActionState(page, options, label) {
   log(options.debug, `${label}: page settled (dom/network/busy checks).`);
 }
 
+// Decode only literal arguments and known Playwright locator calls; never eval
+// recorded JavaScript. Input actions must be replayed before downstream clicks.
+function parseLiteralReplayAction(raw, line) {
+  const file = ts.createSourceFile("action.ts", raw, ts.ScriptTarget.Latest, true);
+  if (file.parseDiagnostics.length || file.statements.length !== 1) return null;
+  const statement = file.statements[0];
+  if (!ts.isExpressionStatement(statement) || !ts.isAwaitExpression(statement.expression)) return null;
+  const call = statement.expression.expression;
+  if (!ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) return null;
+  const methods = ["fill", "press", "selectOption", "setInputFiles", "focus", "waitFor", "click", "dblclick", "hover", "check", "uncheck"];
+  const method = call.expression.name.text;
+  if (!methods.includes(method)) return null;
+  const decode = (node) => {
+    if (ts.isStringLiteralLike(node)) return node.text;
+    if (ts.isNumericLiteral(node)) return Number(node.text);
+    if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
+    if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
+    if (ts.isArrayLiteralExpression(node)) return node.elements.map(decode);
+    if (ts.isObjectLiteralExpression(node)) {
+      const result = {};
+      for (const property of node.properties) {
+        if (!ts.isPropertyAssignment(property)) throw new Error("Nonliteral property");
+        const key = property.name.text;
+        if (!key || ["__proto__", "constructor", "prototype"].includes(key)) throw new Error("Unsafe property");
+        result[key] = decode(property.initializer);
+      }
+      return result;
+    }
+    throw new Error("Nonliteral argument");
+  };
+  try {
+    const chain = [];
+    let node = call.expression.expression;
+    const locatorMethods = ["locator", "frameLocator", "contentFrame", "getByRole", "getByText", "getByLabel", "getByPlaceholder", "getByTitle", "getByTestId", "getByAltText", "first", "last", "nth", "filter"];
+    while (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      const name = node.expression.name.text;
+      if (!locatorMethods.includes(name)) return null;
+      chain.unshift({ name, args: node.arguments.map(decode) });
+      node = node.expression.expression;
+    }
+    if (!ts.isIdentifier(node) || node.text !== "page" || !chain.length) return null;
+    return { line, raw, kind: "replayAction", method, args: call.arguments.map(decode), chain,
+      scope: "page", locatorSource: call.expression.expression.getText(file) };
+  } catch {
+    return null;
+  }
+}
+
 function parseCodeActions(code) {
   const lines = code.split(/\r?\n/);
   const actions = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+    if (/^const\s+\w+\s*=.*(?:waitForEvent\(|\bawait\b)/.test(line)) {
+      actions.push({ line: i + 1, raw: lines[i], kind: "unsupportedAction" });
+      continue;
+    }
     if (!line.startsWith("await ")) {
       continue;
     }
 
     const lineNumber = i + 1;
     const locatorSource = trimActionSource(lines[i]);
+
+    if (/\.(fill|press|selectOption|setInputFiles|focus|waitFor|getByAltText|frameLocator)\(/.test(line) ||
+      (line.match(/\.contentFrame\(/g) || []).length > 1) {
+      actions.push(parseLiteralReplayAction(lines[i], lineNumber) || { line: lineNumber, raw: lines[i], kind: "unsupportedAction" });
+      continue;
+    }
 
     const gotoMatch = line.match(/^await\s+page\.goto\((['"`])([^'"`]+)\1\);$/);
     if (gotoMatch) {
@@ -360,10 +419,12 @@ function parseCodeActions(code) {
         kind: "locatorAction",
         selector: locatorClickMatch[2],
         method: locatorClickMatch[3],
+        first: line.includes(".first()"),
         scope: "page"
       });
       continue;
     }
+    actions.push(parseLiteralReplayAction(lines[i], lineNumber) || { line: lineNumber, raw: lines[i], kind: "unsupportedAction" });
   }
 
   return actions;
@@ -560,6 +621,13 @@ async function extractContextForLocator(locator, actionDescriptor) {
         tagName: targetTagName,
         text: targetText,
         role: element.getAttribute("role") || null,
+        href: element.getAttribute("href"),
+        type: element.getAttribute("type"),
+        list: element.getAttribute("list"),
+        multiple: element.hasAttribute("multiple"),
+        size: element.getAttribute("size"),
+        scope: element.getAttribute("scope"),
+        alt: element.getAttribute("alt"),
         testId: targetTestId,
         id: targetId,
         className: targetClassName,
@@ -616,6 +684,9 @@ async function extractContextForLocator(locator, actionDescriptor) {
 }
 
 function buildLocator(base, action) {
+  if (action.kind === "replayAction") {
+    return action.chain.reduce((locator, call) => locator[call.name](...call.args), base);
+  }
   const applyModifiers = (locator) => {
     let current = locator;
     if (action.filterHasTextBlank) {
@@ -858,7 +929,9 @@ async function executeAction(action, locator) {
   }
 
   if (typeof locator[action.method] === "function") {
-    await locator[action.method]();
+    await locator[action.method](...(action.args || []));
+  } else {
+    throw new Error(`Unsupported replay method: ${action.method}`);
   }
 }
 
@@ -867,6 +940,7 @@ async function observeRecordedFlow(options) {
   const actions = parseCodeActions(code);
 
   const observations = {
+    replayVersion: 2,
     generatedAtUtc: new Date().toISOString(),
     source: {
       codeFilePath: options.codeFilePath
@@ -895,10 +969,19 @@ async function observeRecordedFlow(options) {
 
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
+  page.setDefaultTimeout(toNumber(options.resolveTimeoutMs, 10000));
+  let blockedByLine = null;
 
   try {
     for (let actionIndex = 0; actionIndex < actions.length; actionIndex++) {
       const action = actions[actionIndex];
+      if (blockedByLine !== null || action.kind === "unsupportedAction") {
+        blockedByLine ??= action.line;
+        observations.actions.push({ line: action.line, raw: action.raw, type: action.kind,
+          observationStatus: "unverified", executionStatus: "skipped", blockedByLine,
+          error: `Observation replay incomplete at source line ${blockedByLine}; downstream DOM evidence is not reliable.` });
+        continue;
+      }
       try {
         if (action.kind === "goto") {
           log(options.debug, `Line ${action.line}: goto ${action.url}`);
@@ -910,6 +993,7 @@ async function observeRecordedFlow(options) {
             line: action.line,
             raw: action.raw,
             type: "goto",
+            executionStatus: "succeeded",
             page: action.url,
             debug: {
               actionIndex,
@@ -949,6 +1033,8 @@ async function observeRecordedFlow(options) {
             frameSelector: action.frameSelector || null,
             originalLocator: action.locatorSource || trimActionSource(action.raw),
             matchCount: 0,
+            observationStatus: "observed",
+            executionStatus: "failed",
             isUnique: false,
             duplicateText: false,
             insideTable: false,
@@ -960,6 +1046,7 @@ async function observeRecordedFlow(options) {
             options.debug,
             `Line ${action.line}: unresolved locator. reason=${unresolvedDebug.reason}, url=${unresolvedDebug.currentUrl}`
           );
+          blockedByLine = action.line;
           continue;
         }
 
@@ -982,6 +1069,8 @@ async function observeRecordedFlow(options) {
           frameSelector: action.frameSelector || null,
           originalLocator: action.locatorSource || trimActionSource(action.raw),
           ...contextData,
+          observationStatus: "observed",
+          executionStatus: "pending",
           debug: {
             actionIndex,
             originalLocator: action.locatorSource || trimActionSource(action.raw),
@@ -1004,9 +1093,19 @@ async function observeRecordedFlow(options) {
           }
         });
 
-        await executeAction(action, locator.first());
+        await executeAction(action, locator);
+        observations.actions[observations.actions.length - 1].executionStatus = "succeeded";
         await waitForPostActionState(page, options, `Line ${action.line}`);
       } catch (error) {
+        blockedByLine = action.line;
+        const captured = observations.actions.find((item) => item.line === action.line);
+        if (captured) {
+          // A failed click/fill does not mean a previously observed target had
+          // zero matches. Keep its DOM evidence and record the execution error.
+          captured.executionStatus = "failed";
+          captured.error = error instanceof Error ? error.message : String(error);
+          continue;
+        }
         const unresolvedDebug = await buildUnresolvedDebug(
           page,
           action,
@@ -1026,13 +1125,14 @@ async function observeRecordedFlow(options) {
           frameSelector: action.frameSelector || null,
           originalLocator: action.locatorSource || trimActionSource(action.raw),
           insideTable: false,
-          matchCount: 0,
+          observationStatus: "unverified",
+          executionStatus: "failed",
           isUnique: false,
           debug: unresolvedDebug,
           error: error instanceof Error ? error.message : String(error)
         });
 
-        log(options.debug, `Line ${action.line}: observation failed, continuing with fallback.`);
+        log(options.debug, `Line ${action.line}: observation failed; downstream replay will be skipped.`);
       }
     }
   } finally {

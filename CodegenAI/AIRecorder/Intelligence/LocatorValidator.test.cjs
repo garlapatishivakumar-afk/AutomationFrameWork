@@ -173,7 +173,40 @@ function testDynamicIdIsWarningNotHardFailureWhenUnique() {
   });
 }
 
+function testImplicitAriaRoleCompatibility() {
+  const validator = new LocatorValidator({});
+  for (const [role, target, expected] of [
+    ["link", { tagName: "a", href: "/example" }, "PASS"],
+    ["link", { tagName: "a", href: "" }, "PASS"],
+    ["link", { tagName: "a", href: null }, "FAIL"],
+    ["link", { tagName: "a" }, "WARNING"],
+    ["button", { tagName: "a" }, "FAIL"],
+    ["button", { tagName: "button" }, "PASS"],
+    ["button", { tagName: "div" }, "FAIL"],
+    ["button", { tagName: "div", role: "button" }, "PASS"],
+    ["button", { tagName: "button", role: "link" }, "FAIL"],
+    ["checkbox", { tagName: "input", type: "checkbox" }, "PASS"],
+    ["radio", { tagName: "input", attributes: { type: "radio" } }, "PASS"],
+    ["checkbox", { tagName: "input", type: "text" }, "FAIL"],
+    ["textbox", { tagName: "input", type: null }, "PASS"],
+    ["textbox", { tagName: "input", type: "password" }, "FAIL"],
+    ["searchbox", { tagName: "input", type: "search" }, "PASS"],
+    ["slider", { tagName: "input", type: "range" }, "PASS"],
+    ["spinbutton", { tagName: "input", type: "number" }, "PASS"],
+    ["combobox", { tagName: "input", type: "text", list: "choices" }, "PASS"],
+    ["textbox", { tagName: "textarea" }, "PASS"],
+    ["combobox", { tagName: "select", multiple: false, size: null }, "PASS"],
+    ["listbox", { tagName: "select", multiple: true, size: null }, "PASS"],
+    ["rowheader", { tagName: "th", scope: "row" }, "PASS"],
+    ["columnheader", { tagName: "th", scope: null }, "PASS"]
+  ]) {
+    const result = validator.validateTargetType({ targetElement: role, locator: { kind: "role", role } }, { target });
+    assert.strictEqual(result.status, expected, `${role} on ${JSON.stringify(target)}: ${result.message}`);
+  }
+}
+
 function runAllTests() {
+  testImplicitAriaRoleCompatibility();
   testRejectsAbsoluteXPath();
   testRejectsTextLocatorWhenStableIdExists();
   testFailsOnNonUniqueLocatorCount();

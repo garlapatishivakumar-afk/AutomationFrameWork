@@ -35,7 +35,7 @@ function getActionLocatorText(locator) {
     return String(locator.name || "");
   }
 
-  if (locator.kind === "text" || locator.kind === "scopedText" || locator.kind === "frameText" || locator.kind === "frameScopedText" || locator.kind === "label" || locator.kind === "placeholder" || locator.kind === "title" || locator.kind === "testid") {
+  if (locator.kind === "text" || locator.kind === "scopedText" || locator.kind === "frameText" || locator.kind === "frameScopedText" || locator.kind === "label" || locator.kind === "placeholder" || locator.kind === "title" || locator.kind === "testid" || locator.kind === "altText") {
     return String(locator.text || "");
   }
 
@@ -206,6 +206,33 @@ class LocatorValidator {
   }
 
   validateActions(actions) {
+    // Old observer versions silently omitted fill/press/selectOption (and other
+    // actions). A downstream zero count from that different application state
+    // is not proof of a bad locator. Preserve the evidence, but mark it unverified.
+    const observed = [...this.liveByLine.values()];
+    const isReplay = this.domObservations.replayVersion >= 2 || observed.some((item) => typeof item.raw === "string");
+    let firstUntrustedLine = Infinity;
+    const gaps = [];
+    if (isReplay) {
+      for (const action of actions) {
+        const line = Number(action.sourceLine);
+        const evidence = this.liveByLine.get(line);
+        if (!evidence || evidence.observationStatus === "unverified" || evidence.executionStatus === "skipped") {
+          firstUntrustedLine = Math.min(firstUntrustedLine, line);
+          gaps.push({ sourceLine: line, reason: evidence?.error || "Recorded action was not replayed by the observer." });
+        } else if (evidence.executionStatus === "failed" || evidence.error) {
+          firstUntrustedLine = Math.min(firstUntrustedLine, line + 1);
+          gaps.push({ sourceLine: line, reason: "Observer replay failed; later application state is unverified." });
+        }
+      }
+    }
+    this.firstUntrustedLine = firstUntrustedLine;
+    const observationCoverage = {
+      status: observed.length === 0 ? "UNAVAILABLE" : gaps.length ? "INCOMPLETE" : "AVAILABLE",
+      firstUntrustedLine: Number.isFinite(firstUntrustedLine) ? firstUntrustedLine : null,
+      gaps,
+      unverifiedSourceLines: actions.filter((action) => action.locator && action.sourceLine >= firstUntrustedLine).map((action) => action.sourceLine)
+    };
     const dataAnchors = new Set();
     for (const action of actions) {
       if (["fill", "selectOption", "press"].includes(action.actionType) && typeof action.value === "string" && action.value.trim().length > 0) {
@@ -237,6 +264,7 @@ class LocatorValidator {
       failedLocators: results.filter((x) => x.severity === RuleStatus.FAIL).length,
       warningLocators: results.filter((x) => x.severity === RuleStatus.WARNING).length,
       validatedSourceLines,
+      observationCoverage,
       results
     };
   }
@@ -244,8 +272,9 @@ class LocatorValidator {
   validateSingleLocator(action, dataAnchors) {
     const locatorText = getActionLocatorText(action.locator);
     const ruleResults = [];
-    const domAction = this.liveByLine.get(Number(action.sourceLine));
-    const tableAction = this.tableByLine.get(Number(action.sourceLine));
+    const unverified = Number(action.sourceLine) >= (this.firstUntrustedLine ?? Infinity);
+    const domAction = unverified ? null : this.liveByLine.get(Number(action.sourceLine));
+    const tableAction = unverified ? null : this.tableByLine.get(Number(action.sourceLine));
     const stableAttributes = collectStableAttributes(domAction);
 
     ruleResults.push(this.validateNotEmpty(locatorText));
@@ -265,6 +294,10 @@ class LocatorValidator {
     ruleResults.push(this.validateDomUniqueness(action, domAction));
     ruleResults.push(this.validateTargetType(action, domAction));
     ruleResults.push(this.validateDomPresence(action, domAction));
+    if (unverified) {
+      ruleResults.push({ ruleId: "LV015", status: RuleStatus.WARNING,
+        message: "Incomplete observer replay: downstream DOM evidence ignored. Locator requires runtime verification after a complete replay." });
+    }
 
     const cleanedRules = ruleResults.filter(Boolean);
     return {
@@ -613,10 +646,59 @@ class LocatorValidator {
       };
     }
 
-    const expected = String(action.targetElement || "").toLowerCase();
-    const actual = String(domAction.target.tagName || "").toLowerCase();
+    const target = domAction.target;
+    const expected = String((action.locator && action.locator.role) || action.targetElement || "").toLowerCase();
+    const actual = String(target.tagName || "").toLowerCase();
+    const attribute = (name) => Object.prototype.hasOwnProperty.call(target, name)
+      ? target[name]
+      : (target.attributes && Object.prototype.hasOwnProperty.call(target.attributes, name) ? target.attributes[name] : undefined);
+    const explicitRole = String(attribute("role") || "").trim().toLowerCase().split(/\s+/)[0];
+    let observedRole = explicitRole;
+    let incompleteEvidence = false;
+    if (!observedRole) {
+      const roles = {
+        button: "button", textarea: "textbox", option: "option", optgroup: "group",
+        table: "table", tr: "row", td: "cell", thead: "rowgroup", tbody: "rowgroup", tfoot: "rowgroup",
+        ul: "list", ol: "list", li: "listitem", h1: "heading", h2: "heading", h3: "heading",
+        h4: "heading", h5: "heading", h6: "heading", progress: "progressbar", meter: "meter",
+        nav: "navigation", main: "main", aside: "complementary", dialog: "dialog", article: "article"
+      };
+      observedRole = roles[actual] || "generic";
+      if (actual === "a" || actual === "area") {
+        incompleteEvidence = attribute("href") === undefined;
+        observedRole = attribute("href") != null ? "link" : "generic";
+      } else if (actual === "input") {
+        incompleteEvidence = attribute("type") === undefined;
+        const type = String(attribute("type") || "text").toLowerCase();
+        const inputRoles = { checkbox: "checkbox", radio: "radio", button: "button", submit: "button", reset: "button", image: "button", range: "slider", number: "spinbutton", search: "searchbox", text: "textbox", email: "textbox", tel: "textbox", url: "textbox" };
+        observedRole = inputRoles[type] || "generic";
+        if (["text", "email", "tel", "url", "search"].includes(type) && attribute("list")) observedRole = "combobox";
+      } else if (actual === "select") {
+        incompleteEvidence = attribute("multiple") === undefined || attribute("size") === undefined;
+        const multiple = attribute("multiple");
+        observedRole = (multiple != null && multiple !== false) || Number(attribute("size")) > 1 ? "listbox" : "combobox";
+      } else if (actual === "th") {
+        incompleteEvidence = attribute("scope") === undefined;
+        observedRole = ["row", "rowgroup"].includes(attribute("scope")) ? "rowheader" : "columnheader";
+      } else if (actual === "img") {
+        observedRole = attribute("alt") === "" ? "presentation" : "img";
+      }
+    }
 
-    const compatible = expected === actual || (expected === "text" && actual.length > 0) || (expected === "locator" && actual.length > 0);
+    // Older observation files omitted href/type/etc. Do not invent evidence or
+    // block otherwise valid recordings; require fresh observations for certainty.
+    const isRoleLocator = Boolean(action.locator && action.locator.role);
+    const possibleRoles = {
+      a: ["link", "generic"], area: ["link", "generic"],
+      input: ["checkbox", "radio", "button", "slider", "spinbutton", "searchbox", "textbox", "combobox", "generic"],
+      select: ["listbox", "combobox"], th: ["rowheader", "columnheader"]
+    };
+    if (incompleteEvidence && (possibleRoles[actual] || []).includes(expected) && (isRoleLocator || expected !== actual)) {
+      return { ruleId: "LV013", status: RuleStatus.WARNING, message: `Insufficient attributes to verify implicit role '${expected}' on '${actual}'.` };
+    }
+    const compatible = isRoleLocator
+      ? expected === observedRole
+      : expected === actual || expected === observedRole || expected === "text" || expected === "locator";
     if (!compatible) {
       return {
         ruleId: "LV013",

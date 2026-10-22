@@ -1,0 +1,1047 @@
+{
+  "generatedAtUtc": "2026-10-07T19:25:11.612Z",
+  "codeFilePath": "CodegenAI/Code.ts",
+  "outputFilePath": "CodegenAI/Code.cs",
+  "actionCount": 6,
+  "generatedLocatorProperties": 4,
+  "frameworkMatches": [
+    {
+      "sourceLine": 8,
+      "type": "navigation",
+      "target": "CommonActionsPage.NavigateToURLAsync"
+    }
+  ],
+  "sourceMap": [
+    {
+      "sourceLine": 8,
+      "generatedLine": 34,
+      "actionType": "goto",
+      "locatorStrategy": "PAGE_URL",
+      "supported": true
+    },
+    {
+      "sourceLine": 9,
+      "generatedLine": 35,
+      "actionType": "click",
+      "locatorStrategy": "ROLE",
+      "supported": true
+    },
+    {
+      "sourceLine": 10,
+      "generatedLine": 36,
+      "actionType": "click",
+      "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 11,
+      "generatedLine": 38,
+      "actionType": "fill",
+      "locatorStrategy": "LOCATOR",
+      "supported": true
+    },
+    {
+      "sourceLine": 12,
+      "generatedLine": 39,
+      "actionType": "click",
+      "locatorStrategy": "ROLE",
+      "supported": true
+    },
+    {
+      "sourceLine": 13,
+      "generatedLine": 40,
+      "actionType": "click",
+      "locatorStrategy": "ROLE",
+      "supported": true
+    }
+  ],
+  "dataContract": {
+    "scenario": "",
+    "inputs": [],
+    "status": "PASS",
+    "blocking": false,
+    "missingKeys": [],
+    "typeErrors": [],
+    "warnings": [],
+    "results": []
+  },
+  "methodQualityGate": {
+    "status": "PASS",
+    "blocking": false,
+    "score": 100,
+    "rules": [],
+    "methods": []
+  },
+  "executionReliability": {
+    "status": "BLOCKED",
+    "blocking": true,
+    "score": 53,
+    "category": "TIMEOUT_VISIBILITY_RACE",
+    "severity": "HIGH",
+    "confidence": 0.92,
+    "recommendation": "Review synchronization and wait strategy for target visibility/readiness.",
+    "rules": [
+      {
+        "ruleId": "ERI001",
+        "status": "BLOCKED",
+        "category": "TIMEOUT_VISIBILITY_RACE",
+        "severity": "HIGH",
+        "confidence": 0.92,
+        "recommendation": "Review synchronization and wait strategy for target visibility/readiness.",
+        "evidence": [
+          "Error: Timeout 30000ms exceeded while waiting for selector #Submit to be visible",
+          "Timeout: 30000 ms",
+          "Trace: click #Submit",
+          "Trace: wait for visible state",
+          "Locator: #Submit"
+        ]
+      }
+    ],
+    "evidence": [
+      "Error: Timeout 30000ms exceeded while waiting for selector #Submit to be visible",
+      "Timeout: 30000 ms",
+      "Trace: click #Submit",
+      "Trace: wait for visible state",
+      "Locator: #Submit"
+    ]
+  },
+  "maintainabilityDrift": {
+    "status": "WARNING",
+    "severity": "HIGH",
+    "driftDetected": true,
+    "driftScore": 93,
+    "blocking": false,
+    "metrics": {
+      "totalRuns": 7,
+      "failedRuns": 6,
+      "failureRateOverall": 0.8571428571428571,
+      "failureTrendIncrease": 0.33333333333333337,
+      "locatorChangeCount": 6,
+      "uniqueLocatorsChanged": 1,
+      "maxLocatorChangesForOneKey": 6,
+      "maxCategoryRepeat": 6,
+      "topLocatorHotspots": [
+        {
+          "key": "BeneficiaryAddress",
+          "count": 6
+        }
+      ],
+      "topExecutionCategories": [
+        {
+          "key": "TIMEOUT_VISIBILITY_RACE",
+          "count": 6
+        }
+      ],
+      "scoreComponents": {
+        "locatorChurnScore": 100,
+        "categoryRepeatScore": 100,
+        "failureTrendScore": 67,
+        "failureRateScore": 100
+      }
+    },
+    "hotspots": [
+      {
+        "key": "BeneficiaryAddress",
+        "locatorChanges": 6
+      }
+    ],
+    "rules": [
+      {
+        "ruleId": "MDI001",
+        "status": "WARNING",
+        "message": "Locator key changed repeatedly across runs.",
+        "evidence": [
+          "BeneficiaryAddress: 6 change(s)"
+        ]
+      },
+      {
+        "ruleId": "MDI002",
+        "status": "WARNING",
+        "message": "Same runtime failure category repeats across runs.",
+        "evidence": [
+          "TIMEOUT_VISIBILITY_RACE: 6 run(s)"
+        ]
+      },
+      {
+        "ruleId": "MDI003",
+        "status": "WARNING",
+        "message": "Failure rate is increasing over time.",
+        "evidence": [
+          "Failure rate overall: 86%",
+          "Trend increase: 33%"
+        ]
+      },
+      {
+        "ruleId": "MDI004",
+        "status": "WARNING",
+        "message": "Overall failure rate indicates maintainability risk.",
+        "evidence": [
+          "Failed runs: 6/7"
+        ]
+      }
+    ],
+    "recommendations": [
+      "Prioritize locator refactoring for top hotspot keys.",
+      "Investigate recurring execution category and stabilize related test flow.",
+      "Schedule maintenance for scenarios with rising failure trend.",
+      "Prioritize this test suite for near-term maintenance before new feature work."
+    ]
+  },
+  "initialLocatorValidation": {
+    "severity": "FAIL",
+    "hasFailures": true,
+    "totalLocators": 5,
+    "totalLocatorActions": 5,
+    "uniqueLocatorActions": 3,
+    "failedLocators": 4,
+    "warningLocators": 1,
+    "validatedSourceLines": [
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "results": [
+      {
+        "locator": "Search",
+        "sourceLine": 9,
+        "severity": "FAIL",
+        "score": 72,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "PASS",
+            "message": "No id segment detected in locator."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "FAIL",
+            "message": "Locator does not match any element in observed DOM."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "PASS",
+            "message": "Locator evaluated against captured DOM observation."
+          }
+        ]
+      },
+      {
+        "locator": "#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue",
+        "sourceLine": 10,
+        "severity": "FAIL",
+        "score": 64,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV002",
+            "status": "PASS",
+            "message": "Locator is not an absolute XPath."
+          },
+          {
+            "ruleId": "LV003",
+            "status": "PASS",
+            "message": "No positional XPath detected."
+          },
+          {
+            "ruleId": "LV004",
+            "status": "PASS",
+            "message": "Not a text-based XPath."
+          },
+          {
+            "ruleId": "LV007",
+            "status": "PASS",
+            "message": "No invented attribute usage detected."
+          },
+          {
+            "ruleId": "LV010",
+            "status": "PASS",
+            "message": "Tag specificity is acceptable."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "WARNING",
+            "message": "Locator uses potentially dynamic id 'ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue'. Prefer a stable attribute combination if available."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "FAIL",
+            "message": "Locator does not match any element in observed DOM."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "PASS",
+            "message": "Locator evaluated against captured DOM observation."
+          }
+        ]
+      },
+      {
+        "locator": "#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue",
+        "sourceLine": 11,
+        "severity": "WARNING",
+        "score": 68,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV002",
+            "status": "PASS",
+            "message": "Locator is not an absolute XPath."
+          },
+          {
+            "ruleId": "LV003",
+            "status": "PASS",
+            "message": "No positional XPath detected."
+          },
+          {
+            "ruleId": "LV004",
+            "status": "PASS",
+            "message": "Not a text-based XPath."
+          },
+          {
+            "ruleId": "LV007",
+            "status": "PASS",
+            "message": "No invented attribute usage detected."
+          },
+          {
+            "ruleId": "LV010",
+            "status": "PASS",
+            "message": "Tag specificity is acceptable."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "WARNING",
+            "message": "Locator uses potentially dynamic id 'ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue'. Prefer a stable attribute combination if available."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "WARNING",
+            "message": "No runtime match count available; uniqueness not verified."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "WARNING",
+            "message": "No observed DOM record found for source line 11."
+          }
+        ]
+      },
+      {
+        "locator": "Search",
+        "sourceLine": 12,
+        "severity": "FAIL",
+        "score": 72,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "PASS",
+            "message": "No id segment detected in locator."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "FAIL",
+            "message": "Locator does not match any element in observed DOM."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "PASS",
+            "message": "Locator evaluated against captured DOM observation."
+          }
+        ]
+      },
+      {
+        "locator": "310929478",
+        "sourceLine": 13,
+        "severity": "FAIL",
+        "score": 72,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "PASS",
+            "message": "No id segment detected in locator."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "FAIL",
+            "message": "Locator does not match any element in observed DOM."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "PASS",
+            "message": "Locator evaluated against captured DOM observation."
+          }
+        ]
+      }
+    ]
+  },
+  "locatorValidation": {
+    "severity": "FAIL",
+    "hasFailures": true,
+    "totalLocators": 5,
+    "totalLocatorActions": 5,
+    "uniqueLocatorActions": 3,
+    "failedLocators": 4,
+    "warningLocators": 1,
+    "validatedSourceLines": [
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "results": [
+      {
+        "locator": "Search",
+        "sourceLine": 9,
+        "severity": "FAIL",
+        "score": 72,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "PASS",
+            "message": "No id segment detected in locator."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "FAIL",
+            "message": "Locator does not match any element in observed DOM."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "PASS",
+            "message": "Locator evaluated against captured DOM observation."
+          }
+        ]
+      },
+      {
+        "locator": "#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue",
+        "sourceLine": 10,
+        "severity": "FAIL",
+        "score": 64,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV002",
+            "status": "PASS",
+            "message": "Locator is not an absolute XPath."
+          },
+          {
+            "ruleId": "LV003",
+            "status": "PASS",
+            "message": "No positional XPath detected."
+          },
+          {
+            "ruleId": "LV004",
+            "status": "PASS",
+            "message": "Not a text-based XPath."
+          },
+          {
+            "ruleId": "LV007",
+            "status": "PASS",
+            "message": "No invented attribute usage detected."
+          },
+          {
+            "ruleId": "LV010",
+            "status": "PASS",
+            "message": "Tag specificity is acceptable."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "WARNING",
+            "message": "Locator uses potentially dynamic id 'ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue'. Prefer a stable attribute combination if available."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "FAIL",
+            "message": "Locator does not match any element in observed DOM."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "PASS",
+            "message": "Locator evaluated against captured DOM observation."
+          }
+        ]
+      },
+      {
+        "locator": "#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue",
+        "sourceLine": 11,
+        "severity": "WARNING",
+        "score": 68,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV002",
+            "status": "PASS",
+            "message": "Locator is not an absolute XPath."
+          },
+          {
+            "ruleId": "LV003",
+            "status": "PASS",
+            "message": "No positional XPath detected."
+          },
+          {
+            "ruleId": "LV004",
+            "status": "PASS",
+            "message": "Not a text-based XPath."
+          },
+          {
+            "ruleId": "LV007",
+            "status": "PASS",
+            "message": "No invented attribute usage detected."
+          },
+          {
+            "ruleId": "LV010",
+            "status": "PASS",
+            "message": "Tag specificity is acceptable."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "WARNING",
+            "message": "Locator uses potentially dynamic id 'ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue'. Prefer a stable attribute combination if available."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "WARNING",
+            "message": "No runtime match count available; uniqueness not verified."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "WARNING",
+            "message": "No observed DOM record found for source line 11."
+          }
+        ]
+      },
+      {
+        "locator": "Search",
+        "sourceLine": 12,
+        "severity": "FAIL",
+        "score": 72,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "PASS",
+            "message": "No id segment detected in locator."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "FAIL",
+            "message": "Locator does not match any element in observed DOM."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "PASS",
+            "message": "Locator evaluated against captured DOM observation."
+          }
+        ]
+      },
+      {
+        "locator": "310929478",
+        "sourceLine": 13,
+        "severity": "FAIL",
+        "score": 72,
+        "rules": [
+          {
+            "ruleId": "LV001",
+            "status": "PASS",
+            "message": "Locator is not empty."
+          },
+          {
+            "ruleId": "LV005",
+            "status": "PASS",
+            "message": "Primary locator is not text-only."
+          },
+          {
+            "ruleId": "LV006",
+            "status": "PASS",
+            "message": "No test-data anchor detected."
+          },
+          {
+            "ruleId": "LV008",
+            "status": "PASS",
+            "message": "No id segment detected in locator."
+          },
+          {
+            "ruleId": "LV009",
+            "status": "PASS",
+            "message": "No class stability risk detected."
+          },
+          {
+            "ruleId": "LV012",
+            "status": "FAIL",
+            "message": "Locator does not match any element in observed DOM."
+          },
+          {
+            "ruleId": "LV013",
+            "status": "WARNING",
+            "message": "Target element type could not be verified."
+          },
+          {
+            "ruleId": "LV014",
+            "status": "PASS",
+            "message": "Locator evaluated against captured DOM observation."
+          }
+        ]
+      }
+    ]
+  },
+  "locatorRepair": {
+    "attempts": 1,
+    "repairStatus": "FAILED",
+    "repairedAny": false,
+    "codeGenerationBlocked": true,
+    "items": [
+      {
+        "sourceLine": 9,
+        "originalLocator": "Search",
+        "repairedLocator": "",
+        "attempts": 1,
+        "repairStatus": "FAILED",
+        "reason": "No stable replacement candidate could be produced from minimal context.",
+        "failedRuleIds": [
+          "LV012"
+        ],
+        "stableAttributes": [],
+        "targetTag": "",
+        "suggestedLocator": "",
+        "provider": "deterministic",
+        "codeGenerationBlocked": true
+      },
+      {
+        "sourceLine": 10,
+        "originalLocator": "#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue",
+        "repairedLocator": "",
+        "attempts": 1,
+        "repairStatus": "FAILED",
+        "reason": "No stable replacement candidate could be produced from minimal context.",
+        "failedRuleIds": [
+          "LV012"
+        ],
+        "stableAttributes": [],
+        "targetTag": "",
+        "suggestedLocator": "",
+        "provider": "deterministic",
+        "codeGenerationBlocked": true
+      },
+      {
+        "sourceLine": 12,
+        "originalLocator": "Search",
+        "repairedLocator": "",
+        "attempts": 1,
+        "repairStatus": "FAILED",
+        "reason": "No stable replacement candidate could be produced from minimal context.",
+        "failedRuleIds": [
+          "LV012"
+        ],
+        "stableAttributes": [],
+        "targetTag": "",
+        "suggestedLocator": "",
+        "provider": "deterministic",
+        "codeGenerationBlocked": true
+      },
+      {
+        "sourceLine": 13,
+        "originalLocator": "310929478",
+        "repairedLocator": "",
+        "attempts": 1,
+        "repairStatus": "FAILED",
+        "reason": "No stable replacement candidate could be produced from minimal context.",
+        "failedRuleIds": [
+          "LV012"
+        ],
+        "stableAttributes": [],
+        "targetTag": "",
+        "suggestedLocator": "",
+        "provider": "deterministic",
+        "codeGenerationBlocked": true
+      }
+    ],
+    "actions": [
+      {
+        "sourceLine": 8,
+        "raw": "  await page.goto('https://inspections-sit.trimont.com/default.aspx');",
+        "actionType": "goto",
+        "locator": null,
+        "locatorStrategy": "PAGE_URL",
+        "targetElement": "page",
+        "value": "https://inspections-sit.trimont.com/default.aspx",
+        "expectedResult": null,
+        "frame": null,
+        "popup": null,
+        "table": null,
+        "confidence": 0.7,
+        "supported": true,
+        "diagnostics": []
+      },
+      {
+        "sourceLine": 9,
+        "raw": "  await page.getByRole('link', { name: 'Search' }).nth(1).click();",
+        "actionType": "click",
+        "locator": {
+          "kind": "role",
+          "role": "link",
+          "name": "Search",
+          "exact": false,
+          "position": {
+            "type": "nth",
+            "index": 1
+          },
+          "actor": "page"
+        },
+        "locatorStrategy": "ROLE",
+        "targetElement": "role",
+        "value": null,
+        "expectedResult": null,
+        "frame": null,
+        "popup": null,
+        "table": null,
+        "confidence": 0.88,
+        "supported": true,
+        "diagnostics": []
+      },
+      {
+        "sourceLine": 10,
+        "raw": "  await page.locator('#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue').click();",
+        "actionType": "click",
+        "locator": {
+          "kind": "locator",
+          "actor": "page",
+          "selector": "#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue",
+          "first": false
+        },
+        "locatorStrategy": "LOCATOR",
+        "targetElement": "locator",
+        "value": null,
+        "expectedResult": null,
+        "frame": null,
+        "popup": null,
+        "table": null,
+        "confidence": 0.93,
+        "supported": true,
+        "diagnostics": []
+      },
+      {
+        "sourceLine": 11,
+        "raw": "  await page.locator('#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue').fill('6678');",
+        "actionType": "fill",
+        "locator": {
+          "kind": "locator",
+          "actor": "page",
+          "selector": "#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue",
+          "first": false
+        },
+        "locatorStrategy": "LOCATOR",
+        "targetElement": "locator",
+        "value": "6678",
+        "expectedResult": null,
+        "frame": null,
+        "popup": null,
+        "table": null,
+        "confidence": 0.9,
+        "supported": true,
+        "diagnostics": [
+          "Literal input value preserved from recording. Consider replacing with framework data binding."
+        ]
+      },
+      {
+        "sourceLine": 12,
+        "raw": "  await page.getByRole('button', { name: 'Search' }).click();",
+        "actionType": "click",
+        "locator": {
+          "kind": "role",
+          "actor": "page",
+          "role": "button",
+          "name": "Search",
+          "exact": false
+        },
+        "locatorStrategy": "ROLE",
+        "targetElement": "button",
+        "value": null,
+        "expectedResult": null,
+        "frame": null,
+        "popup": null,
+        "table": null,
+        "confidence": 0.95,
+        "supported": true,
+        "diagnostics": []
+      },
+      {
+        "sourceLine": 13,
+        "raw": "  await page.getByRole('cell', { name: '310929478', exact: true }).click();",
+        "actionType": "click",
+        "locator": {
+          "kind": "role",
+          "actor": "page",
+          "role": "cell",
+          "name": "310929478",
+          "exact": true
+        },
+        "locatorStrategy": "ROLE",
+        "targetElement": "cell",
+        "value": null,
+        "expectedResult": null,
+        "frame": null,
+        "popup": null,
+        "table": null,
+        "confidence": 0.95,
+        "supported": true,
+        "diagnostics": []
+      }
+    ],
+    "validation": {
+      "severity": "FAIL",
+      "failedLocators": 4,
+      "warningLocators": 1
+    }
+  },
+  "failureTriage": {
+    "status": "BLOCKED",
+    "category": "LOCATOR_REPAIR_FAILED",
+    "severity": "HIGH",
+    "action": "Review repaired locator proposals and DOM evidence.",
+    "blocking": true,
+    "source": "LocatorValidator",
+    "ruleIds": [
+      "LV012"
+    ]
+  },
+  "locatorCoverage": {
+    "locatorActionsDetected": 5,
+    "locatorActionsValidated": 5,
+    "uniqueLocatorActionsValidated": 3,
+    "generatedLocatorProperties": 4,
+    "validatedSourceLines": [
+      9,
+      10,
+      11,
+      12,
+      13
+    ]
+  },
+  "unsupportedActions": [],
+  "validation": {
+    "success": true,
+    "errors": [
+      "Locator validation failed: 4 locator(s) failed deterministic rules."
+    ],
+    "warnings": []
+  }
+}

@@ -757,7 +757,39 @@ function testRowIdPrefersStableCellClassOverIndex() {
   assert.strictEqual(result.metadata.transformedActions, 1);
 }
 
+function testEmptyResultsTextIsNotRewrittenAsBusinessRow() {
+  const observations = { actions: [{
+    line: 1, text: "No records to display.", insideTable: true,
+    table: { id: "ctl00_Results_ctl00", className: "rgMasterTable" },
+    row: { className: "rgNoRecords", businessValue: "No records to display.", rowValues: ["No records to display."] },
+    cell: { columnIndex: 1 }, target: { tagName: "div" },
+    matchCount: 1, sameBusinessRowCount: 1, tableScopedMatchCount: 28
+  }] };
+  for (const input of [
+    "await page.getByText('No records to display.').click();",
+    "await page.getByText('No records to display.', { exact: true }).click();",
+    "await page1.locator('iframe').contentFrame().getByText('No records to display.', { exact: true }).click();"
+  ]) {
+    const result = runTransform(input, observations);
+    assert.strictEqual(result.code, input);
+    assert.strictEqual(result.metadata.transformedActions, 0);
+    assert.strictEqual(result.metadata.actions[0].strategy, "PRESERVE_EMPTY_TABLE_TEXT");
+    assert.strictEqual(result.metadata.actions[0].uniqueMatch, true);
+  }
+  // Preserving an expression must not invent uniqueness or hide bad evidence.
+  observations.actions[0].matchCount = 2;
+  const duplicate = runTransform("await page.getByText('No records to display.').click();", observations);
+  assert.strictEqual(duplicate.metadata.actions[0].uniqueMatch, false);
+  // Text alone must not classify a genuine data row as an empty placeholder.
+  observations.actions[0].matchCount = 1;
+  observations.actions[0].row.className = "rgRow";
+  observations.actions[0].row.id = "result-row";
+  const normal = runTransform("await page.getByText('No records to display.').click();", observations);
+  assert.notStrictEqual(normal.metadata.actions[0].strategy, "PRESERVE_EMPTY_TABLE_TEXT");
+}
+
 function runAllTests() {
+  testEmptyResultsTextIsNotRewrittenAsBusinessRow();
   testNormalElementUnchanged();
   testTableLinkRewrittenWithContext();
   testDuplicateTextUsesObservedRowIdLocator();

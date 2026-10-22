@@ -12,7 +12,7 @@
     <Compile Remove="obj\**" />
     <Compile Remove="AISetup\**" />
     <Compile Remove="GeneratedOutput\**" />
-    <Compile Remove="CodegenAI\Recordings\**" />
+    <Compile Remove="CodegenAI\**" />
     <EmbeddedResource Remove="node_modules\**" />
     <EmbeddedResource Remove="bin\**" />
     <EmbeddedResource Remove="obj\**" />

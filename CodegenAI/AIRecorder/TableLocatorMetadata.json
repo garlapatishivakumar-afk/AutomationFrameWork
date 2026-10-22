@@ -1,15 +1,15 @@
 {
-  "generatedAtUtc": "2026-10-06T17:46:44.399Z",
+  "generatedAtUtc": "2026-10-21T12:20:21.507Z",
   "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.ts",
   "tableSelector": "table",
-  "analyzedActions": 4,
-  "transformedActions": 0,
+  "analyzedActions": 5,
+  "transformedActions": 1,
   "specificRulesFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\AIRecorder\\Intelligence\\SpecificLocatorRules.json",
   "actions": [
     {
       "line": 9,
       "action": "click",
-      "text": "Search",
+      "text": "CMBS",
       "tableDetected": false,
       "strategy": "ROLE",
       "confidence": 0.5,
@@ -18,7 +18,7 @@
     {
       "line": 10,
       "action": "click",
-      "text": "",
+      "text": "Exceptions",
       "tableDetected": false,
       "strategy": "ROLE",
       "confidence": 0.5,
@@ -27,16 +27,81 @@
     {
       "line": 12,
       "action": "click",
-      "text": "Search",
+      "elementType": "table-a",
+      "text": "View Active Exceptions Report",
+      "tableDetected": true,
+      "dataGridDetected": true,
+      "strategy": "TARGET_ID",
+      "confidence": 0.92,
+      "locator": "//a[@id='ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport']",
+      "reason": "Stable target id; Validation: Stable target attribute uniquely identifies observed element",
+      "uniqueMatch": true,
+      "candidates": [
+        {
+          "strategy": "ROLE",
+          "score": 5,
+          "locator": "page.getByRole('link', { name: 'View Active Exceptions Report' })",
+          "validation": null
+        },
+        {
+          "strategy": "TARGET_ID",
+          "score": 13,
+          "locator": "//a[@id='ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport']",
+          "validation": {
+            "valid": true,
+            "unique": true,
+            "matchEstimate": 1,
+            "reason": "Stable target attribute uniquely identifies observed element"
+          }
+        },
+        {
+          "strategy": "TABLE_KEY_VALUE_ROW",
+          "score": 5,
+          "locator": "//tr[td[1][text()='View Active Exceptions Report']]//a[text()='View Active Exceptions Report']",
+          "validation": {
+            "valid": false,
+            "unique": false,
+            "matchEstimate": 0,
+            "reason": "Candidate is not unique in table scope"
+          }
+        },
+        {
+          "strategy": "TABLE_ROW_BUSINESS_VALUE",
+          "score": 3,
+          "locator": "//tr[td[text()='View Active Exceptions Report']]//a[@id='ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport']",
+          "validation": {
+            "valid": false,
+            "unique": false,
+            "matchEstimate": 0,
+            "reason": "Candidate is not unique in table scope"
+          }
+        },
+        {
+          "strategy": "TABLE_CELL",
+          "score": 7,
+          "locator": "//table//tr[.//a[@id='ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport']]//a[@id='ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport']",
+          "validation": {
+            "valid": true,
+            "unique": true,
+            "matchEstimate": 1,
+            "reason": "Observed target uniquely resolves within detected column"
+          }
+        }
+      ]
+    },
+    {
+      "line": 16,
+      "action": "click",
+      "text": "",
       "tableDetected": false,
       "strategy": "ROLE",
       "confidence": 0.5,
       "reason": "Not detected as table/grid action"
     },
     {
-      "line": 13,
+      "line": 18,
       "action": "click",
-      "text": "310929478",
+      "text": "",
       "tableDetected": false,
       "strategy": "ROLE",
       "confidence": 0.5,

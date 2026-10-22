@@ -10,6 +10,8 @@ namespace AutomationFrameWork.CodegenAI
     {
         private readonly CommonActionsPage _commonActions;
 
+        private IPage _page1 = default!;
+
         public CodegenRecordedFlow(IPage page, ConfigReader config)
         {
             Page = page ?? throw new ArgumentNullException(nameof(page));
@@ -22,44 +24,58 @@ namespace AutomationFrameWork.CodegenAI
         public ConfigReader Config { get; }
 
         // Locators
-        public ILocator Search2 => Page.GetByRole(AriaRole.Link, new() { Name = "Search" }).Nth(1);
-        public ILocator NewSearchControl1TxtSearchValue => Page.Locator("#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue");
-        public ILocator Search => Page.GetByRole(AriaRole.Button, new() { Name = "Search" });
-        public ILocator Locator310929478 => Page.GetByRole(AriaRole.Cell, new() { Name = "310929478", Exact = true });
+        public ILocator Cmbs => Page.GetByRole(AriaRole.Link, new() { Name = "CMBS" });
+        public ILocator Exceptions => Page.GetByRole(AriaRole.Link, new() { Name = "Exceptions" });
+        public ILocator AidRadGridInspectionExceptionsLnkExceptionsReport => Page.Locator("//a[@id='ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport']");
+        public ILocator Refresh => _page1.FrameLocator("iframe').contentFrame().locator('iframe").GetByRole(AriaRole.Button, new() { Name = "Refresh" });
+        public ILocator IframeContentFrameGetByTestIDToolbarExportDropdown => _page1.FrameLocator("iframe").Locator("iframe').contentFrame().getByTestId('toolbar-export-dropdown");
+        public ILocator IframeContentFrameGetByTestIDExportXlsxBtn => _page1.FrameLocator("iframe").Locator("iframe').contentFrame().getByTestId('export-xlsx-btn");
 
         public async Task ReplayAsync()
         {
             await NavigateToApplicationAsync();
-            await OpenTargetModuleAsync();
-            await ApplySearchCriteriaAsync();
+            await ExecutePrePopupActionsAsync();
+            var popupPage = await OpenOverridePopupAsync();
+            await UpdateOverrideDetailsAsync(popupPage);
         }
 
         public async Task NavigateToApplicationAsync()
         {
-            // Review: URL at source line uses literal value because no matching appsettings Urls entry was found: https://inspections-sit.trimont.com/default.aspx
-            await _commonActions.NavigateToURLAsync("https://inspections-sit.trimont.com/default.aspx");
+            // Review: URL at source line uses literal value because no matching appsettings Urls entry was found: https://inspections-dev.trimont.com/default.aspx
+            await _commonActions.NavigateToURLAsync("https://inspections-dev.trimont.com/default.aspx");
             await Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
         }
 
-        public async Task OpenTargetModuleAsync()
+        public async Task ExecutePrePopupActionsAsync()
         {
-            await Search2.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-            await Search2.ClickAsync();
-            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-            await NewSearchControl1TxtSearchValue.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-            await NewSearchControl1TxtSearchValue.ClickAsync();
-            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await Cmbs.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await Cmbs.ClickAsync();
+            await Exceptions.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await Exceptions.ClickAsync();
         }
 
-        public async Task ApplySearchCriteriaAsync()
+        public async Task<IPage> OpenOverridePopupAsync()
         {
-            // Review: Literal input value preserved from recording. Consider replacing with framework data binding.
-            await NewSearchControl1TxtSearchValue.FillAsync("6678");
-            await Search.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-            await Search.ClickAsync();
-            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-            await Locator310929478.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-            await Locator310929478.ClickAsync();
+            var page1Promise = Page.WaitForPopupAsync();
+            await AidRadGridInspectionExceptionsLnkExceptionsReport.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await AidRadGridInspectionExceptionsLnkExceptionsReport.ClickAsync();
+            _page1 = await page1Promise;
+            await _page1.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+            await Refresh.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            return _page1;
+        }
+
+        public async Task UpdateOverrideDetailsAsync(IPage popupPage)
+        {
+            await Refresh.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await Refresh.ClickAsync();
+            await Refresh.ClickAsync();
+            await IframeContentFrameGetByTestIDToolbarExportDropdown.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await IframeContentFrameGetByTestIDToolbarExportDropdown.ClickAsync();
+            var download = await _page1.RunAndWaitForDownloadAsync(async () =>
+            {
+                await IframeContentFrameGetByTestIDExportXlsxBtn.ClickAsync();
+            });
         }
     }
 }

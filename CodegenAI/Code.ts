@@ -5,10 +5,16 @@ test.use({
 });
 
 test('test', async ({ page }) => {
-  await page.goto('https://inspections-sit.trimont.com/default.aspx');
-  await page.getByRole('link', { name: 'Search' }).nth(1).click();
-  await page.locator('#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue').click();
-  await page.locator('#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue').fill('6678');
-  await page.getByRole('button', { name: 'Search' }).click();
-  await page.getByRole('cell', { name: '310929478', exact: true }).click();
+  await page.goto('https://inspections-dev.trimont.com/default.aspx');
+  await page.getByRole('link', { name: 'CMBS' }).click();
+  await page.getByRole('link', { name: 'Exceptions' }).click();
+  const page1Promise = page.waitForEvent('popup');
+  await page.locator("//a[@id='ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport']").click();
+  const page1 = await page1Promise;
+  await page1.locator('iframe').contentFrame().locator('iframe').contentFrame().getByRole('button', { name: 'Refresh' }).click();
+  await page1.locator('iframe').contentFrame().locator('iframe').contentFrame().getByRole('button', { name: 'Refresh' }).click();
+  await page1.locator('iframe').contentFrame().locator('iframe').contentFrame().getByTestId('toolbar-export-dropdown').click();
+  const downloadPromise = page1.waitForEvent('download');
+  await page1.locator('iframe').contentFrame().locator('iframe').contentFrame().getByTestId('export-xlsx-btn').click();
+  const download = await downloadPromise;
 });

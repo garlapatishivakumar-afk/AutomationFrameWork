@@ -4,6 +4,9 @@
 bin/
 obj/
 
+# Installed Node.js dependencies
+node_modules/
+
 # Playwright / test artifacts
 browser-session/
 Reports/

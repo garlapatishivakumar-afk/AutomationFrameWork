@@ -1,0 +1,63 @@
+{
+  "generatedAtUtc": "2026-10-07T19:20:29.827Z",
+  "inputCounts": {
+    "generationReports": 3,
+    "runtimeReports": 0,
+    "runsAnalyzed": 3
+  },
+  "recommendedCandidate": {
+    "candidate": "MAINTAINABILITY_DRIFT",
+    "candidateLabel": "Maintainability Drift Intelligence",
+    "failureFrequencyPct": 67,
+    "impactBand": "High",
+    "impactScore": 78,
+    "rerunSuccessPct": 22,
+    "diagnosisEffortBand": "High",
+    "diagnosisEffortScore": 85,
+    "priorityScore": 74,
+    "matchedRuns": 2,
+    "totalRuns": 3
+  },
+  "reason": "Failure patterns indicate persistent locator/drift behavior with low rerun recovery, so maintainability drift intelligence is the highest-value next capability.",
+  "scorecards": [
+    {
+      "candidate": "MAINTAINABILITY_DRIFT",
+      "candidateLabel": "Maintainability Drift Intelligence",
+      "failureFrequencyPct": 67,
+      "impactBand": "High",
+      "impactScore": 78,
+      "rerunSuccessPct": 22,
+      "diagnosisEffortBand": "High",
+      "diagnosisEffortScore": 85,
+      "priorityScore": 74,
+      "matchedRuns": 2,
+      "totalRuns": 3
+    },
+    {
+      "candidate": "SELF_HEALING_RETRY_POLICY",
+      "candidateLabel": "Self-Healing Retry Policy Intelligence",
+      "failureFrequencyPct": 33,
+      "impactBand": "High",
+      "impactScore": 100,
+      "rerunSuccessPct": 68,
+      "diagnosisEffortBand": "High",
+      "diagnosisEffortScore": 90,
+      "priorityScore": 66,
+      "matchedRuns": 1,
+      "totalRuns": 3
+    },
+    {
+      "candidate": "COST_STABILITY_OPTIMIZER",
+      "candidateLabel": "Execution Cost & Stability Optimizer",
+      "failureFrequencyPct": 33,
+      "impactBand": "High",
+      "impactScore": 100,
+      "rerunSuccessPct": 45,
+      "diagnosisEffortBand": "Medium",
+      "diagnosisEffortScore": 70,
+      "priorityScore": 63,
+      "matchedRuns": 1,
+      "totalRuns": 3
+    }
+  ]
+}

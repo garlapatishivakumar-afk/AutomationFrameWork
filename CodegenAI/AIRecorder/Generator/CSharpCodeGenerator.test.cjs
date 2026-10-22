@@ -1543,6 +1543,7 @@ function testBatchPowerShellOrchestration() {
     const batchName = `phase1-test-${process.pid}-${Date.now()}`;
     const recordingsRoot = path.join(recorderRoot, "Recordings");
     const batchFolder = path.join(recordingsRoot, batchName);
+    const workFolder = path.join(batchFolder, ".work");
     const latestPath = path.join(recordingsRoot, "latest-batch.txt");
     const oldLatest = fs.existsSync(latestPath) ? fs.readFileSync(latestPath) : null;
     const sessionPath = path.join(recorderRoot, "AIRecorder", "auth", "session.json");
@@ -1563,39 +1564,125 @@ function testBatchPowerShellOrchestration() {
       fs.writeFileSync(csvPath, headers + validRows);
       run(["-DryRun"]);
       assert.deepStrictEqual(manifest().testCases.map((entry) => entry.status), ["planned", "planned"]);
-      assert.ok(!fs.existsSync(path.join(batchFolder, "TC01", "Code.cs")));
-      assert.strictEqual(fs.readFileSync(latestPath, "utf8"), `Recordings/${batchName}`);
+      assert.deepStrictEqual(fs.readdirSync(batchFolder), ["manifest.json"]);
+      assert.ok(!fs.existsSync(workFolder));
+      assert.strictEqual(manifest().testCases[0].workFolder, ".work/TC01");
+      assert.strictEqual(manifest().testCases[0].codeTs, "Code.ts");
       for (const id of ["TC01", "TC02"]) {
-        fs.writeFileSync(path.join(batchFolder, id, "Code.ts"), "await page.getByRole('button', { name: 'Login' }).click();");
+        fs.mkdirSync(path.join(workFolder, id), { recursive: true });
+        fs.writeFileSync(path.join(workFolder, id, "Code.ts"), "import { test, expect } from '@playwright/test';\n\ntest('test', async ({ page }) => {\n  await page.getByRole('button', { name: 'Login' }).click();\n});\n");
       }
       run(["-GenerateOnly", "-SkipLiveObservation"]);
+      assert.strictEqual(fs.readFileSync(latestPath, "utf8"), `Recordings/${batchName}`);
       assert.deepStrictEqual(manifest().testCases.map((entry) => entry.status), ["generated", "generated"]);
       for (const id of ["TC01", "TC02"]) {
-        const code = fs.readFileSync(path.join(batchFolder, id, "Code.cs"), "utf8");
+        const code = fs.readFileSync(path.join(workFolder, id, "Code.cs"), "utf8");
         assert.ok(code.includes(`public sealed class CodegenFlow${id}`));
-        assert.ok(fs.existsSync(path.join(batchFolder, id, "CSharpGenerationReport.json")));
-        assert.ok(fs.existsSync(path.join(batchFolder, id, "TableLocatorMetadata.json")));
-        assert.ok(!fs.existsSync(path.join(batchFolder, id, "LiveObservations.json")));
-        assert.ok(!fs.existsSync(path.join(batchFolder, id, ".csharp-live-sync.stop")));
+        assert.ok(fs.existsSync(path.join(workFolder, id, "CSharpGenerationReport.json")));
+        assert.ok(fs.existsSync(path.join(workFolder, id, "TableLocatorMetadata.json")));
+        assert.ok(!fs.existsSync(path.join(workFolder, id, "LiveObservations.json")));
+        assert.ok(!fs.existsSync(path.join(workFolder, id, ".csharp-live-sync.stop")));
       }
+      const sharedTs = fs.readFileSync(path.join(batchFolder, "Code.ts"), "utf8");
+      assert.strictEqual((sharedTs.match(/^import /gm) || []).length, 1);
+      assert.ok(sharedTs.includes("test('TC01 - First case'"));
+      assert.ok(sharedTs.includes("test('TC02 - Second case'"));
+      assert.strictEqual(JSON.parse(fs.readFileSync(path.join(batchFolder, "CSharpGenerationReport.json"), "utf8")).cases.length, 2);
       const untouchedEntry = manifest().testCases[1];
-      const untouchedFiles = fs.readdirSync(path.join(batchFolder, "TC02")).map((name) => {
-        const file = path.join(batchFolder, "TC02", name);
+      const untouchedFiles = fs.readdirSync(path.join(workFolder, "TC02")).map((name) => {
+        const file = path.join(workFolder, "TC02", name);
         return { file, bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs };
       });
+      const selectedSource = path.join(workFolder, "TC01", "Code.ts");
+      fs.writeFileSync(selectedSource, fs.readFileSync(selectedSource, "utf8").replace("name: 'Login'", "name: 'Save'"));
       // Omitting SkipLiveObservation still must never open a browser.
       run(["-GenerateOnly", "-Only", "TC01"]);
+      const replacedTs = fs.readFileSync(path.join(batchFolder, "Code.ts"), "utf8");
+      assert.strictEqual(replacedTs, sharedTs.replace("name: 'Login'", "name: 'Save'"));
+      assert.deepStrictEqual(manifest().testCases.map((entry) => entry.id), ["TC01", "TC02"]);
       assert.deepStrictEqual(manifest().testCases[1], untouchedEntry);
       for (const item of untouchedFiles) {
         assert.deepStrictEqual(fs.readFileSync(item.file), item.bytes);
         assert.strictEqual(fs.statSync(item.file).mtimeMs, item.mtime);
       }
-      fs.writeFileSync(path.join(batchFolder, "TC01", "Code.ts"), "// empty recording\n");
+      // A new CSV order controls shared output, even for a partial regeneration.
+      fs.writeFileSync(csvPath, headers + validRows.trim().split("\n").reverse().join("\n") + "\n");
+      run(["-GenerateOnly", "-Only", "TC01"]);
+      assert.deepStrictEqual(manifest().testCases.map((entry) => entry.id), ["TC02", "TC01"]);
+      const reorderedTs = fs.readFileSync(path.join(batchFolder, "Code.ts"), "utf8");
+      assert.ok(reorderedTs.indexOf("test('TC02") < reorderedTs.indexOf("test('TC01"));
+      fs.writeFileSync(csvPath, headers + validRows);
+      // Two recorded test blocks must never become a falsely successful case.
+      fs.appendFileSync(selectedSource, "\ntest('extra', async ({ page }) => {\nawait page.getByRole('button', { name: 'Other' }).click();\n});\n");
+      run(["-GenerateOnly", "-Only", "TC01"], 1);
+      const mergeFailure = JSON.parse(fs.readFileSync(path.join(batchFolder, "CSharpGenerationReport.json"), "utf8"));
+      assert.strictEqual(manifest().testCases[0].status, "failed: sprint merge error");
+      assert.strictEqual(mergeFailure.codeGenerationBlocked, true);
+      assert.match(mergeFailure.cases[0].mergeError, /exactly one test/);
+      assert.ok(fs.readFileSync(path.join(batchFolder, "Code.ts"), "utf8").includes("test('TC02"));
+      fs.writeFileSync(path.join(workFolder, "TC01", "Code.ts"), "// empty recording\n");
       run(["-GenerateOnly"], 1);
       assert.deepStrictEqual(manifest().testCases.map((entry) => entry.status), ["failed: empty recording", "generated"]);
-      fs.unlinkSync(path.join(batchFolder, "TC01", "Code.ts"));
+      const afterFailure = fs.readFileSync(path.join(batchFolder, "Code.ts"), "utf8");
+      assert.ok(!afterFailure.includes("test('TC01"));
+      assert.ok(afterFailure.includes("test('TC02"));
+      fs.unlinkSync(path.join(workFolder, "TC01", "Code.ts"));
       run(["-GenerateOnly", "-Only", "TC01"]);
       assert.strictEqual(manifest().testCases[0].status, "skipped");
+      // Reject incompatible manifests before touching any files, including when
+      // working inputs exist, the invalid entry is selected/skipped, or no Only
+      // filter is supplied. Never silently normalize invalid path fields.
+      const validManifestBytes = fs.readFileSync(path.join(batchFolder, "manifest.json"));
+      const snapshot = () => {
+        const files = [];
+        const visit = (folder) => {
+          for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+            const file = path.join(folder, entry.name);
+            if (entry.isDirectory()) visit(file);
+            else files.push({ file, bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs });
+          }
+        };
+        visit(batchFolder);
+        files.push({ file: latestPath, bytes: fs.readFileSync(latestPath), mtime: fs.statSync(latestPath).mtimeMs });
+        return files;
+      };
+      const malformedCases = [
+        { change: (m) => { m.batchId = "WrongBatch"; } },
+        { change: (m) => { m.testCases = {}; }, mergerRejects: true },
+        { change: (m) => { m.testCases[0] = null; }, mergerRejects: true },
+        { change: (m) => { m.testCases[1].id = "tc01"; }, mergerRejects: true },
+        { change: (m) => { m.testCases[1].id = "../escape"; }, mergerRejects: true },
+        { change: (m) => { m.testCases[1].id = "CON"; }, mergerRejects: true },
+        { change: (m) => { m.testCases[1].status = null; }, mergerRejects: true },
+        { change: (m) => { m.testCases[1].title = " "; }, mergerRejects: true },
+        { change: (m) => { delete m.testCases[1].workFolder; }, mergerRejects: true },
+        { change: (m) => { m.testCases[0].workFolder = "../escape"; }, mergerRejects: true },
+        ...["folder", "codeTs", "codeCs", "report", "tableMetadata"].map((field) => ({
+          change: (m) => { m.testCases[1][field] = "invalid/path"; }
+        }))
+      ];
+      try {
+        for (const invalid of malformedCases) {
+          const malformed = JSON.parse(validManifestBytes.toString("utf8"));
+          invalid.change(malformed);
+          fs.writeFileSync(path.join(batchFolder, "manifest.json"), JSON.stringify(malformed));
+          const beforeRejection = snapshot();
+          for (const args of [["-GenerateOnly", "-Only", "TC01"], ["-GenerateOnly"], ["-DryRun"]]) {
+            assert.ok(run(args, 1).includes("Invalid batch manifest"));
+            assert.deepStrictEqual(snapshot(), beforeRejection, "Rejection must not write or normalize any files");
+          }
+          if (invalid.mergerRejects) {
+            assert.throws(() => require("./SprintMerger.cjs").rebuildSprint(path.join(batchFolder, "manifest.json")), /Invalid|expected workFolder/);
+            assert.deepStrictEqual(snapshot(), beforeRejection, "Merger rejection must not write output");
+          }
+        }
+        fs.writeFileSync(path.join(batchFolder, "manifest.json"), "{ invalid JSON");
+        const beforeBadJson = snapshot();
+        assert.ok(run(["-GenerateOnly"], 1).includes("cannot parse JSON"));
+        assert.deepStrictEqual(snapshot(), beforeBadJson);
+      } finally {
+        fs.writeFileSync(path.join(batchFolder, "manifest.json"), validManifestBytes);
+      }
       const beforeInvalid = fs.readFileSync(path.join(batchFolder, "manifest.json"));
       assert.ok(run(["-DryRun", "-Only", "UNKNOWN"], 1).includes("Unknown -Only TestCaseId"));
       for (const [rows, message] of [
@@ -1619,7 +1706,142 @@ function testBatchPowerShellOrchestration() {
   console.log("Batch PowerShell integration tests passed (dry-run, generate-only, merge, failures, validation, session isolation)");
 }
 
+function testDownloadAndUnknownPromiseGeneration() {
+  withTempFiles((tempDir) => {
+    writeAppSettings(tempDir);
+    const options = {
+      codeFilePath: path.join(tempDir, "Code.ts"), outputFilePath: path.join(tempDir, "Code.cs"),
+      reportFilePath: path.join(tempDir, "report.json"), appSettingsPath: path.join(tempDir, "appsettings.json")
+    };
+    // Sanitized reproduction of the popup / nested-frame export in the real recording.
+    const recorded = [
+      "const page1Promise = page.waitForEvent('popup');",
+      "await page.getByRole('link', { name: 'Open report' }).click();",
+      "const page1 = await page1Promise;",
+      "const downloadPromise = page1.waitForEvent('download');",
+      "await page1.locator('iframe').contentFrame().locator('iframe').contentFrame().getByTestId('export-xlsx-btn').click();",
+      "const download = await downloadPromise;"
+    ].join("\n");
+    for (const enterpriseMode of [false, true]) {
+      fs.writeFileSync(options.codeFilePath, recorded);
+      const result = generateCSharpCode({ ...options, enterpriseMode });
+      assert.strictEqual(result.validation.success, true, result.validation.errors.join(" | "));
+      assert.strictEqual(result.unsupportedActions.length, 0);
+      assert.ok(result.code.includes("var download = await _page1.RunAndWaitForDownloadAsync(async () =>"));
+      assert.ok(!result.code.includes("await downloadPromise"));
+      assert.ok(!result.code.includes("IPage _download"));
+      assert.ok(result.code.includes('_page1.FrameLocator("iframe").FrameLocator("iframe").GetByTestId("export-xlsx-btn")'));
+      assert.strictEqual(result.actionFidelity.success, true);
+      assert.ok(/RunAndWaitForDownloadAsync\(async \(\) =>\s*\{[\s\S]*?\.ClickAsync\(\);\s*\}\);/.test(result.code));
+    }
+    // A long linear flow must not split subscription and trigger across methods.
+    fs.writeFileSync(options.codeFilePath, [
+      ...Array.from({ length: 10 }, (_, i) => `await page.getByRole('button', { name: 'Step ${i}' }).click();`),
+      "const downloadPromise = page.waitForEvent('download');",
+      "await page.getByRole('button', { name: 'Export' }).click();",
+      "const download = await downloadPromise;"
+    ].join("\n"));
+    const linear = generateCSharpCode({ ...options, enterpriseMode: true });
+    assert.strictEqual(linear.validation.success, true);
+    assert.ok(linear.code.includes("Page.RunAndWaitForDownloadAsync(async () =>"));
+    assert.ok(!linear.code.includes("await downloadPromise"));
+
+    fs.writeFileSync(options.codeFilePath, [
+      "const responsePromise = page.waitForEvent('response');",
+      "await page.getByRole('button', { name: 'Go' }).click();",
+      "const response = await responsePromise;",
+      "const mystery = await unknownPromise;",
+      "await anotherPromise;",
+      "const unfinished = page.waitForEvent('download');"
+    ].join("\n"));
+    const unknown = generateCSharpCode(options);
+    assert.strictEqual(unknown.unsupportedActions.length, 5);
+    assert.ok(unknown.actions.every((action) => action.actionType !== "popupResolve"));
+    assert.strictEqual(JSON.parse(fs.readFileSync(options.reportFilePath, "utf8")).unsupportedActions.length, 5);
+    const executable = unknown.code.replace(/^\s*\/\/.*$/gm, "");
+    assert.ok(!executable.includes("await responsePromise"));
+    assert.ok(!executable.includes("await unknownPromise"));
+    assert.strictEqual(unknown.validation.success, false);
+    assert.strictEqual(unknown.codeGenerationBlocked, true);
+    assert.ok(unknown.validation.errors.some((error) => error.includes("unsupported statements")));
+  });
+}
+
+function testUndeclaredAwaitedVariableValidation() {
+  const wrap = (body) => `using Microsoft.Playwright;\npublic class Flow { public async Task ReplayAsync() { ${body} } }`;
+  assert.strictEqual(validateGeneratedCSharp(wrap("await missingPromise;"), []).success, false);
+  assert.strictEqual(validateGeneratedCSharp(wrap("await missingPromise.ConfigureAwait(false);"), []).success, false);
+  assert.strictEqual(validateGeneratedCSharp(wrap("var pending = Page.WaitForPopupAsync(); var popup = await pending;"), []).success, true);
+  assert.strictEqual(validateGeneratedCSharp(wrap("Task<IPage> pending = Page.WaitForPopupAsync(); var popup = await pending;"), []).success, true);
+  assert.strictEqual(validateGeneratedCSharp(wrap("{ var pending = Page.WaitForPopupAsync(); } await pending;"), []).success, false);
+  assert.strictEqual(validateGeneratedCSharp(wrap('var text = "await missingPromise;"; // await ignored;\n'), []).success, true);
+}
+
+function testGenerationFailureExitCodes() {
+  if (process.platform !== "win32") return;
+  withTempFiles((tempDir) => {
+    const recorder = path.join(tempDir, "CodegenAI");
+    const generatorDir = path.join(recorder, "AIRecorder", "Generator");
+    const authDir = path.join(recorder, "AIRecorder", "auth");
+    fs.mkdirSync(generatorDir, { recursive: true });
+    fs.mkdirSync(authDir, { recursive: true });
+    fs.copyFileSync(path.resolve(__dirname, "../../StartCodegen.ps1"), path.join(recorder, "StartCodegen.ps1"));
+    fs.copyFileSync(path.resolve(__dirname, "../auth/SessionManager.ps1"), path.join(authDir, "SessionManager.ps1"));
+    fs.writeFileSync(path.join(generatorDir, "SprintMerger.cjs"), `const result = require(${JSON.stringify(path.join(__dirname, "SprintMerger.cjs"))}).rebuildSprint(process.argv[process.argv.indexOf('--manifest-file') + 1]); process.exitCode = result.errors.length ? 1 : 0;`);
+    writeAppSettings(tempDir);
+    const shim = path.join(generatorDir, "CSharpCodeGenerator.cjs");
+    const realGenerator = path.join(__dirname, "CSharpCodeGenerator.cjs");
+    const delegate = `const r = require('child_process').spawnSync(process.execPath, [${JSON.stringify(realGenerator)}, ...process.argv.slice(2)], { stdio: 'inherit' }); process.exit(r.status === null ? 1 : r.status);`;
+    fs.writeFileSync(shim, delegate);
+    const csv = path.join(recorder, "cases.csv");
+    fs.writeFileSync(csv, "TestCaseId,Title,StartUrl,Preconditions,ExpectedResult,Priority,DataHint\nTC01,Blocked case,,Ready,Blocked,High,\nTC02,Valid case,,Ready,Generated,High,\n");
+    const quote = (value) => `'${value.replace(/'/g, "''")}'`;
+    const run = (args, expectedCode) => {
+      // Stub only browser recording. The real script, session helper and final
+      // generator execute against disposable files; no application is opened.
+      const command = `function npx { $global:LASTEXITCODE = 0 }; & ${quote(path.join(recorder, "StartCodegen.ps1"))} ${args} ; exit $LASTEXITCODE`;
+      const result = require("child_process").spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command], { encoding: "utf8", timeout: 60000 });
+      assert.strictEqual(result.status, expectedCode, `${result.error || ""}\n${result.stdout}\n${result.stderr}`);
+      return `${result.stdout}\n${result.stderr}`;
+    };
+    const code = "await page.getByRole('button', { name: 'Submit' }).click();";
+    const blockedDom = JSON.stringify({ actions: [{ line: 1, matchCount: 1, target: { tagName: "div" } }] });
+    fs.writeFileSync(path.join(recorder, "Code.ts"), code);
+    fs.writeFileSync(path.join(recorder, "AIRecorder", "LiveObservations.json"), blockedDom);
+    const legacyOutput = run("-SkipLiveObservation -SkipTableLocatorPostProcess", 1);
+    assert.ok(legacyOutput.includes("generation blocked"));
+    const legacyReport = JSON.parse(fs.readFileSync(path.join(recorder, "CSharpGenerationReport.json"), "utf8"));
+    assert.strictEqual(legacyReport.locatorValidation.hasFailures, true);
+    assert.strictEqual(legacyReport.validation.success, false);
+    assert.ok(!fs.existsSync(path.join(recorder, "Code.cs")));
+    const batchArgs = `-BatchFile ${quote(csv)} -BatchName FailureTest`;
+    run(`${batchArgs} -DryRun`, 0);
+    const batch = path.join(recorder, "Recordings", "FailureTest");
+    for (const id of ["TC01", "TC02"]) {
+      fs.mkdirSync(path.join(batch, ".work", id), { recursive: true });
+      fs.writeFileSync(path.join(batch, ".work", id, "Code.ts"), `import { test, expect } from '@playwright/test';\ntest('test', async ({ page }) => {\n${code}\n});`);
+    }
+    fs.writeFileSync(path.join(batch, ".work", "TC01", "LiveObservations.json"), JSON.stringify({ actions: [{ line: 3, matchCount: 1, target: { tagName: "div" } }] }));
+    run(`${batchArgs} -GenerateOnly -SkipTableLocatorPostProcess`, 1);
+    let manifest = JSON.parse(fs.readFileSync(path.join(batch, "manifest.json"), "utf8"));
+    assert.deepStrictEqual(manifest.testCases.map((entry) => entry.status), ["failed: generation blocked", "generated"]);
+    // An ostensibly successful process must still fail if its report blocks generation.
+    fs.writeFileSync(shim, `const fs = require('fs'); const args = process.argv; fs.writeFileSync(args[args.indexOf('--report-file') + 1], JSON.stringify({ validation: { success: true }, codeGenerationBlocked: true }));`);
+    assert.ok(run("-SkipLiveObservation -SkipTableLocatorPostProcess", 1).includes("generation blocked"));
+    // Native crash/no report must not reuse the previous blocked report.
+    fs.writeFileSync(shim, "process.exit(7);");
+    assert.ok(run("-SkipLiveObservation -SkipTableLocatorPostProcess", 1).includes("generation error"));
+    run(`${batchArgs} -GenerateOnly -Only TC02 -SkipTableLocatorPostProcess`, 1);
+    manifest = JSON.parse(fs.readFileSync(path.join(batch, "manifest.json"), "utf8"));
+    assert.strictEqual(manifest.testCases[1].status, "failed: generation error");
+    console.log("Failure visibility tests passed: legacy blocked exit=1; batch blocked exit=1 and continuation; blocked report with exit=0 rejected; generation error exit=1");
+  });
+}
+
 function runAllTests() {
+  testGenerationFailureExitCodes();
+  testDownloadAndUnknownPromiseGeneration();
+  testUndeclaredAwaitedVariableValidation();
   testBatchIdentityAndSanitization();
   testNestedBatchCliProjectInference();
   testBatchPowerShellOrchestration();

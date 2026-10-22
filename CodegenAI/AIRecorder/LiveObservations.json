@@ -1,26 +1,26 @@
 {
-  "generatedAtUtc": "2026-10-06T17:46:01.617Z",
+  "generatedAtUtc": "2026-10-21T12:20:08.877Z",
   "source": {
     "codeFilePath": "C:\\Users\\shivakumar.garlapati\\source\\repos\\AutomationFrameWork\\CodegenAI\\Code.ts"
   },
   "actions": [
     {
       "line": 8,
-      "raw": "  await page.goto('https://inspections-sit.trimont.com/default.aspx');",
+      "raw": "  await page.goto('https://inspections-dev.trimont.com/default.aspx');",
       "type": "goto",
-      "page": "https://inspections-sit.trimont.com/default.aspx",
+      "page": "https://inspections-dev.trimont.com/default.aspx",
       "debug": {
         "actionIndex": 0,
         "originalLocator": "page.goto(...)",
-        "currentUrl": "https://inspections-sit.trimont.com/default.aspx",
-        "pageTitle": "Inspections - SIT",
+        "currentUrl": "https://inspections-dev.trimont.com/default.aspx",
+        "pageTitle": "Inspections - DEV",
         "readyState": "complete",
         "frameCount": 1,
         "frames": [
           {
             "index": 0,
             "name": null,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
+            "url": "https://inspections-dev.trimont.com/default.aspx",
             "isMainFrame": true
           }
         ],
@@ -29,1743 +29,357 @@
     },
     {
       "line": 9,
-      "raw": "  await page.getByRole('link', { name: 'Search' }).nth(1).click();",
+      "raw": "  await page.getByRole('link', { name: 'CMBS' }).click();",
       "type": "roleAction",
       "method": "click",
-      "text": "Search",
+      "text": "CMBS",
       "role": "link",
       "scope": "page",
       "frameSelector": null,
-      "originalLocator": "page.getByRole('link', { name: 'Search' }).nth(1)",
-      "matchCount": 0,
-      "isUnique": false,
+      "originalLocator": "page.getByRole('link', { name: 'CMBS' })",
+      "matchCount": 1,
+      "isUnique": true,
       "duplicateText": false,
       "insideTable": false,
+      "ancestors": [
+        "a",
+        "li",
+        "ul",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "form",
+        "body",
+        "html"
+      ],
+      "table": null,
+      "row": null,
+      "cell": null,
+      "target": {
+        "tagName": "a",
+        "text": "CMBS",
+        "role": null,
+        "testId": null,
+        "id": null,
+        "className": "rmLink rmRootLink",
+        "ariaLabel": null,
+        "name": null,
+        "title": null,
+        "dataQa": null,
+        "dataTest": null,
+        "attributeCounts": {
+          "testId": 0,
+          "id": 0,
+          "ariaLabel": 0,
+          "name": 0,
+          "title": 0,
+          "dataQa": 0,
+          "dataTest": 0
+        }
+      },
+      "tableScopedMatchCount": 0,
+      "sameBusinessRowCount": 0,
+      "rowId": null,
+      "tableId": null,
       "debug": {
         "actionIndex": 1,
-        "originalLocator": "page.getByRole('link', { name: 'Search' }).nth(1)",
-        "currentUrl": "https://inspections-sit.trimont.com/default.aspx",
-        "pageTitle": "Inspections - SIT",
+        "originalLocator": "page.getByRole('link', { name: 'CMBS' })",
+        "currentUrl": "https://inspections-dev.trimont.com/default.aspx",
+        "pageTitle": "Inspections - DEV",
         "readyState": "complete",
         "frameCount": 1,
         "frames": [
           {
             "index": 0,
             "name": null,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
+            "url": "https://inspections-dev.trimont.com/default.aspx",
             "isMainFrame": true
           }
         ],
-        "resolvedScope": "unresolved",
+        "resolvedScope": "page",
         "resolvedFrame": null,
-        "locatorMatchCount": 0,
-        "attachedState": false,
-        "visibleState": false,
+        "locatorMatchCount": 1,
+        "attachedState": true,
+        "visibleState": true,
         "lastAttempt": {
-          "elapsedMs": 9765,
-          "url": "https://inspections-sit.trimont.com/default.aspx",
+          "elapsedMs": 0,
+          "url": "https://inspections-dev.trimont.com/default.aspx",
           "readyState": "complete",
-          "pageTitle": "Inspections - SIT",
+          "pageTitle": "Inspections - DEV",
           "frameCount": 1,
-          "mainFrameMatchCount": 0,
+          "mainFrameMatchCount": 1,
           "frameMatches": [],
           "scope": "page"
         },
         "attempts": [
           {
             "elapsedMs": 0,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
+            "url": "https://inspections-dev.trimont.com/default.aspx",
             "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
+            "pageTitle": "Inspections - DEV",
             "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 288,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 551,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 819,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1090,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1356,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1623,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1880,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2140,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2401,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2661,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2928,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3186,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3449,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3711,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3976,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4241,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4505,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4773,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5038,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5306,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5572,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5834,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6100,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6367,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6633,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6887,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7166,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7429,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7684,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7945,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8204,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8460,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8720,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8977,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9237,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9505,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9765,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
+            "mainFrameMatchCount": 1,
             "frameMatches": [],
             "scope": "page"
           }
         ],
-        "reason": "Timeout waiting for locator to be attached"
-      },
-      "error": "Timeout waiting for locator to be attached"
+        "reason": "Locator resolved and DOM inspected"
+      }
     },
     {
       "line": 10,
-      "raw": "  await page.locator('#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue').click();",
-      "type": "locatorAction",
+      "raw": "  await page.getByRole('link', { name: 'Exceptions' }).click();",
+      "type": "roleAction",
       "method": "click",
-      "text": "",
-      "role": null,
+      "text": "Exceptions",
+      "role": "link",
       "scope": "page",
       "frameSelector": null,
-      "originalLocator": "page.locator('#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue')",
-      "matchCount": 0,
-      "isUnique": false,
+      "originalLocator": "page.getByRole('link', { name: 'Exceptions' })",
+      "matchCount": 1,
+      "isUnique": true,
       "duplicateText": false,
       "insideTable": false,
+      "ancestors": [
+        "a",
+        "li",
+        "ul",
+        "div",
+        "li",
+        "ul",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "form",
+        "body",
+        "html"
+      ],
+      "table": null,
+      "row": null,
+      "cell": null,
+      "target": {
+        "tagName": "a",
+        "text": "Exceptions",
+        "role": null,
+        "testId": null,
+        "id": null,
+        "className": "rmLink",
+        "ariaLabel": null,
+        "name": null,
+        "title": null,
+        "dataQa": null,
+        "dataTest": null,
+        "attributeCounts": {
+          "testId": 0,
+          "id": 0,
+          "ariaLabel": 0,
+          "name": 0,
+          "title": 0,
+          "dataQa": 0,
+          "dataTest": 0
+        }
+      },
+      "tableScopedMatchCount": 0,
+      "sameBusinessRowCount": 0,
+      "rowId": null,
+      "tableId": null,
       "debug": {
         "actionIndex": 2,
-        "originalLocator": "page.locator('#ctl00_ContentPlaceHolder1_NewSearchControl1_txtSearchValue')",
-        "currentUrl": "https://inspections-sit.trimont.com/default.aspx",
-        "pageTitle": "Inspections - SIT",
+        "originalLocator": "page.getByRole('link', { name: 'Exceptions' })",
+        "currentUrl": "https://inspections-dev.trimont.com/default.aspx",
+        "pageTitle": "Inspections - DEV",
         "readyState": "complete",
         "frameCount": 1,
         "frames": [
           {
             "index": 0,
             "name": null,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
+            "url": "https://inspections-dev.trimont.com/default.aspx",
             "isMainFrame": true
           }
         ],
-        "resolvedScope": "unresolved",
+        "resolvedScope": "page",
         "resolvedFrame": null,
-        "locatorMatchCount": 0,
-        "attachedState": false,
-        "visibleState": false,
+        "locatorMatchCount": 1,
+        "attachedState": true,
+        "visibleState": true,
         "lastAttempt": {
-          "elapsedMs": 9964,
-          "url": "https://inspections-sit.trimont.com/default.aspx",
+          "elapsedMs": 0,
+          "url": "https://inspections-dev.trimont.com/default.aspx",
           "readyState": "complete",
-          "pageTitle": "Inspections - SIT",
+          "pageTitle": "Inspections - DEV",
           "frameCount": 1,
-          "mainFrameMatchCount": 0,
+          "mainFrameMatchCount": 1,
           "frameMatches": [],
           "scope": "page"
         },
         "attempts": [
           {
             "elapsedMs": 0,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
+            "url": "https://inspections-dev.trimont.com/default.aspx",
             "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
+            "pageTitle": "Inspections - DEV",
             "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 275,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 543,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 804,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1071,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1325,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1589,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1853,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2107,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2370,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2632,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2887,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3150,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3415,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3682,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3948,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4202,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4463,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4732,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4992,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5248,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5509,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5763,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6027,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6293,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6556,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6825,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7081,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7337,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7605,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7869,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8136,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8401,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8667,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8932,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9188,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9449,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9703,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9964,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
+            "mainFrameMatchCount": 1,
             "frameMatches": [],
             "scope": "page"
           }
         ],
-        "reason": "Timeout waiting for locator to be attached"
-      },
-      "error": "Timeout waiting for locator to be attached"
+        "reason": "Locator resolved and DOM inspected"
+      }
     },
     {
       "line": 12,
-      "raw": "  await page.getByRole('button', { name: 'Search' }).click();",
+      "raw": "  await page.getByRole('link', { name: 'View Active Exceptions Report' }).click();",
       "type": "roleAction",
       "method": "click",
-      "text": "Search",
-      "role": "button",
+      "text": "View Active Exceptions Report",
+      "role": "link",
       "scope": "page",
       "frameSelector": null,
-      "originalLocator": "page.getByRole('button', { name: 'Search' })",
-      "matchCount": 0,
-      "isUnique": false,
+      "originalLocator": "page.getByRole('link', { name: 'View Active Exceptions Report' })",
+      "matchCount": 1,
+      "isUnique": true,
       "duplicateText": false,
-      "insideTable": false,
+      "insideTable": true,
+      "ancestors": [
+        "a",
+        "td",
+        "tr",
+        "thead",
+        "table",
+        "div",
+        "span",
+        "td",
+        "tr",
+        "tbody",
+        "table",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "form",
+        "body",
+        "html"
+      ],
+      "table": {
+        "tagName": "a",
+        "id": "ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport",
+        "testId": null,
+        "role": null,
+        "className": null
+      },
+      "row": {
+        "tagName": "tr",
+        "id": null,
+        "testId": null,
+        "role": null,
+        "className": "rgCommandRow",
+        "labelValue": null,
+        "businessValue": "View Active Exceptions Report",
+        "businessValueColumnIndex": 1,
+        "rowValues": [
+          "View Active Exceptions Report"
+        ]
+      },
+      "cell": {
+        "tagName": "td",
+        "columnIndex": 1,
+        "testId": null,
+        "role": null,
+        "className": "rgCommandCell"
+      },
+      "target": {
+        "tagName": "a",
+        "text": "View Active Exceptions Report",
+        "role": null,
+        "testId": null,
+        "id": "ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport",
+        "className": null,
+        "ariaLabel": null,
+        "name": null,
+        "title": null,
+        "dataQa": null,
+        "dataTest": null,
+        "attributeCounts": {
+          "testId": 0,
+          "id": 1,
+          "ariaLabel": 0,
+          "name": 0,
+          "title": 0,
+          "dataQa": 0,
+          "dataTest": 0
+        }
+      },
+      "tableScopedMatchCount": 0,
+      "sameBusinessRowCount": 0,
+      "rowId": {
+        "value": null,
+        "dynamic": false
+      },
+      "tableId": {
+        "value": "ctl00_ContentPlaceHolder1_RadGridInspectionExceptions_ctl00_ctl02_ctl00_lnkExceptionsReport",
+        "dynamic": true
+      },
       "debug": {
         "actionIndex": 3,
-        "originalLocator": "page.getByRole('button', { name: 'Search' })",
-        "currentUrl": "https://inspections-sit.trimont.com/default.aspx",
-        "pageTitle": "Inspections - SIT",
+        "originalLocator": "page.getByRole('link', { name: 'View Active Exceptions Report' })",
+        "currentUrl": "https://inspections-dev.trimont.com/WebForms/InspectionExceptions.aspx?LOB=Mvk0R85F5FGPwJgCjqyIMA==&Product=qnMt82Fc4GbppxH/Mp4Rpw==",
+        "pageTitle": "Inspections - DEV",
         "readyState": "complete",
         "frameCount": 1,
         "frames": [
           {
             "index": 0,
             "name": null,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
+            "url": "https://inspections-dev.trimont.com/WebForms/InspectionExceptions.aspx?LOB=Mvk0R85F5FGPwJgCjqyIMA==&Product=qnMt82Fc4GbppxH/Mp4Rpw==",
             "isMainFrame": true
           }
         ],
-        "resolvedScope": "unresolved",
+        "resolvedScope": "page",
         "resolvedFrame": null,
-        "locatorMatchCount": 0,
-        "attachedState": false,
-        "visibleState": false,
+        "locatorMatchCount": 1,
+        "attachedState": true,
+        "visibleState": true,
         "lastAttempt": {
-          "elapsedMs": 9960,
-          "url": "https://inspections-sit.trimont.com/default.aspx",
+          "elapsedMs": 0,
+          "url": "https://inspections-dev.trimont.com/WebForms/InspectionExceptions.aspx?LOB=Mvk0R85F5FGPwJgCjqyIMA==&Product=qnMt82Fc4GbppxH/Mp4Rpw==",
           "readyState": "complete",
-          "pageTitle": "Inspections - SIT",
+          "pageTitle": "Inspections - DEV",
           "frameCount": 1,
-          "mainFrameMatchCount": 0,
+          "mainFrameMatchCount": 1,
           "frameMatches": [],
           "scope": "page"
         },
         "attempts": [
           {
             "elapsedMs": 0,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
+            "url": "https://inspections-dev.trimont.com/WebForms/InspectionExceptions.aspx?LOB=Mvk0R85F5FGPwJgCjqyIMA==&Product=qnMt82Fc4GbppxH/Mp4Rpw==",
             "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
+            "pageTitle": "Inspections - DEV",
             "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 262,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 537,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 791,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1069,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1324,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1585,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1840,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2102,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2357,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2615,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2878,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3134,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3399,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3665,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3935,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4196,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4455,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4711,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4971,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5226,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5485,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5741,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5998,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6257,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6515,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6772,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7037,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7304,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7572,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7835,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8101,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8366,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8633,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8897,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9165,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9429,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9696,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9960,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
+            "mainFrameMatchCount": 1,
             "frameMatches": [],
             "scope": "page"
           }
         ],
-        "reason": "Timeout waiting for locator to be attached"
-      },
-      "error": "Timeout waiting for locator to be attached"
-    },
-    {
-      "line": 13,
-      "raw": "  await page.getByRole('cell', { name: '310929478', exact: true }).click();",
-      "type": "roleAction",
-      "method": "click",
-      "text": "310929478",
-      "role": "cell",
-      "scope": "page",
-      "frameSelector": null,
-      "originalLocator": "page.getByRole('cell', { name: '310929478', exact: true })",
-      "matchCount": 0,
-      "isUnique": false,
-      "duplicateText": false,
-      "insideTable": false,
-      "debug": {
-        "actionIndex": 4,
-        "originalLocator": "page.getByRole('cell', { name: '310929478', exact: true })",
-        "currentUrl": "https://inspections-sit.trimont.com/default.aspx",
-        "pageTitle": "Inspections - SIT",
-        "readyState": "complete",
-        "frameCount": 1,
-        "frames": [
-          {
-            "index": 0,
-            "name": null,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "isMainFrame": true
-          }
-        ],
-        "resolvedScope": "unresolved",
-        "resolvedFrame": null,
-        "locatorMatchCount": 0,
-        "attachedState": false,
-        "visibleState": false,
-        "lastAttempt": {
-          "elapsedMs": 9772,
-          "url": "https://inspections-sit.trimont.com/default.aspx",
-          "readyState": "complete",
-          "pageTitle": "Inspections - SIT",
-          "frameCount": 1,
-          "mainFrameMatchCount": 0,
-          "frameMatches": [],
-          "scope": "page"
-        },
-        "attempts": [
-          {
-            "elapsedMs": 0,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 265,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 530,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 806,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1076,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1354,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1622,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 1885,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2153,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2417,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2672,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 2933,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3202,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3464,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3722,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 3979,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4238,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4495,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 4754,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5025,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5295,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5557,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 5822,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6088,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6355,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6613,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 6870,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7135,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7401,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7666,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 7933,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8197,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8465,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8730,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 8999,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9258,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9514,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          },
-          {
-            "elapsedMs": 9772,
-            "url": "https://inspections-sit.trimont.com/default.aspx",
-            "readyState": "complete",
-            "pageTitle": "Inspections - SIT",
-            "frameCount": 1,
-            "mainFrameMatchCount": 0,
-            "frameMatches": [],
-            "scope": "page"
-          }
-        ],
-        "reason": "Timeout waiting for locator to be attached"
-      },
-      "error": "Timeout waiting for locator to be attached"
+        "reason": "Locator resolved and DOM inspected"
+      }
     }
   ]
 }

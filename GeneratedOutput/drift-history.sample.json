@@ -1,0 +1,82 @@
+{
+  "runs": [
+    {
+      "timestampUtc": "2026-10-01T10:00:00Z",
+      "testName": "Code",
+      "failed": false,
+      "executionReliability": {
+        "category": "NONE",
+        "severity": "LOW",
+        "confidence": 1
+      },
+      "locatorChanges": [
+        { "key": "BeneficiaryAddress" }
+      ]
+    },
+    {
+      "timestampUtc": "2026-10-02T10:00:00Z",
+      "testName": "Code",
+      "failed": true,
+      "executionReliability": {
+        "category": "TIMEOUT_VISIBILITY_RACE",
+        "severity": "HIGH",
+        "confidence": 0.92
+      },
+      "locatorChanges": [
+        { "key": "BeneficiaryAddress" }
+      ]
+    },
+    {
+      "timestampUtc": "2026-10-03T10:00:00Z",
+      "testName": "Code",
+      "failed": true,
+      "executionReliability": {
+        "category": "TIMEOUT_VISIBILITY_RACE",
+        "severity": "HIGH",
+        "confidence": 0.92
+      },
+      "locatorChanges": [
+        { "key": "BeneficiaryAddress" }
+      ]
+    },
+    {
+      "timestampUtc": "2026-10-04T10:00:00Z",
+      "testName": "Code",
+      "failed": true,
+      "executionReliability": {
+        "category": "TIMEOUT_VISIBILITY_RACE",
+        "severity": "HIGH",
+        "confidence": 0.92
+      },
+      "locatorChanges": [
+        { "key": "BeneficiaryAddress" }
+      ]
+    },
+    {
+      "timestampUtc": "2026-10-05T10:00:00Z",
+      "testName": "Code",
+      "failed": true,
+      "executionReliability": {
+        "category": "TIMEOUT_VISIBILITY_RACE",
+        "severity": "HIGH",
+        "confidence": 0.92
+      },
+      "locatorChanges": [
+        { "key": "BeneficiaryAddress" }
+      ]
+    },
+    {
+      "timestampUtc": "2026-10-06T10:00:00Z",
+      "testName": "Code",
+      "failed": true,
+      "executionReliability": {
+        "category": "TIMEOUT_VISIBILITY_RACE",
+        "severity": "HIGH",
+        "confidence": 0.92
+      },
+      "locatorChanges": [
+        { "key": "BeneficiaryAddress" }
+      ]
+    }
+  ]
+}

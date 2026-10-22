@@ -1565,6 +1565,27 @@ function transformCode(options) {
         continue;
       }
 
+      // Telerik renders its empty-results message inside a synthetic row. It is
+      // not a business record: column-index/wildcard candidates change the text
+      // target and their inferred uniqueness does not establish a safe rewrite.
+      // Preserve the complete recorded expression (including frame/exact scope);
+      // the downstream validator still checks the original observation normally.
+      if (action.kind === "text" && /(?:^|\s)rgNoRecords(?:\s|$)/i.test(context.row.className || "") &&
+          ["div", "span", "td", "th", "p"].includes(normalize(context.target.tagName))) {
+        outLines.push(line);
+        metadata.actions.push({
+          line: lineNumber,
+          action: action.method,
+          text: action.text,
+          tableDetected: true,
+          strategy: "PRESERVE_EMPTY_TABLE_TEXT",
+          confidence: context.candidateEvidence.roleMatchCount === 1 ? 1 : 0.5,
+          reason: "Empty-results row is not a business record; preserved recorded text locator",
+          uniqueMatch: context.candidateEvidence.roleMatchCount === 1
+        });
+        continue;
+      }
+
       if (preserveIdTableLocators && isIdAnchoredTableLocator(action.originalLocator)) {
         outLines.push(line);
         metadata.actions.push({
