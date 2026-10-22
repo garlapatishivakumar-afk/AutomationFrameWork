@@ -231,3 +231,50 @@ authentication reuse, DOM replay, or application-specific expected results.
 Keep sprints to about 15 cases for manageable agent context. Split larger sprints
 into names such as `Sprint12-A` and `Sprint12-B`. Phase 2 should read the shared
 Code.cs and manifest.json, not internal `.work` files.
+
+## AI generation step
+
+1. Attach `AIRecorder/SprintPrompt.md` in agent chat (plain Markdown, not an
+  auto-discovered slash command). Fill in `Batch` and `Feature` (feature stem).
+2. Pass 1 reads all shared sprint inputs and actual framework references, produces
+  one plan table for every case, then stops. No code, workbook, CSV or recording
+  writes. Review title/flow mismatches, URLs, reuse, Excel needs and assertion TODOs.
+3. Explicitly approve Pass 2 before implementation. `FrameworkPrompt.md` owns code
+  rules; `SprintPrompt.md` owns workflow. Draft classes are never promoted wholesale.
+4. Pass 3 builds only; it does not execute tests. Review the diff and manually import
+  `DataFiles/Templates/<Batch>_<Feature>.csv` into the stated workbook/sheet, skipping
+  its first `# Sheet:` comment line. Existing workbooks are never edited by the agent.
+
+Use `AutomationFrameWork.Helpers.TestCaseContext.GetTestCaseId(scenarioContext)`
+and `ExcelUtility.ReadByTestCaseId(sheetName, id)`. The Excel reader returns a
+case-insensitive string dictionary (trimmed cells, blank values retained) using
+the first used row as headers, like `ReadAsList`. It rejects missing/duplicate
+case rows, missing TestCaseId, duplicate headers and missing/empty sheets.
+Tags are read in order: the first matching `^TC[A-Za-z0-9_-]+$` wins; `TC` is
+uppercase and Reqnroll removes the Gherkin `@` prefix. Missing IDs fail clearly.
+Shared `CommonActionsPage.FillAsync` and `SelectDropdownAsync` wait for visibility;
+the latter selects a native HTML option by **value**, not label or custom widget.
+
+### Running one case (manual execution after review)
+
+With this repository's Reqnroll.xUnit 3.3.3 / xUnit v2 / VSTest adapter, `@TC01`
+generates `[Xunit.Trait("Category", "TC01")]`. Verified using a throwaway external
+tagged feature: discovery with `--list-tests --filter "Category=TC01"` listed only
+the TC01 scenario, without executing it. Existing root features have no TC tags yet.
+
+From the repository root, after approved generation and data preparation:
+
+```powershell
+dotnet test .\AutomationFrameWork.csproj --filter "Category=TC01"
+```
+
+If IDs repeat across features, narrow by the actual Gherkin Feature title:
+
+```powershell
+dotnet test .\AutomationFrameWork.csproj --filter "Category=TC01&FeatureTitle=Inspections Create Order"
+```
+
+The FeatureTitle value is the `Feature:` text, not the file stem. These are manual
+execution instructions; the sprint prompt must not run them. A build or successful
+generation is not business-flow validation. Resolve TODO assertions (which throw),
+unverified locators, missing login bindings and error-page URLs first.

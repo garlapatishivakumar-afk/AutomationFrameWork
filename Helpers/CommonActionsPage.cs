@@ -19,6 +19,24 @@ namespace AutomationFrameWork.Pages
             ProjectRoot = GetProjectRoot();
         }
 
+        public async Task FillAsync(ILocator locator, string value)
+        {
+            ArgumentNullException.ThrowIfNull(locator);
+            ArgumentNullException.ThrowIfNull(value);
+
+            await locator.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await locator.FillAsync(value);
+        }
+
+        public async Task SelectDropdownAsync(ILocator locator, string value)
+        {
+            ArgumentNullException.ThrowIfNull(locator);
+            ArgumentNullException.ThrowIfNull(value);
+
+            await locator.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await locator.SelectOptionAsync(value);
+        }
+
         public async Task NavigateToURLAsync(String url)
         {
             if (!PlaywrightDriver.HasSavedSession())

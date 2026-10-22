@@ -77,6 +77,52 @@ namespace AutomationFrameWork.Helpers
             return result;
         }
 
+        public Dictionary<string, string> ReadByTestCaseId(string sheetName, string testCaseId)
+        {
+            if (string.IsNullOrWhiteSpace(sheetName))
+                throw new ArgumentException("Worksheet name cannot be empty.", nameof(sheetName));
+
+            if (string.IsNullOrWhiteSpace(testCaseId))
+                throw new ArgumentException("Test case ID cannot be empty.", nameof(testCaseId));
+
+            using var workbook = new XLWorkbook(_filePath);
+            if (!workbook.TryGetWorksheet(sheetName, out var worksheet))
+                throw new InvalidOperationException($"Worksheet '{sheetName}' not found in '{_filePath}'.");
+
+            var rows = worksheet.RowsUsed().ToList();
+            if (!rows.Any())
+                throw new InvalidOperationException($"Worksheet '{sheetName}' is empty; a TestCaseId column is required.");
+
+            var columns = rows.First().CellsUsed()
+                .Where(cell => !string.IsNullOrWhiteSpace(cell.GetString()))
+                .Select(cell => new { Name = cell.GetString().Trim(), Index = cell.Address.ColumnNumber })
+                .ToList();
+
+            var duplicateColumn = columns.GroupBy(column => column.Name, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicateColumn != null)
+                throw new InvalidOperationException($"Worksheet '{sheetName}' has duplicate column '{duplicateColumn.Key}'.");
+
+            var idColumn = columns.FirstOrDefault(column =>
+                string.Equals(column.Name, "TestCaseId", StringComparison.OrdinalIgnoreCase));
+            if (idColumn == null)
+                throw new InvalidOperationException($"Worksheet '{sheetName}' has no TestCaseId column.");
+
+            var matches = rows.Skip(1).Where(row => string.Equals(
+                row.Cell(idColumn.Index).GetString().Trim(), testCaseId.Trim(),
+                StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (matches.Count == 0)
+                throw new InvalidOperationException($"No row for TestCaseId '{testCaseId}' in worksheet '{sheetName}'.");
+
+            if (matches.Count > 1)
+                throw new InvalidOperationException($"More than one row for TestCaseId '{testCaseId}' in worksheet '{sheetName}'.");
+
+            return columns.ToDictionary(column => column.Name,
+                column => matches[0].Cell(column.Index).GetString().Trim(),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
         public List<string> ReadFirstColumn(string filePath, string sheetName = null)
         {
             if (string.IsNullOrWhiteSpace(filePath))

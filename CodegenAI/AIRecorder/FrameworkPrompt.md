@@ -1,466 +1,73 @@
-Read `CodegenAI/Code.ts`.
-
-Convert the recorded Playwright script into my existing automation framework.
-
----
-
-## URL Management Rules
-
-Before generating any automation assets:
-
-1. Read the first `page.goto()` URL from `Code.ts`.
-
-2. Check whether the URL already exists in `appsettings.json` under the `Urls` section.
-
-3. If the URL exists:
-
-   * Reuse the existing URL key.
-   * Never hardcode URLs in generated code.
-
-4. If the URL does not exist:
-
-   * Generate a meaningful key name from the URL.
-   * Add the URL entry into `appsettings.json`.
-   * Update `ConfigReader` only if the current URL structure requires modification.
-
-5. All generated navigation methods must use `ConfigReader` URLs.
-
-6. Never hardcode application URLs in generated classes.
-
-7. Reuse existing ConfigReader settings whenever possible.
-
----
-
-## Feature Selection Rules
-
-Before generating automation assets:
-
-1. Scan the `Features` folder.
-
-2. Display all existing Feature files.
-
-3. Always include an additional option:
-
-   `[Create New Feature]`
-
-Example:
-
-Available Features:
-
-1. Login.feature
-
-2. ExternalWire.feature
-
-3. Deals.feature
-
-4. Portfolio.feature
-
-5. Create New Feature
-
-6. Ask the user to select one option.
-
----
-
-## If an Existing Feature is Selected
-
-1. Append only the new Scenario(s) to the selected Feature file.
-
-2. Never modify existing Scenarios.
-
-3. Never delete existing content.
-
-4. Automatically identify related framework classes using naming conventions.
-
-Example:
-
-ExternalWire.feature
-
-↓
-
-ExternalWireSteps.cs
-
-↓
-
-ExternalWireMethods.cs
-
-↓
-
-ExternalWireObjects.cs
-
-5. Append only the minimum required code.
-
-6. Reuse existing methods whenever possible.
-
-7. Generate only missing:
-
-   * Locators
-   * Methods
-   * Step Definitions
-
-8. Preserve all existing implementations.
-
-9. Never rename existing methods.
-
-10. Never remove existing code.
-
-11. Do not change old scenarios.
-
-12. Do not overwrite existing files.
-
----
-
-## If "Create New Feature" is Selected
-
-1. Determine the module name from `Code.ts`.
-
-2. Generate a completely new automation set.
-
-Example:
-
-Reports.feature
-
-ReportsSteps.cs
-
-ReportsMethods.cs
-
-ReportsObjects.cs
-
-3. Follow all framework standards.
-
-4. Use ConfigReader URLs.
-
-5. Use Excel-driven test data.
-
-6. Use reusable methods.
-
-7. Do not duplicate existing utilities.
-
-8. Preserve backward compatibility with existing framework classes.
-
----
-
-## Framework Rules
-
-1. Generate PageElements (Objects) class.
-
-2. Generate PageActions (Methods) class.
-
-3. Generate StepDefinitions class.
-
-4. Use Playwright C#.
-
-5. Use SpecFlow.
-
-6. Follow Page Object Model.
-
-7. Separate locators and actions.
-
-8. Follow existing LoginObjects patterns.
-
-9. Follow existing LoginMethods patterns.
-
-10. Generate reusable methods.
-
-11. Preserve backward compatibility.
-
-12. Generate only minimum required changes.
-
-13. Never duplicate existing utilities.
-
-14. If similar methods already exist, reuse them instead of generating duplicates.
-
-15. Generate only missing implementations.
-
-16. Preserve all existing code.
-
----
-
-## Common Action Reuse Rules
-
-For actions parsed from `Code.ts`:
-
-1. For textbox/input fill actions, use a shared common method instead of inline `FillAsync` in each business method.
-
-2. For dropdown selection actions, use a shared common method instead of inline `SelectOptionAsync` in each business method.
-
-3. If suitable common methods already exist in framework helpers or base classes, reuse them.
-
-4. If no suitable common methods exist, generate them once (single reusable implementation) and call them from page action methods.
-
-5. Do not generate duplicate fill/select helper methods across multiple classes.
-
-6. Keep page-specific business methods thin: they should call reusable common methods with locator and value parameters.
-
-7. Apply this rule consistently for all matching actions in the recorded flow.
-
----
-
-## Waiting Rules
-
-1. Never use `Thread.Sleep`.
-
-2. Never use `Task.Delay`.
-
-3. Use `WaitForAsync`.
-
-4. Use `WaitForResponseAsync` for navigation and AJAX calls.
-
-5. Use Playwright native waits.
-
-6. Wait for loaders to disappear.
-
-7. Wait for frames before interaction.
-
-8. Wait for dynamic content refreshes.
-
-9. Wait for grids to finish refreshing.
-
-10. Wait for popup windows before interaction.
-
-11. Wait for popup close completion before continuing.
-
----
-
-## Assertion Rules
-
-1. Use Expect assertions whenever possible.
-
-2. Validate page navigations.
-
-3. Validate field values after filling.
-
-4. Validate dropdown selections.
-
-5. Validate success messages.
-
-6. Validate error messages.
-
-7. Validate validation messages.
-
-8. Validate transaction IDs.
-
-9. Validate popup states.
-
-10. Validate grid refresh completion.
-
-11. Validate no unexpected inline errors exist.
-
----
-
-## Excel Rules
-
-1. Replace hardcoded test data with Excel-driven data.
-
-2. Generate Excel readers only if missing.
-
-3. Reuse existing Excel utilities whenever possible.
-
-4. Preserve existing Excel implementation.
-
-5. Generate data mapping methods only when necessary.
-
----
-
-## Locator Rules
-
-1. Separate locators into Objects classes.
-
-2. Prefer stable locators.
-
-3. Avoid absolute XPath.
-
-4. Prefer:
-
-   * getByRole
-   * getByLabel
-   * getByPlaceholder
-   * CSS selectors
-   * Relative XPath
-
-5. Use `.First` only when necessary.
-
-6. Avoid duplicate locators.
-
-7. Reuse an existing locator only when the new locator expression exactly matches it.
-
-8. If the locator does not exactly match, define a new locator.
-
-9. Never reuse locators based on partial/contains/similar matches.
-
----
-
-## Method Generation Rules
-
-1. Generate reusable action methods.
-
-2. Break large flows into smaller methods.
-
-3. Reuse existing methods whenever possible.
-
-4. Do not duplicate methods.
-
-5. Preserve old implementations.
-
-6. Generate only missing methods.
-
-7. Follow existing naming conventions.
-
----
-
-## Step Definition Rules
-
-1. Reuse existing step definitions whenever possible.
-
-2. Generate only missing bindings.
-
-3. Avoid duplicate SpecFlow expressions.
-
-4. Preserve all existing step definitions.
-
-5. Append new steps without modifying old steps.
-
----
-
-## Code Quality Rules
-
-1. Follow existing project structure.
-
-2. Preserve backward compatibility.
-
-3. Never remove working code.
-
-4. Never overwrite existing implementations.
-
-5. Never rename existing classes.
-
-6. Never change unrelated files.
-
-7. Generate only minimum required changes.
-
-8. Clearly indicate newly generated sections.
-
----
-
-## Output Requirements
-
-At completion, provide a summary containing:
-
-* Selected Feature
-* Feature Updated or Created
-* Scenario(s) Added
-* Existing Steps Reused
-* New Steps Generated
-* Existing Methods Reused
-* New Methods Generated
-* Existing Objects Reused
-* New Objects Generated
-* URLs Reused
-* URLs Added
-* appsettings.json Changes
-* ConfigReader Changes
-* Excel Changes
-* Validation Rules Added
-* Waits Added
-* Assertions Added
-* Files Modified
-* Files Created
-
----
-
-## Final Workflow
-
-Code.ts
-
-↓
-
-Extract page.goto URL
-
-↓
-
-Validate appsettings.json
-
-↓
-
-Reuse/Add URL
-
-↓
-
-Display Feature List
-
-(Login.feature,
-ExternalWire.feature,
-Deals.feature,
-Portfolio.feature,
-Create New Feature)
-
-↓
-
-User Selection
-
-↓
-
-Existing Feature?
-
-├─ Yes
-
-│
-
-│ Feature
-
-│ ↓
-
-│ Related Steps
-
-│ ↓
-
-│ Related Methods
-
-│ ↓
-
-│ Related Objects
-
-│ ↓
-
-│ Append Minimum Required Code
-
-│
-
-└─ No
-
-↓
-
-Generate New Feature Set
-
-↓
-
-Feature
-
-Steps
-
-Methods
-
-Objects
-
-↓
-
-Build
-
-↓
-
-Execute
-
-↓
-
-Generate Trace
-
-↓
-
-Analyze Trace
-
-↓
-
-Improve Framework
-
-↓
-
-Execution Summary
+# Sprint generation code rules
+
+## Inputs and evidence
+Read `CodegenAI/Recordings/<Batch>/manifest.json`, `Code.cs`,
+`CSharpGenerationReport.json` and `TableLocatorMetadata.json`. Manifest fields:
+`id`, `title`, `expectedResult`, `preconditions`, `startUrl`, `dataHint`.
+Read `Code.ts` ONLY for `unsupportedActions`, using case/source-line mappings.
+Never change recordings. Missing inputs, failed/excluded cases and unsupported
+actions are planning blockers. `CodegenFlowTCxx` classes are DRAFTS: extract
+locators and ordered flow; never copy draft classes into the project. Generation
+success is not runtime verification.
+
+## Architecture and append-only scope
+Use Playwright C#, Reqnroll, xUnit and awaited async APIs. Scan actual Features and
+bindings; target Feature comes from SprintPrompt, not an interactive picker.
+Reference: `Features/DealsCompletionStatus.feature`,
+`StepDefinitions/DealsCompletionStatusSteps.cs`, `PageActions/DealsCompletionStatusPage.cs`,
+`PageElements/DealsCompletionStatusLocators.cs`. Use `<X>Steps.cs`, `<X>Page.cs`,
+`<X>Locators.cs` in those folders: thin steps, separate locators/business actions.
+Reuse compatible login/navigation steps, methods and helpers first; check behavior
+and URLs. Stubs are not implementations. Append only missing scenarios, bindings,
+methods and locators; define shared steps once. Never edit/rename/delete existing
+implementations, Hooks or unrelated files. Avoid rerun duplicates; keep CRLF/style.
+
+## Batch and domain names
+One Scenario per case, title `<TestCaseId> - <Title>`, tag `@<TestCaseId>` (e.g. @TC01).
+Plan ALL cases, including blocked ones. Scenario Outline is allowed only when the
+manifest demonstrates identical flow with different data; preserve per-case tags
+through separately tagged Examples blocks. Extract repeated subflows and split
+long flows into single-purpose methods. Use PascalCase verb-first domain names
+ending Async, replacing OpenTargetModuleAsync, ApplySearchCriteriaAsync and
+NavigateToApplicationAsync. Flag title/flow disagreements; do not invent intent.
+
+## Configuration and test data
+Resolve every URL through appsettings.json and ConfigReader. Reuse exact keys in
+`Urls:Applications` via `config.Urls.TryGetApplication(key)`; reject empty values.
+Propose meaningful missing keys in the plan; add only approved entries. Never
+hardcode URLs. Change ConfigReader only for approved structural additions.
+Flag error-page URLs; never substitute another URL without approval.
+Read Excel inputs by TestCaseId, not row order. Use
+`TestCaseContext.GetTestCaseId(scenarioContext)` and
+`new ExcelUtility(workbookPath).ReadByTestCaseId(sheetName, id)`; the latter returns
+a case-insensitive Dictionary<string, string>, including blanks. Resolve paths
+from the framework project root. Do not edit .xlsx files. In approved implementation
+write `DataFiles/Templates/<Batch>_<Feature>.csv`: first line `# Sheet: <SheetName>`,
+then TestCaseId/required columns and recorded sample values, correctly CSV-escaped.
+Specify workbook/sheet/columns for manual import; omit secrets. No planning writes.
+Use CommonActionsPage.FillAsync and SelectDropdownAsync (native select by option
+value). Custom dropdowns need recorded interactions. Leave private helpers intact.
+
+## Locators and waits
+Reuse locators ONLY on exact expression match, including Exact/position/frame scope;
+never partial similarity. Preserve a draft expression verbatim when its locator text
+matches same-case table metadata with positive live uniqueness evidence. Match text,
+not line number alone; fallback metadata or incomplete replay is not validation.
+Otherwise prefer role, label or stable CSS; avoid volatile ctl00 IDs, generated
+numeric suffixes and row indexes. Never invent attributes or simplify validated
+frame/table scope. Prefer short unique relative XPath if needed; no absolute XPath
+or unjustified First/Nth. Unprovable replacements need human evidence, not guesses.
+Use visible/hidden/attached waits, loader/grid readiness or a specific response.
+No Thread.Sleep, Task.Delay, fixed sleeps or blanket NetworkIdle. Subscribe to popup,
+download/response events before triggering actions; preserve event/action order.
+Follow FrameworkContext dialog handling. Reuse framework logging/error handling.
+
+## Assertions and summary
+Derive Assertions.Expect checks from each expectedResult using recorded locators
+or literal UI text actually specified there. "Confirmation shown" is not exact UI
+text. Assert relevant navigation, values/selections, messages and popup/grid states
+only with evidence. If no stable locator exists, add the Then binding with
+`// TODO(assert): <reason>` and throw NotImplementedException; never silently pass.
+Summary: feature; scenarios/tags; steps/methods/locators reused vs
+added; URL/config changes; Excel workbook/sheet/columns/CSV; waits/assertions; files
+changed; build result; blockers and **Assertions needing human input**.
