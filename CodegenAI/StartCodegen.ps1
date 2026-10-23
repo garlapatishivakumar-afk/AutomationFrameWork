@@ -1,5 +1,5 @@
 param(
-	[string]$TargetUrl = 'https://inspections-dev.trimont.com/default.aspx',
+	[string]$TargetUrl,
 	[string]$TestIdAttribute = 'data-testid',
 	[string]$TableSelector = 'table',
 	[switch]$SkipLiveObservation,
@@ -33,6 +33,26 @@ $csharpStopSignalFile = Join-Path $PSScriptRoot ".csharp-live-sync.stop"
 $appSettingsFile = Join-Path (Split-Path $PSScriptRoot -Parent) "appsettings.json"
 $maxAgeDays = 4
 $liveCSharpJob = $null
+
+# App settings allow JSON comments; preserve quoted strings (including https://)
+# while stripping comments for Windows PowerShell 5.1's ConvertFrom-Json.
+if ([string]::IsNullOrWhiteSpace($TargetUrl)) {
+	try {
+		$settingsText = Get-Content -LiteralPath $appSettingsFile -Raw -ErrorAction Stop
+		$settingsText = [regex]::Replace($settingsText, '"(?:\\.|[^"\\])*"|//[^\r\n]*|/\*[\s\S]*?\*/', {
+			param($Match)
+			if ($Match.Value.StartsWith('"')) { return $Match.Value }
+			return ' '
+		})
+		$settings = $settingsText | ConvertFrom-Json -ErrorAction Stop
+		$TargetUrl = [string]$settings.Urls.IReport
+	} catch {
+		throw 'Cannot read appsettings.json. Configure Urls.IReport with the application URL.'
+	}
+	if ([string]::IsNullOrWhiteSpace($TargetUrl)) {
+		throw 'Configure Urls.IReport in appsettings.json with the application URL.'
+	}
+}
 
 function Protect-DiagnosticText([string]$Value) {
 	return [regex]::Replace($Value, 'https?://[^\s"''<>`]+', {
@@ -333,7 +353,7 @@ function Test-ReservedFolderName([string]$Name) {
 if (Test-ReservedFolderName $BatchName) { throw "Reserved Windows folder name: $BatchName" }
 $rows = @(Import-Csv -LiteralPath $BatchFile)
 if ($rows.Count -eq 0) { throw 'Batch CSV must contain at least one test case.' }
-$columns = @('TestCaseId', 'Title', 'StartUrl', 'Preconditions', 'ExpectedResult', 'Priority', 'DataHint')
+$columns = @('TestCaseId', 'Title')
 foreach ($column in $columns) {
 	if ($rows[0].PSObject.Properties.Name -notcontains $column) { throw "Missing CSV column: $column" }
 }
@@ -345,6 +365,7 @@ foreach ($row in $rows) {
 	if (Test-ReservedFolderName $id) { throw "Reserved Windows folder name: $id" }
 	if ($ids.ContainsKey($id)) { throw "Duplicate TestCaseId: $id" }
 	if ([string]::IsNullOrWhiteSpace($row.Title)) { throw "Title is required for $id" }
+	if ($row.Title -match '[\r\n]') { throw "Title must be a single-line Scenario name for $id" }
 	$className = 'CodegenFlow' + ($id -replace '[^A-Za-z0-9_]', '_')
 	if ($classNames.ContainsKey($className)) { throw "TestCaseIds produce the same C# class: $id and $($classNames[$className])" }
 	$ids[$id] = $true
@@ -495,8 +516,9 @@ foreach ($row in $selectedRows) {
 	$position++
 	$entry = @($manifest.testCases | Where-Object { $_.id -eq $row.TestCaseId })[0]
 	Write-Host (Protect-DiagnosticText "[$position/$($selectedRows.Count)] $($entry.id) - $($entry.title)")
-	Write-Host (Protect-DiagnosticText "  Preconditions: $($entry.preconditions)")
-	Write-Host (Protect-DiagnosticText "  ExpectedResult: $($entry.expectedResult)")
+	Write-Host "  Tag: @$($entry.id)"
+	if ($entry.preconditions) { Write-Host (Protect-DiagnosticText "  Preconditions: $($entry.preconditions)") }
+	if ($entry.expectedResult) { Write-Host (Protect-DiagnosticText "  ExpectedResult: $($entry.expectedResult)") }
 	Write-Host (Protect-DiagnosticText "  StartUrl: $($entry.startUrl)")
 	if ($DryRun) { Save-BatchManifest; continue }
 	if (-not $NoPrompt -and -not $GenerateOnly) {

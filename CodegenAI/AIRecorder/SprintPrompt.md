@@ -22,7 +22,12 @@ Read Code.ts only for unsupportedActions, never as the default input.
 If Batch/Feature is unset or inputs are missing, report it; never substitute silently.
 Output ONE table covering ALL manifest cases: ID/tag and scenario title; recorded
 flow; steps/methods/locators reused vs new; Excel workbook/sheet/columns/sample data;
-expected-result assertions buildable vs TODO; blockers/red flags. Compare each
+expected-result assertions buildable vs TODO; blockers/red flags.
+Use manifest `title` (CSV Title/test case name) exactly as the Scenario name,
+without an ID prefix; use manifest `id` (CSV TestCaseId) as `@<id>` for that case.
+Only those two CSV columns are required. Missing optional expected-result metadata
+is not a missing input file; report assertions lacking recorded evidence as TODO.
+Compare each
 manifest startUrl with the draft's first navigation; flag error pages, title/flow
 mismatches, missing login implementations, unsupported actions, incomplete DOM
 evidence, volatile locators and configuration gaps. List exact files to append/create.

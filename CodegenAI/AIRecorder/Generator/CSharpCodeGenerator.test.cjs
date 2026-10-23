@@ -1543,6 +1543,7 @@ function testBatchPowerShellOrchestration() {
   withTempFiles((tempDir) => {
     const recorderRoot = path.join(tempDir, "CodegenAI");
     fs.mkdirSync(recorderRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, "appsettings.json"), JSON.stringify({ Urls: { IReport: "https://example.test/" } }));
     fs.copyFileSync(path.resolve(__dirname, "../../StartCodegen.ps1"), path.join(recorderRoot, "StartCodegen.ps1"));
     const copyTooling = (source, target) => {
       fs.mkdirSync(target, { recursive: true });
@@ -1561,8 +1562,8 @@ function testBatchPowerShellOrchestration() {
     const sessionPath = path.join(recorderRoot, "AIRecorder", "auth", "session.json");
     const oldSession = fs.existsSync(sessionPath) ? fs.readFileSync(sessionPath) : null;
     const csvPath = path.join(tempDir, "testcases.csv");
-    const headers = "TestCaseId,Title,StartUrl,Preconditions,ExpectedResult,Priority,DataHint\n";
-    const validRows = "TC01,First case,,Ready,Done,High,\nTC02,Second case,,Ready,Validated,Medium,\n";
+    const headers = "TestCaseId,Title\n";
+    const validRows = "TC01,First case\nTC02,Second case\n";
     const manifest = () => JSON.parse(fs.readFileSync(path.join(batchFolder, "manifest.json"), "utf8"));
     function run(args, expectedStatus = 0) {
       const result = require("child_process").spawnSync("powershell.exe", [
@@ -1802,6 +1803,7 @@ function testGenerationFailureExitCodes() {
     fs.writeFileSync(path.join(generatorDir, "SprintMerger.cjs"), `if (process.argv.includes('--review-summary')) { console.log('review summary'); } else { const result = require(${JSON.stringify(path.join(__dirname, "SprintMerger.cjs"))}).rebuildSprint(process.argv[process.argv.indexOf('--manifest-file') + 1]); process.exitCode = result.errors.length ? 1 : 0; }`);
     writeAppSettings(tempDir);
     const shim = path.join(generatorDir, "CSharpCodeGenerator.cjs");
+    fs.writeFileSync(path.join(tempDir, "appsettings.json"), JSON.stringify({ Urls: { IReport: "https://example.test/" } }));
     const realGenerator = path.join(__dirname, "CSharpCodeGenerator.cjs");
     const delegate = `const r = require('child_process').spawnSync(process.execPath, [${JSON.stringify(realGenerator)}, ...process.argv.slice(2)], { stdio: 'inherit' }); process.exit(r.status === null ? 1 : r.status);`;
     fs.writeFileSync(shim, delegate);

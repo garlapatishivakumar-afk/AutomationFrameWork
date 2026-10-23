@@ -22,7 +22,7 @@ function runAllTests() {
       projectRoot: root, className: "CodegenFlowTC01", caseId: "TC01", caseTitle: "Create order", enterpriseMode: true };
     fs.writeFileSync(options.codeFilePath, fixture.source);
     fs.writeFileSync(options.domObservationPath, JSON.stringify(fixture.observations));
-    fs.writeFileSync(path.join(root, "appsettings.json"), JSON.stringify({ Urls: { Applications: {} } }));
+    fs.writeFileSync(path.join(root, "appsettings.json"), JSON.stringify({ Urls: { IReport: "https://example.test/", Applications: {} } }));
     const strict = generateCSharpCode({ ...options, strictLocators: true });
     assert.strictEqual(strict.codeGenerationBlocked, true);
     const review = generateCSharpCode(options);

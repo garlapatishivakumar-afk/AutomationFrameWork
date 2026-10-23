@@ -3,7 +3,9 @@
 ## Inputs and evidence
 Read `CodegenAI/Recordings/<Batch>/manifest.json`, `Code.cs`,
 `CSharpGenerationReport.json` and `TableLocatorMetadata.json`. Manifest fields:
-`id`, `title`, `expectedResult`, `preconditions`, `startUrl`, `dataHint`.
+`id` (CSV TestCaseId), `title` (CSV Title/test case name), `startUrl`.
+The CSV needs only TestCaseId and Title. `expectedResult`, `preconditions` and
+`dataHint` are optional legacy metadata; missing values are not input blockers.
 Read `Code.ts` ONLY for `unsupportedActions`, using case/source-line mappings.
 Never change recordings. Missing inputs, failed/excluded cases and unsupported
 actions are planning blockers. `CodegenFlowTCxx` classes are DRAFTS: extract
@@ -23,7 +25,11 @@ methods and locators; define shared steps once. Never edit/rename/delete existin
 implementations, Hooks or unrelated files. Avoid rerun duplicates; keep CRLF/style.
 
 ## Batch and domain names
-One Scenario per case, title `<TestCaseId> - <Title>`, tag `@<TestCaseId>` (e.g. @TC01).
+One Scenario per case: use manifest `title` exactly as the Scenario name (the CSV
+test case name), and put `@<TestCaseId>` on the preceding tag line using manifest
+`id`. Never prefix the Scenario name with the ID or derive it from the merged
+TypeScript test title. For example, `@95040` followed by
+`Scenario: Verify Financial IRP Deal Report Details Page`.
 Plan ALL cases, including blocked ones. Scenario Outline is allowed only when the
 manifest demonstrates identical flow with different data; preserve per-case tags
 through separately tagged Examples blocks. Extract repeated subflows and split
@@ -72,10 +78,12 @@ issue for flagged cases and propose one of: re-record, a stable alternative loca
 code without stating it in the plan, and never claim downstream actions after an
 incomplete replay are verified.
 
-Derive Assertions.Expect checks from each expectedResult using recorded locators
+When expectedResult is supplied, derive Assertions.Expect checks using recorded locators
 or literal UI text actually specified there. "Confirmation shown" is not exact UI
 text. Assert relevant navigation, values/selections, messages and popup/grid states
-only with evidence. If no stable locator exists, add the Then binding with
+only with evidence. With the two-column CSV, use recorded assertions/evidence;
+never invent expected results from the test case name alone. Flag missing business
+expectations as needing human input. If no stable locator exists, add the Then binding with
 `// TODO(assert): <reason>` and throw NotImplementedException; never silently pass.
 Summary: feature; scenarios/tags; steps/methods/locators reused vs
 added; URL/config changes; Excel workbook/sheet/columns/CSV; waits/assertions; files

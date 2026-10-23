@@ -95,20 +95,34 @@ node --test .\CodegenAI\AIRecorder\Generator\CSharpCodeGenerator.Tll.test.cjs
 
 ## Test case CSV
 
-Create/edit [testcases.csv](testcases.csv), with all seven column headers:
+Create/edit [testcases.csv](testcases.csv), with only these two column headers.
+`Title` is the test case name:
 
 ```csv
-TestCaseId,Title,StartUrl,Preconditions,ExpectedResult,Priority,DataHint
-TC01,Create inspection order with valid data,,User is logged in,Order is created and confirmation shown,High,InspectionsCreateOrder
-TC02,Create inspection order with missing mandatory field,,User is logged in,Validation message is shown,Medium,
+TestCaseId,Title
+TC01,Create inspection order with valid data
+TC02,Create inspection order with missing mandatory field
 ```
 
 `TestCaseId` must be unique (case-insensitive on Windows), match
 `^[A-Za-z0-9_-]+$`, and not be a reserved Windows device name. `Title` cannot
-be blank. Quote CSV values containing commas or newlines. Blank `StartUrl` uses
-`-TargetUrl`, including its existing default. No additional application URL is
-hardcoded by batch mode; C# URL resolution continues to use the repository's
-appsettings configuration.
+be blank or contain newlines (Scenario names must be single-line). Quote names
+containing commas. The default start URL comes from `Urls.IReport` in the root
+appsettings.json, including files with JSON comments. No URL is hardcoded in the
+launcher. Existing `-TargetUrl` overrides and optional legacy CSV columns remain
+supported, but are not required.
+
+When including the recorded script in the framework, use `Title` exactly as the
+Scenario name and `TestCaseId` as its tag, without prefixing the name with the ID:
+
+```gherkin
+@TC01
+Scenario: Create inspection order with valid data
+```
+
+Both FrameworkPrompt.md and SprintPrompt.md enforce this mapping. The two-column
+CSV does not supply expected results: use recorded assertion evidence or flag
+missing business expectations for human input rather than inventing assertions.
 
 Each generated class is `CodegenFlow<TestCaseId>`; hyphens become underscores.
 Each merged TypeScript test is titled `TestCaseId - Title`, with quotes, backslashes
@@ -133,7 +147,8 @@ Add a `TC03` row to the CSV before using the second command. Multiple IDs can
 be selected with `-Only TC01,TC02`. Paths supplied with `-BatchFile` are relative
 to the current directory (or absolute).
 
-- Normal recording prints the case title, preconditions, expected result and URL.
+- Normal recording prints the case title, ID tag and configured URL (plus legacy
+  preconditions/expected result only when supplied).
   Press Enter to record, `s` to skip, or `q` to stop; unvisited cases stay planned.
   `-NoPrompt` suppresses this pause, not the interactive browser recording itself.
 - Saved session initialization happens once before recording; its validity is

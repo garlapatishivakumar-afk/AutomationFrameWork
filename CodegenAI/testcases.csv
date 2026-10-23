@@ -1,3 +1,6 @@
-TestCaseId,Title,StartUrl,Preconditions,ExpectedResult,Priority,DataHint
-TC01,Create inspection order with valid data,,User is logged in,Order is created and confirmation shown,High,InspectionsCreateOrder
-TC02,Create inspection order with missing mandatory field,,User is logged in,Validation message is shown,Medium,
+TestCaseId,Title
+95063,Verify Override Restriction for Cash Action Form with Final Status
+95064,Verify Field Override Restriction When Allow Override Is Disabled
+95065,Verify Field Override Functionality When Allow Override Is Enabled
+95066,Verify Direct Entry Functionality for an Overridable Field
+95070,"Verify NTOR Report Generation, Calculation, and Cash Action Form Workflow"

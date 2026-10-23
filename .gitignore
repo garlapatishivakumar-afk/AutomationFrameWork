@@ -21,3 +21,11 @@ FileDownloads/
 # Per-case recordings and saved authentication state
 CodegenAI/Recordings/
 CodegenAI/AIRecorder/auth/session.json
+
+# Generated recorder scripts and run-specific evidence (keep local only)
+/CodegenAI/Code.ts
+/CodegenAI/Code.cs
+/CodegenAI/CSharpGenerationReport.json
+/CodegenAI/AIRecorder/CSharpGenerationReport.json
+/CodegenAI/AIRecorder/LiveObservations.json
+/CodegenAI/AIRecorder/TableLocatorMetadata.json
