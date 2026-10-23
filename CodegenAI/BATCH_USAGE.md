@@ -6,6 +6,93 @@ the sprint's **Code.ts**, **Code.cs** and **manifest.json**. The existing
 single-recording command and paths are unchanged. Generation defaults to tiered
 review handling; add `-StrictLocators` for the previous strict failure policy.
 
+## Yellow table-locator highlighting
+
+Phase 3 uses the dependency-free, read-only local extension in
+[AIRecorder/Extension/TllHighlighter](AIRecorder/Extension/TllHighlighter).
+It needs no npm packages, compilation/build step, or network connection.
+
+**What counts as transformed:** in the current TableLocatorMetadata.json schema,
+only a non-empty `actions[].locator` identifies a rewrite counted in
+`transformedActions`. `tableDetected`, `uniqueMatch`, confidence, candidates and
+`analyzedActions` alone do not. `locator` is the generated inner selector, usually
+XPath. The engine has an internal full `originalLocator` expression, but does not
+persist it or a `generatedLocator` field; the tooltip explicitly reports a missing
+original rather than reconstructing one. The table engine is unchanged.
+
+- TypeScript gets **no markers or edits**. The extension verifies the locator at
+  metadata's one-based `line`, normalizing syntax whitespace/quote style without
+  changing string values. If moved, it picks the nearest verified locator/action
+  match (ties choose the earlier line), restricted to the same case in merged files.
+  No match means no highlight. Comments, input values and unrelated locators do not count.
+- Generated C# properties/statements end with `// [TLL TC01:L21]`, or
+  `// [TLL L21]` in legacy mode. The number is the per-case TypeScript source line,
+  not the C# line. Shared properties use the first transformed action's provenance;
+  other actions using that property are marked only if individually transformed.
+  Only complete statement/property lines receive comments; callback wrapper/closing
+  lines do not inherit a child action's marker. The merger preserves markers and
+  generation-report hashes. Missing/unreadable metadata produces one non-blocking
+  console warning and no markers. Existing strict/default policies remain unchanged.
+- The extension uses metadata beside the file; legacy CodegenAI/Code.ts falls back
+  to AIRecorder/TableLocatorMetadata.json. Merged metadata's `line` is the merged TS
+  line; `sourceLine` and `testCaseId` locate the original action for C# hovers.
+- Whole lines and the overview ruler are yellow. Hover shows case, source line,
+  original/generated locator, strategy, confidence and uniqueMatch. Forced/fallback,
+  inferred, low-confidence or absent live-validation provenance gets a visible
+  **NOT LIVE-VALIDATED / not established** note. Yellow never overrides failed
+  validation, incomplete replay, reviewRequired or missing assertions.
+- Setting `tllHighlighter.filePatterns` defaults to `["Code.ts", "Code.cs"]`;
+  file-name patterns support `*` and `?`. Editor changes, debounced edits and metadata
+  create/change/delete refresh decorations. Read errors clear decorations and log
+  a short message in the **TLL Highlighter** Output channel, never metadata contents.
+
+### Try without installing (from the repository root)
+
+```powershell
+code --extensionDevelopmentPath=.\CodegenAI\AIRecorder\Extension\TllHighlighter .
+```
+
+Open the sprint's Code.ts and Code.cs in that window. Check the yellow lines,
+hover text, moved-line behavior, and refresh after offline regeneration yourself;
+unit tests and a successful copy do **not** verify VS Code rendering or discovery.
+If the earlier prototype `automationframework-local.codegen-tll-highlighter` is
+installed, disable it manually while testing to avoid duplicate decorations.
+
+### Install / uninstall (only after visual review)
+
+```powershell
+.\CodegenAI\AIRecorder\Extension\TllHighlighter\Install-TllHighlighter.ps1
+# Then reload the VS Code window.
+.\CodegenAI\AIRecorder\Extension\TllHighlighter\Install-TllHighlighter.ps1 -Uninstall
+```
+
+The PowerShell 5.1 script copies this extension into
+`%USERPROFILE%\.vscode\extensions\local.tll-highlighter-0.1.0`, replacing **only that
+folder**. `-ExtensionsRoot <temporary-directory>` tests installation elsewhere;
+use the same root with `-Uninstall` to remove it. Linked destinations and a destination
+containing/inside the source folder are rejected. No Marketplace or packaging tool
+is needed. Reload after installation/removal; copied-folder discovery needs manual verification.
+
+### Existing recordings and tests
+
+Existing C# drafts need offline regeneration for the new markers. Back up ignored
+recordings, and test on a temporary copy first. To retain saved rewritten TypeScript
+and its original metadata, use the existing `-GenerateOnly -SkipLiveObservation
+-SkipTableLocatorPostProcess` workflow. Do not manually append markers to old drafts:
+their report hashes would no longer match. Generation performs no live replay in
+this mode. Rerunning the rewrite engine can replace metadata with zero new rewrites;
+highlighting reflects that metadata, not a historical cumulative count.
+
+`analyzed=13, transformed=2` means two verified TS action lines, **not 13**. C# can
+have more yellow lines because each rewritten action also has a locator property
+and potentially a readiness statement. If the current metadata says transformed=0,
+zero highlights is correct, regardless of older console output.
+
+```powershell
+node --test .\CodegenAI\AIRecorder\Extension\TllHighlighter\*.test.cjs
+node --test .\CodegenAI\AIRecorder\Generator\CSharpCodeGenerator.Tll.test.cjs
+```
+
 ## Test case CSV
 
 Create/edit [testcases.csv](testcases.csv), with all seven column headers:

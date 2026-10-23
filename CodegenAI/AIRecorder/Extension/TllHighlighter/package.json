@@ -1,0 +1,26 @@
+{
+  "name": "tll-highlighter",
+  "publisher": "local",
+  "displayName": "TLL Highlighter",
+  "description": "Read-only yellow highlighting and provenance tooltips for table-locator rewrites.",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.80.0" },
+  "main": "./extension.js",
+  "activationEvents": ["workspaceContains:**/TableLocatorMetadata.json"],
+  "scripts": { "test": "node --test *.test.cjs" },
+  "categories": ["Other"],
+  "capabilities": { "untrustedWorkspaces": { "supported": true } },
+  "contributes": {
+    "configuration": {
+      "title": "TLL Highlighter",
+      "properties": {
+        "tllHighlighter.filePatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["Code.ts", "Code.cs"],
+          "description": "File-name patterns to decorate (* and ? supported). Only TypeScript and C# files are considered."
+        }
+      }
+    }
+  }
+}

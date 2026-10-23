@@ -23,7 +23,7 @@ function safeReadJson(filePath) {
   }
 
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
   } catch {
     return null;
   }
@@ -1347,7 +1347,51 @@ function applyPositionSuffix(name, position) {
   return name;
 }
 
-function buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap) {
+function resolveTllSourceLines(actions, options) {
+  const siblingPath = options.codeFilePath
+    ? path.join(path.dirname(options.codeFilePath), "TableLocatorMetadata.json") : "";
+  const metadataPath = options.tableMetadataPath ||
+    (siblingPath && fs.existsSync(siblingPath) ? siblingPath : inferLocatorValidationPaths(options).tableMetadataPath);
+  let entries;
+  try {
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8").replace(/^\uFEFF/, ""));
+    if (!Array.isArray(metadata?.actions)) throw new Error("Invalid metadata actions");
+    entries = metadata.actions;
+  } catch {
+    // stdout avoids PowerShell 5.1 NativeCommandError for a non-blocking warning.
+    // Do not expose file contents or paths that might contain private information.
+    console.log("[TLL] Warning: table locator metadata is missing or unreadable; no rewrite markers added. Generation continues unchanged.");
+    return new Set();
+  }
+  // A line number alone is not evidence: stale metadata or a subsequent repair
+  // must not label a different locator as a table-engine rewrite.
+  return new Set(actions.filter((action) => action.supported && action.locator?.kind === "locator" &&
+    !action.locator.position && !action.locator.first && !action.locator.filterText && entries.some((entry) =>
+    entry && Number.isInteger(entry.line) && entry.line === action.sourceLine &&
+    (!entry.testCaseId || entry.testCaseId === options.caseId) &&
+    (!entry.action || entry.action === action.actionType) &&
+    typeof entry.locator === "string" && entry.locator.trim() &&
+    entry.locator === action.locator.selector
+  )).map((action) => action.sourceLine));
+}
+
+function tllMarker(sourceLine, options) {
+  const caseId = String(options.caseId || "").replace(/[^A-Za-z0-9_-]/g, "_");
+  return ` // [TLL ${caseId ? `${caseId}:` : ""}L${sourceLine}]`;
+}
+
+function markTllStatements(lines, action, options) {
+  if (!options.tllSourceLines?.has(action.sourceLine)) return lines;
+  // Current locator actions/properties are emitted as complete single-line
+  // statements. Do not decorate continuation/brace lines of wrapper constructs.
+  return lines.map((line) => {
+    const syntax = line.replace(/@"(?:""|[^"])*"|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\/.*$/g, " ");
+    return /^\s*(?:await|var|ILocator)\b/.test(syntax) && /;\s*$/.test(syntax)
+      ? `${line.trimEnd()}${tllMarker(action.sourceLine, options)}` : line;
+  });
+}
+
+function buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap, tllSourceLines) {
   const expressionToProperty = new Map();
   const usedNames = new Map();
   const actionBindings = new Map();
@@ -1375,7 +1419,9 @@ function buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap)
     }
 
     if (expressionToProperty.has(locatorExpression)) {
-      actionBindings.set(action.sourceLine, expressionToProperty.get(locatorExpression));
+      const binding = expressionToProperty.get(locatorExpression);
+      if (!binding.tllSourceLine && tllSourceLines.has(action.sourceLine)) binding.tllSourceLine = action.sourceLine;
+      actionBindings.set(action.sourceLine, binding);
       continue;
     }
 
@@ -1393,7 +1439,8 @@ function buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap)
       kind: "generated",
       propertyName,
       expression: propertyName,
-      locatorExpression
+      locatorExpression,
+      tllSourceLine: tllSourceLines.has(action.sourceLine) ? action.sourceLine : null
     };
     expressionToProperty.set(locatorExpression, binding);
     actionBindings.set(action.sourceLine, binding);
@@ -1454,6 +1501,10 @@ function collectFrameworkDependencies(actions, options) {
 }
 
 function buildActionStatement(action, options) {
+  return markTllStatements(buildUnmarkedActionStatement(action, options), action, options);
+}
+
+function buildUnmarkedActionStatement(action, options) {
   options.emittedSourceLines?.push(action.sourceLine);
   if (!action.supported) {
     return [
@@ -1580,6 +1631,9 @@ function buildActionStatement(action, options) {
   }
 
   if (action.actionType === "fill") {
+    if (options.fillArgBySourceLine?.has(action.sourceLine)) {
+      return [...warnings, `            await FillInputAsync(${effectiveExpression}, ${options.fillArgBySourceLine.get(action.sourceLine)});`];
+    }
     const split = buildInlineLocatorSplit(action, locatorBinding, effectiveExpression, options.runtimeState);
     if (split) {
       return [...warnings, ...split.prefixLines, `            await ${split.callTarget}.FillAsync("${escapeCSharpString(action.value)}");`];
@@ -1722,7 +1776,9 @@ function renderMethodBodyForActions(actions, buildOptions, fillArgBySourceLine) 
       return;
     }
 
-    lines.push(`            await ${effectiveExpression}.WaitForAsync(new() { State = WaitForSelectorState.Visible });`);
+    lines.push(...markTllStatements([
+      `            await ${effectiveExpression}.WaitForAsync(new() { State = WaitForSelectorState.Visible });`
+    ], action, buildOptions));
     lastReadinessWaitExpression = effectiveExpression;
   };
 
@@ -1749,17 +1805,7 @@ function renderMethodBodyForActions(actions, buildOptions, fillArgBySourceLine) 
   for (const action of actions) {
     appendInteractionWaitIfNeeded(action);
 
-    if (action.actionType === "fill" && fillArgBySourceLine && fillArgBySourceLine.has(action.sourceLine)) {
-      buildOptions.emittedSourceLines?.push(action.sourceLine);
-      const effectiveExpression = getActionBindingExpression(action, buildOptions);
-      const warnings = action.diagnostics.map((message) => `            // Review: ${message}`);
-      lines.push(...warnings);
-      lines.push(`            await FillInputAsync(${effectiveExpression}, ${fillArgBySourceLine.get(action.sourceLine)});`);
-      appendPostActionWaitIfNeeded(action);
-      continue;
-    }
-
-    const generated = buildActionStatement(action, buildOptions);
+    const generated = buildActionStatement(action, { ...buildOptions, fillArgBySourceLine });
     lines.push(...generated);
     appendPostActionWaitIfNeeded(action);
   }
@@ -2189,9 +2235,11 @@ function buildCode(actions, options) {
     ...options,
     actorFieldMap
   });
-  const locatorRegistry = buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap);
+  const tllSourceLines = resolveTllSourceLines(actions, options);
+  const locatorRegistry = buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap, tllSourceLines);
   const buildOptions = {
     ...options,
+    tllSourceLines,
     frameworkContext,
     frameworkDependencies: dependencies,
     locatorBindings: locatorRegistry.actionBindings,
@@ -2274,7 +2322,7 @@ function buildCode(actions, options) {
         ? [
             "",
             "        // Locators",
-            ...locatorRegistry.generatedLocators.map((locator) => `        public ILocator ${locator.propertyName} => ${locator.locatorExpression};`)
+            ...locatorRegistry.generatedLocators.map((locator) => `        public ILocator ${locator.propertyName} => ${locator.locatorExpression};${locator.tllSourceLine ? tllMarker(locator.tllSourceLine, options) : ""}`)
           ]
         : []
     ),

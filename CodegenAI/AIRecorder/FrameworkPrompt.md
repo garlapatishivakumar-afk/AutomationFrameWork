@@ -52,7 +52,10 @@ value). Custom dropdowns need recorded interactions. Leave private helpers intac
 Reuse locators ONLY on exact expression match, including Exact/position/frame scope;
 never partial similarity. Preserve a draft expression verbatim when its locator text
 matches same-case table metadata with positive live uniqueness evidence. Match text,
-not line number alone; fallback metadata or incomplete replay is not validation.
+not line number alone; fallback/low-confidence metadata or incomplete replay is not
+proof of live validation. A trailing `// [TLL TC01:L21]` (legacy `// [TLL L21]`)
+in Code.cs marks a table-engine rewrite and identifies its case/source line; it is
+provenance, not proof of live validation. Never copy marker comments into project code.
 Otherwise prefer role, label or stable CSS; avoid volatile ctl00 IDs, generated
 numeric suffixes and row indexes. Never invent attributes or simplify validated
 frame/table scope. Prefer short unique relative XPath if needed; no absolute XPath
