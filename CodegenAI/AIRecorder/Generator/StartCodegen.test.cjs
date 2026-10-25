@@ -19,7 +19,7 @@ test('two-column CSV plans names and IDs using commented app settings, without r
       const manifestFile = path.join(recorder, 'Recordings', 'Checks', 'manifest.json');
       const run = (expected = 0) => {
         const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script,
-          '-BatchFile', csv, '-BatchName', 'Checks', '-DryRun'], { encoding: 'utf8', timeout: 60000 });
+          '-BatchFile', csv, '-BatchName', 'Checks', '-DryRun', '-TargetUrl', ' '], { encoding: 'utf8', timeout: 60000 });
         assert.equal(result.status, expected, result.stdout + result.stderr);
         return result.stdout + result.stderr;
       };
@@ -56,6 +56,47 @@ test('two-column CSV plans names and IDs using commented app settings, without r
       const invalidOutput = run(1);
       assert.match(invalidOutput, /Cannot read appsettings.json/);
       assert.ok(!invalidOutput.includes('SECRET_VALUE'));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+test('editable script URL and per-run overrides reach the batch plan without app settings',
+  { skip: process.platform !== 'win32' }, () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dynamic-url-codegen-'));
+    try {
+      const recorder = path.join(root, 'CodegenAI');
+      fs.mkdirSync(recorder);
+      const script = path.join(recorder, 'StartCodegen.ps1');
+      const source = fs.readFileSync(path.resolve(__dirname, '../../StartCodegen.ps1'), 'utf8');
+      fs.writeFileSync(script, source);
+      const csv = path.join(root, 'cases.csv');
+      fs.writeFileSync(csv, 'TestCaseId,Title\r\nTC01,First case\r\nTC02,Second case\r\n');
+      const run = (...args) => {
+        const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script,
+          '-BatchFile', csv, '-BatchName', 'Checks', '-DryRun', ...args], { encoding: 'utf8', timeout: 60000 });
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        return JSON.parse(fs.readFileSync(path.join(recorder, 'Recordings', 'Checks', 'manifest.json'), 'utf8'));
+      };
+      const assertUrl = (manifest, url) => {
+        assert.equal(manifest.targetUrl, url);
+        assert.ok(manifest.testCases.every(entry => entry.startUrl === url));
+      };
+      assertUrl(run(), 'https://inspections-dev.trimont.com/default.aspx');
+      assertUrl(run('-TargetUrl', 'https://first.example.test/start'), 'https://first.example.test/start');
+      assertUrl(run('-TargetUrl', 'https://second.example.test/start'), 'https://second.example.test/start');
+      const editedSource = source.replace(
+        /\[string\]\$TargetUrl = '[^']*'/,
+        "[string]$TargetUrl = 'https://edited.example.test/start'");
+      assert.notEqual(editedSource, source);
+      fs.writeFileSync(script, editedSource);
+      assertUrl(run(), 'https://edited.example.test/start');
+      fs.writeFileSync(csv, 'TestCaseId,Title,StartUrl\r\nTC01,First case,https://case.example.test/start\r\nTC02,Second case,\r\n');
+      const manifest = run('-TargetUrl', 'https://override.example.test/start');
+      assert.deepEqual(manifest.testCases.map(entry => entry.startUrl), [
+        'https://case.example.test/start', 'https://override.example.test/start'
+      ]);
+      assert.ok(!fs.existsSync(path.join(recorder, 'AIRecorder', 'auth')));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

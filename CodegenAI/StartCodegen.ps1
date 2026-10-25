@@ -1,5 +1,7 @@
 param(
-	[string]$TargetUrl,
+	# Change this link before recording, or override it per run with -TargetUrl.
+	# Leave it blank to use appsettings.json Urls.IReport instead.
+	[string]$TargetUrl = 'https://inspections-dev.trimont.com/default.aspx',
 	[string]$TestIdAttribute = 'data-testid',
 	[string]$TableSelector = 'table',
 	[switch]$SkipLiveObservation,

@@ -457,7 +457,7 @@ test("PowerShell Sync and boundary GenerateOnly run before missing config/auth/C
   write(script, fs.readFileSync(path.resolve(__dirname, "../../StartCodegen.ps1"), "utf8"));
   const sync = path.join(recorder, "AIRecorder/Generator/SprintSync.cjs"), log = path.join(f.folder, "sync.json");
   write(sync, `require('fs').writeFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)));`);
-  const run = (args) => spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, ...args], { encoding: "utf8", timeout: 60000 });
+  const run = (args) => spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-TargetUrl", " ", ...args], { encoding: "utf8", timeout: 60000 });
   let result = run(["-Sync", "-BatchName", "Demo", "-StrictLocators"]);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.ok(readJson(log).includes("--strict-locators"));
@@ -511,14 +511,15 @@ test("PowerShell recording runs existing per-case table/generator options withou
     fs.writeFileSync(value('--report-file'),JSON.stringify({className:name,actionCount:1,validation:{success:true},unsupportedActions:[]}));
   `);
   for (const skip of [false, true]) {
-    const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-BatchFile", csv, "-BatchName", skip ? "Offline" : "Normal", "-NoPrompt", "-StrictLocators"];
+    const targetUrl = skip ? "https://second.example.invalid/start" : "https://first.example.invalid/start";
+    const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-BatchFile", csv, "-BatchName", skip ? "Offline" : "Normal", "-NoPrompt", "-StrictLocators", "-TargetUrl", targetUrl];
     if (skip) args.push("-SkipLiveObservation");
     fs.rmSync(log, { force: true });
     const result = spawnSync("powershell.exe", args, { encoding: "utf8", timeout: 60000 });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const calls = fs.readFileSync(log, "utf8").trim().split("\n").map(JSON.parse);
     assert.deepEqual(calls.map((call) => call.stage), ["record", "table", "generate", "table", "generate", "publish"]);
-    assert.equal(calls[0].args[calls[0].args.indexOf("--url") + 1], "https://example.invalid/");
+    assert.equal(calls[0].args[calls[0].args.indexOf("--url") + 1], targetUrl);
     for (const call of calls.filter((call) => call.stage === "table")) assert.equal(call.args[call.args.indexOf("--skip-observation") + 1], String(skip));
     for (const call of calls.filter((call) => call.stage === "generate")) assert.ok(call.args.includes("--strict-locators"));
     const combined = fs.readFileSync(path.join(recorder, "Recordings", skip ? "Offline" : "Normal", "Code.ts"), "utf8");

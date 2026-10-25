@@ -189,10 +189,17 @@ TC02,Create inspection order with missing mandatory field
 `TestCaseId` must be unique (case-insensitive on Windows), match
 `^[A-Za-z0-9_-]+$`, and not be a reserved Windows device name. `Title` cannot
 be blank or contain newlines (Scenario names must be single-line). Quote names
-containing commas. The default start URL comes from `Urls.IReport` in the root
-appsettings.json, including files with JSON comments. No URL is hardcoded in the
-launcher. Existing `-TargetUrl` overrides and optional legacy CSV columns remain
-supported, but are not required.
+containing commas. Change the `$TargetUrl` default at the top of
+[StartCodegen.ps1](StartCodegen.ps1) to set the application link before recording,
+as in version 1.3.2. Alternatively, pass `-TargetUrl` on each run to override that
+default without editing the script. If the default is cleared (or a blank override
+is supplied), the launcher falls back to `Urls.IReport` in the root appsettings.json,
+including files with JSON comments.
+
+An optional legacy CSV `StartUrl` still overrides the target URL for that case;
+leave it blank or omit that column to use the script's link. A persistent batch
+opens the first selected case's resolved URL only; later cases continue in the
+same browser without automatic navigation. Offline `-Sync` does not navigate.
 
 When including the recorded script in the framework, use `Title` exactly as the
 Scenario name and `TestCaseId` as its tag, without prefixing the name with the ID:
