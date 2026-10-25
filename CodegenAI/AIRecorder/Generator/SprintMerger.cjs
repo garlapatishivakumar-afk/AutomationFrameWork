@@ -3,6 +3,7 @@ const path = require("path");
 const { randomUUID, createHash } = require("crypto");
 const ts = require("typescript");
 const { collectGenerationIssues, formatGenerationIssues, safeDiagnosticText, addReviewHeader, validateGeneratedCSharp } = require("./CSharpCodeGenerator.cjs");
+const { buildSharedLocators, maskCSharp } = require("./SharedLocators.cjs");
 
 const normalizeText = (value) => String(value || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 const lineAt = (text, offset) => text.slice(0, offset).split("\n").length;
@@ -107,13 +108,6 @@ function mergeTypeScript(cases) {
   return { code: code.trimEnd() + "\n", mappings };
 }
 
-// A small lexical mask is sufficient for the known generator output, and unlike
-// brace-only regex extraction it handles braces in C# strings and comments.
-function maskCSharp(text) {
-  return text.replace(/@"(?:""|[^"])*"|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
-    (match) => match.replace(/[^\n]/g, " "));
-}
-
 function closingBrace(mask, open) {
   let depth = 0;
   for (let index = open; index < mask.length; index += 1) {
@@ -153,8 +147,12 @@ function extractCSharpClass(source) {
 }
 
 function mergeCSharp(cases) {
-  if (!cases.length) return "";
+  return mergeCSharpWithSharedLocators(cases).code;
+}
+
+function mergeCSharpWithSharedLocators(cases) {
   const parsed = cases.map((item) => extractCSharpClass(item.codeCs));
+  if (!cases.length) return { code: "", sharedLocators: buildSharedLocators([], []).summary };
   const namespace = parsed[0].namespace;
   const names = new Set();
   for (const item of parsed) {
@@ -164,7 +162,12 @@ function mergeCSharp(cases) {
   }
   const usings = [...new Set(parsed.flatMap((item) => item.usings))]
     .sort((left, right) => Number(right.startsWith("global ")) - Number(left.startsWith("global ")));
-  return `${usings.join("\n")}\n\nnamespace ${namespace}\n{\n${parsed.map((item) => item.classCode).join("\n\n")}\n}\n`;
+  const shared = buildSharedLocators(cases, parsed);
+  if (names.has("Locators")) throw new Error("Generated class conflicts with Locators.");
+  const emittedNames = cases.map((item) => `TestCase${item.entry.id.replace(/-/g, "_")}`);
+  if (new Set(emittedNames).size !== emittedNames.length) throw new Error("Duplicate generated TestCase class.");
+  const classes = [shared.sharedClassCode, ...shared.classCodes].filter(Boolean);
+  return { code: `${usings.join("\n")}\n\nnamespace ${namespace}\n{\n${classes.join("\n\n")}\n}\n`, sharedLocators: shared.summary };
 }
 
 function isBlocked(report) {
@@ -174,7 +177,7 @@ function isBlocked(report) {
     report.dataContract?.blocking || report.methodQualityGate?.blocking));
 }
 
-function mergeReports(batchId, cases, generatedAtUtc) {
+function mergeReports(batchId, cases, generatedAtUtc, sharedLocators = buildSharedLocators([], []).summary) {
   const entries = cases.map((item) => {
     const report = item.report || {};
     return {
@@ -184,7 +187,8 @@ function mergeReports(batchId, cases, generatedAtUtc) {
         report.unsupportedActions?.length || report.recordingIssues?.length),
       issues: ["planned", "skipped"].includes(item.entry.status) ? [] : collectGenerationIssues(report,
         item.mergeError || (String(item.entry.status).startsWith("failed:") ? item.entry.status : "")),
-      included: Boolean(item.included), className: report.className || `CodegenFlow${item.entry.id.replace(/-/g, "_")}`,
+      included: Boolean(item.included), className: `TestCase${item.entry.id.replace(/-/g, "_")}`,
+      internalClassName: report.className || `CodegenFlow${item.entry.id.replace(/-/g, "_")}`,
       actionCount: report.actionCount || 0, unsupportedActions: report.unsupportedActions || [],
       locatorValidation: report.locatorValidation || null, locatorRepair: report.locatorRepair || null,
       dataContract: report.dataContract || null, methodQualityGate: report.methodQualityGate || null,
@@ -193,7 +197,17 @@ function mergeReports(batchId, cases, generatedAtUtc) {
       ...(item.mergeError ? { mergeError: item.mergeError } : {})
     };
   });
-  return { batchId, generatedAtUtc, reviewRequired: entries.some((entry) => entry.reviewRequired), codeGenerationBlocked: entries.some((entry) => entry.codeGenerationBlocked), cases: entries };
+  for (const conflict of sharedLocators.conflicts) {
+    for (const reference of conflict.references) {
+      const entry = entries.find((entry) => entry.testCaseId === reference.testCaseId);
+      if (!entry?.included) continue;
+      entry.reviewRequired = true;
+      entry.issues.push({ severity: "warning", kind: "sharedLocatorConflict", ruleId: "SL001",
+        sourceLine: reference.actionSourceLines[0], locator: null,
+        message: `Shared locator conflict for ${conflict.propertyName}: different original TS expressions; distinct expressions retained in Locators.` });
+    }
+  }
+  return { batchId, generatedAtUtc, sharedLocators, reviewRequired: entries.some((entry) => entry.reviewRequired), codeGenerationBlocked: entries.some((entry) => entry.codeGenerationBlocked), cases: entries };
 }
 
 function mergeMetadata(batchId, cases, mappings, generatedAtUtc) {
@@ -246,17 +260,19 @@ function buildSprint(batchId, cases, generatedAtUtc = new Date().toISOString()) 
     }
   }
   const merged = mergeTypeScript(accepted);
-  let mergedCs = mergeCSharp(accepted);
+  const mergedCSharp = mergeCSharpWithSharedLocators(accepted);
+  let mergedCs = mergedCSharp.code;
+  const report = mergeReports(batchId, prepared, generatedAtUtc, mergedCSharp.sharedLocators);
   // Class extraction deliberately discards comments outside the class. Restore
   // review markers from report evidence immediately above each included class.
-  for (const item of accepted.filter((item) => item.report.reviewRequired)) {
-    const name = `CodegenFlow${item.entry.id.replace(/-/g, "_")}`;
-    const header = addReviewHeader(`    public sealed class ${name}`, collectGenerationIssues(item.report));
+  for (const item of report.cases.filter((item) => item.included && item.reviewRequired)) {
+    const name = item.className;
+    const header = addReviewHeader(`    public sealed class ${name}`, item.issues);
     mergedCs = mergedCs.replace(`    public sealed class ${name}`, header);
   }
   return {
     codeTs: merged.code, codeCs: mergedCs,
-    report: mergeReports(batchId, prepared, generatedAtUtc),
+    report,
     metadata: mergeMetadata(batchId, accepted, merged.mappings, generatedAtUtc),
     errors: prepared.filter((item) => item.mergeError).map((item) => `${item.entry.id}: ${item.mergeError}`)
   };
@@ -354,5 +370,5 @@ if (require.main === module) {
 
 module.exports = {
   quoteTypeScript, extractTestBlock, renameTestBlock, mergeTypeScript,
-  extractCSharpClass, mergeCSharp, mergeReports, mergeMetadata, buildSprint, rebuildSprint
+  extractCSharpClass, mergeCSharp, mergeCSharpWithSharedLocators, mergeReports, mergeMetadata, buildSprint, rebuildSprint
 };

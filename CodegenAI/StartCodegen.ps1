@@ -10,6 +10,7 @@ param(
 	[string]$BatchName = (Get-Date -Format 'yyyyMMdd-HHmmss'),
 	[string[]]$Only,
 	[switch]$GenerateOnly,
+	[switch]$Sync,
 	[switch]$StrictLocators,
 	[switch]$DryRun,
 	[switch]$NoPrompt
@@ -33,6 +34,26 @@ $csharpStopSignalFile = Join-Path $PSScriptRoot ".csharp-live-sync.stop"
 $appSettingsFile = Join-Path (Split-Path $PSScriptRoot -Parent) "appsettings.json"
 $maxAgeDays = 4
 $liveCSharpJob = $null
+$sessionRecorderScript = Join-Path $PSScriptRoot 'AIRecorder\Generator\SessionRecorder.cjs'
+$sprintSyncScript = Join-Path $PSScriptRoot 'AIRecorder\Generator\SprintSync.cjs'
+$sessionBatch = $false
+
+# Source-driven offline sync must precede URL/auth/CSV resolution and replanning.
+# Legacy batches without boundaries retain the existing GenerateOnly behavior.
+if ($Sync -and -not $PSBoundParameters.ContainsKey('BatchName')) { throw '-Sync requires -BatchName.' }
+$hasSessionBoundaries = $false
+if ($PSBoundParameters.ContainsKey('BatchName') -and $BatchName -match '^[A-Za-z0-9_-]+$') {
+	$hasSessionBoundaries = Test-Path -LiteralPath (Join-Path $PSScriptRoot "Recordings\$BatchName\boundaries.json")
+}
+if ($Sync -or ($GenerateOnly -and $hasSessionBoundaries)) {
+	if ($BatchName -notmatch '^[A-Za-z0-9_-]+$' -or $BatchName -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$') { throw 'Invalid BatchName.' }
+	if ($DryRun -or $SkipCSharpGeneration) { throw '-Sync cannot be combined with -DryRun or -SkipCSharpGeneration.' }
+	if ($Only) { Write-Host '[SprintSync] Syncing the complete combined source, including unselected cases, to keep global line mappings consistent.' }
+	$syncArgs = @($sprintSyncScript, '--manifest-file', (Join-Path $PSScriptRoot "Recordings\$BatchName\manifest.json"))
+	if ($StrictLocators) { $syncArgs += '--strict-locators' }
+	& node @syncArgs
+	exit $LASTEXITCODE
+}
 
 # App settings allow JSON comments; preserve quoted strings (including https://)
 # while stripping comments for Windows PowerShell 5.1's ConvertFrom-Json.
@@ -432,6 +453,9 @@ function Save-BatchManifest {
 function Publish-SprintArtifacts {
 	Save-BatchManifest
 	if ($DryRun) { return }
+	# Session Code.ts includes blocked/unprocessed cases. The legacy merger CLI
+	# filters them out, so defer one source-preserving publication until the end.
+	if ($sessionBatch) { return }
 	Invoke-CodegenNode -Arguments @($sprintMergerScript, '--manifest-file', $manifestPath)
 	$mergeExitCode = $LASTEXITCODE
 	# The merger projects report diagnostics into issues[]. Keep the in-memory
@@ -464,6 +488,16 @@ function Publish-SprintArtifacts {
 	}
 }
 
+$previousManifestFile = $null
+if (-not $DryRun -and -not $GenerateOnly -and (Test-Path -LiteralPath $manifestPath)) {
+	# Preserve the old plan before selected entries/titles are reset, as well as
+	# all selected working evidence. The recorder also backs up before launch.
+	$backupArgs = @($sessionRecorderScript, '--backup', '--manifest-file', $manifestPath)
+	foreach ($row in $selectedRows) { $backupArgs += "--case-id=$($row.TestCaseId)" }
+	$backupFolder = & node @backupArgs
+	if ($LASTEXITCODE -ne 0) { throw 'Cannot back up existing recording; no replan performed.' }
+	$previousManifestFile = Join-Path ([string]$backupFolder) 'manifest.json'
+}
 New-Item -ItemType Directory -Path $batchFolder -Force | Out-Null
 foreach ($row in $selectedRows) {
 	$id = [string]$row.TestCaseId
@@ -511,6 +545,29 @@ if ($GenerateOnly) {
 	$SkipLiveObservation = [switch]$true
 }
 
+if (-not $DryRun -and -not $GenerateOnly) {
+	if (-not $NoPrompt) {
+		$answer = Read-Host 'Press Enter to start one persistent batch browser, or q to quit'
+		if ($answer -eq 'q') { return }
+	}
+	$sessionArgs = @($sessionRecorderScript, '--manifest-file', $manifestPath,
+		'--url', ([string]@($manifest.testCases | Where-Object { $_.id -eq $selectedRows[0].TestCaseId })[0].startUrl),
+		'--save-storage', $sessionPath, '--test-id-attribute', $TestIdAttribute)
+	if (Test-CodegenSessionValid -Path $sessionPath -MaxAgeDays $maxAgeDays) { $sessionArgs += @('--load-storage', $sessionPath) }
+	if ($previousManifestFile) { $sessionArgs += @('--previous-manifest', $previousManifestFile) }
+	foreach ($row in $selectedRows) { $sessionArgs += "--case-id=$($row.TestCaseId)" }
+	# Do not pipe terminal input to the child codegen. SessionRecorder owns Enter
+	# and sends only the final exit command to its child's private stdin pipe.
+	& node @sessionArgs
+	if ($LASTEXITCODE -ne 0) { throw 'Persistent recording failed. Review .work/session backups and boundaries.json; no generation was run.' }
+	$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+	$sessionBatch = $true
+	# Reuse the EXACT per-case table/review/generation pipeline, but no further
+	# codegen or watcher. Set this AFTER the offline-only branch above: a normal
+	# recording retains its original observation default and user skip switches.
+	$GenerateOnly = [switch]$true
+}
+
 $position = 0
 foreach ($row in $selectedRows) {
 	$position++
@@ -521,6 +578,12 @@ foreach ($row in $selectedRows) {
 	if ($entry.expectedResult) { Write-Host (Protect-DiagnosticText "  ExpectedResult: $($entry.expectedResult)") }
 	Write-Host (Protect-DiagnosticText "  StartUrl: $($entry.startUrl)")
 	if ($DryRun) { Save-BatchManifest; continue }
+	if ($sessionBatch -and $entry.status -ne 'recorded') {
+		# done leaves unvisited cases planned; cross-case variables are explicitly
+		# blocked but their source remains present in the authoritative Code.ts.
+		Save-BatchManifest
+		continue
+	}
 	if (-not $NoPrompt -and -not $GenerateOnly) {
 		$answer = Read-Host 'Press Enter to record, s to skip, q to quit'
 		if ($answer -eq 'q') { Publish-SprintArtifacts; break }
@@ -545,7 +608,7 @@ foreach ($row in $selectedRows) {
 			-MetadataFile $metadataFile -StopFile (Join-Path $caseFolder '.csharp-live-sync.stop') `
 			-TargetUrl $entry.startUrl -ClassName ('CodegenFlow' + ($entry.id -replace '[^A-Za-z0-9_]', '_')) `
 			-CaseId $entry.id -CaseTitle $entry.title | Out-Host
-		if ($GenerateOnly) { $entry.status = 'generated' } else { $entry.status = 'recorded'; $entry.recordedAtUtc = [DateTime]::UtcNow.ToString('o') }
+		if ($GenerateOnly -and -not $sessionBatch) { $entry.status = 'generated' } else { $entry.status = 'recorded'; $entry.recordedAtUtc = [DateTime]::UtcNow.ToString('o') }
 		if (-not $SkipCSharpGeneration) {
 			$report = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
 			$entry.actionCount = $report.actionCount
@@ -572,6 +635,14 @@ foreach ($row in $selectedRows) {
 	}
 }
 if (-not $DryRun) { Publish-SprintArtifacts }
+if ($sessionBatch) {
+	# Uses SprintMerger's build/metadata APIs, not its Code.ts-writing CLI. This
+	# projects global tags while retaining original validator/review outcomes;
+	# an automatic second SprintSync generation would replace those outcomes.
+	Invoke-CodegenNode -Arguments @($sessionRecorderScript, '--publish', '--manifest-file', $manifestPath)
+	if ($LASTEXITCODE -ne 0) { $sprintMergeFailed = $true }
+	$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+}
 (Protect-ManifestValue $manifest).testCases | Select-Object id, @{Name='REVIEW';Expression={[bool]$_.reviewRequired}}, status, @{Name='actions';Expression={$_.actionCount}}, @{Name='unsupported';Expression={$_.unsupportedActionCount}}, title | Format-Table -AutoSize | Out-String -Width 240 | Write-Host
 if (-not $DryRun) { Invoke-CodegenNode -Arguments @($sprintMergerScript, '--review-summary', $manifestPath) }
 Write-Host "Sprint TypeScript: $(Join-Path $batchFolder 'Code.ts')"

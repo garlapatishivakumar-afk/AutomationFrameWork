@@ -1,10 +1,92 @@
-# Phase 1b: one output pair per sprint
+# Batch recording: one persistent browser, one output pair per sprint
 
 Run these commands from the `CodegenAI` directory in Windows PowerShell 5.1.
-Each case is still recorded and processed separately, but the files to review are
-the sprint's **Code.ts**, **Code.cs** and **manifest.json**. The existing
+Batch cases are recorded in **one browser session** and then processed separately.
+The files to review are the sprint's **Code.ts**, **Code.cs** and **manifest.json**. The existing
 single-recording command and paths are unchanged. Generation defaults to tiered
 review handling; add `-StrictLocators` for the previous strict failure policy.
+
+## Persistent session boundaries
+
+After the initial launch prompt, record the first CSV case in the browser, then
+press **Enter in the terminal** to save its boundary. The browser stays open with
+its current pages, cookies and application state. Record the next case and press
+Enter again. After the last boundary, **one extra Enter (or `done`) closes the
+browser gracefully**. Do not close the browser manually to finish the batch.
+
+- Empty Enter reprompts without advancing. `done` saves a nonempty current case
+  and leaves remaining cases planned; an empty current case stays planned.
+- `-NoPrompt` suppresses only the initial launch pause. Terminal Enter/`done`
+  boundaries are still mandatory; redirected input ending early is a failure.
+- The first selected case's configured URL starts the browser. Later `StartUrl`
+  values do not cause automatic navigation; navigate manually if the next case
+  needs another page. No URL is hardcoded by the recorder.
+- Output is written live to the batch Code.ts by **one child Node codegen CLI**.
+  Enter waits for a complete single-test AST after an event-driven quiet period
+  longer than Playwright's 250 ms output throttle. Pause browser interactions
+  while accepting a boundary; this is a file-flush heuristic, not a browser-side
+  action-completion acknowledgement.
+- Each boundary saves its action-ending line (not the test footer), cumulative
+  statement count, per-case count and a full snapshot. Completed source prefixes
+  are immutable: Playwright coalescing a later `fill` into a completed case is an
+  explicit failure, never silently attributed to the wrong case. Finish editing
+  the same input before accepting a boundary. Re-record after reviewing backups.
+- Actions after the last boundary, including the shutdown flush, extend the last
+  case and are reported as final-tail actions. Nothing is silently discarded.
+  A shutdown-flushed action for an empty current case belongs to that current case.
+- Popup/download/promise variables declared in a prior case are **blocked for
+  isolated generation** when referenced by a later case. Both named blocks and
+  snippets remain available for review. Keep dependent actions in one case or
+  review/restructure boundaries; the recorder does not invent setup actions.
+- Manual early browser close, invalid capture, prefix rewrite, EOF or interruption
+  fails the session and attempts graceful cleanup. On failure the prior combined
+  source is restored (when present); raw output and completed snapshots remain in
+  `.work/session/<run-id>/`. Forced process termination cannot guarantee cleanup.
+- Existing shared artifacts and selected working evidence are backed up before
+  replan/recording. Backups may contain credentials or private input: treat them
+  like recordings, keep them out of source control, and manage retention locally.
+
+On success the recorder returns with ordinary named `test('ID - title', ...)`
+blocks, `.work/<id>/Code.ts` snippets with the same headers, recorded statuses,
+and boundaries.json. `captureSessions[]` retains raw-file paths, original boundary
+counts/lines, snapshot paths and hashes; `cases[]` holds final combined block
+positions. Raw provenance lives at the top level so subsequent SprintSync updates
+to `cases[]` do not erase capture history. These are capture statement counts,
+including variable declarations, not necessarily the generator's action counts.
+
+The existing per-case LiveTable/review/C# pipeline then processes only newly
+recorded snippets, with codegen and the live C# watcher disabled. **Normal
+recording retains the previous live-observation default**, which replays actions;
+use `-SkipLiveObservation` to prevent that replay. Continuation cases do not get
+invented navigation/setup and may need review when observed in isolation. The
+recorder itself never replays tests. Other table/debug/strict/skip options retain
+their existing meaning.
+
+Publication calls the existing SprintMerger build/metadata APIs once, keeps every
+recorded TypeScript block (including blocked cases), and remaps metadata and C#
+TLL comments to global combined lines. Only eligible cases enter Code.cs. It does
+**not** invoke the merger's filtered-Code.ts writer or automatically regenerate
+through SprintSync: that would replace the just-produced validator outcomes.
+Use explicit offline sync after later source edits. Multi-file publication is not
+a filesystem transaction; recovery backups are retained before publication.
+
+### Offline sync from the authoritative combined source
+
+`-Sync -BatchName Sprint12` needs no CSV, application URL resolution, authentication
+or browser. It invokes the existing offline SprintSync CLI before any replan.
+`-GenerateOnly -BatchName Sprint12` also routes here when boundaries.json exists,
+even if `-BatchFile` is supplied. It reads combined Code.ts, **not stale work
+snippets**, and never runs live observation or table rewriting. `-StrictLocators`
+is forwarded; `-SkipCSharpGeneration` is incompatible. Sync always covers the full
+combined source for consistent global mappings, even with `-Only`. Per-case
+validation is recomputed under SprintSync's existing evidence/review rules; sync
+may refuse a blocked case rather than partially publish. Capture history remains.
+
+For `-Only` re-recording, unselected named blocks are preserved from combined
+Code.ts, not reconstructed from old work files. If their working evidence no
+longer matches manually edited source, publication refuses stale evidence; run
+offline sync before re-recording. Incompatible headers or unknown named blocks
+also require review instead of silent replacement.
 
 ## Yellow table-locator highlighting
 
@@ -124,7 +206,46 @@ Both FrameworkPrompt.md and SprintPrompt.md enforce this mapping. The two-column
 CSV does not supply expected results: use recorded assertion evidence or flag
 missing business expectations for human input rather than inventing assertions.
 
-Each generated class is `CodegenFlow<TestCaseId>`; hyphens become underscores.
+Combined C# classes are `TestCase<TestCaseId>`; hyphens become underscores.
+Internal per-case drafts still use `CodegenFlow<TestCaseId>` so their validated
+hashes and generation/fidelity contracts remain unchanged. The combined report's
+`className` names the public class; `internalClassName` records the draft class.
+
+### Combined locator layout
+
+Normal session publication, offline SprintSync and direct SprintMerger calls all
+emit one namespace-top `public sealed class Locators`. Every generated locator
+property is on a single line, preserving shared, case-ID and case-popup ordering.
+The Locators class has no comments, headings, property TLL tags or banner above it.
+TestCase classes contain actions, not local `ILocator` properties; their banners
+and REVIEW REQUIRED comments remain.
+
+- Main-page calls use `_locators = new Locators(Page)` after Page initialization.
+- Each popup gets its own bound Locators field immediately after its actual page
+  assignment, before locator use. Methods receiving a popup page create a local
+  Locators instance from that parameter, rather than reading a stale page field.
+- Only identical **full, exact original TS expressions** on the main actor may
+  share across cases, and their generated expressions must also match. Different
+  raw selector strings remain distinct even when they generate identical C#.
+  Popup actors never cross-share. Legacy reports without verified provenance are
+  consolidated from declarations but do not cross-share.
+- Global naming collisions use deterministic case/actor suffixes. Conflict review
+  details and flags remain in reports, but exact selector groups share independently
+  of property names: reserve the first existing common name in case/property order
+  before suffixing differing definitions, even when a third case uses that name.
+  Action-level TLL tags and
+  report/metadata lineage retain every origin; property-level comments are omitted
+  only from the final combined projection.
+- The `sharedLocators` report/API remains the exact-sharing summary, not the total
+  number of unified properties. Reference `propertyName` stays the internal name
+  for sync comparisons; `emittedPropertyName` identifies the combined property.
+- Actions, waits, ReplayAsync ordering, values, URL resolution and existing method
+  names are preserved. Unsupported/broken declarations or ambiguous popup binding
+  are rejected, never silently dropped. Offline sync retains its combined compile
+  gate. The standalone, non-batch generator keeps its legacy output format.
+
+Existing recording artifacts are not automatically rewritten by this format
+change; use the normal explicit generation/sync workflow after backing them up.
 Each merged TypeScript test is titled `TestCaseId - Title`, with quotes, backslashes
 and line breaks escaped. The original per-case recording is not renamed or edited
 by the merger.
@@ -137,6 +258,7 @@ not be a Windows device name. Its default is `yyyyMMdd-HHmmss`.
 ```powershell
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -Only TC03
+.\StartCodegen.ps1 -Sync -BatchName Sprint12
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -GenerateOnly -SkipLiveObservation
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -GenerateOnly -StrictLocators
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Demo -DryRun
@@ -147,24 +269,23 @@ Add a `TC03` row to the CSV before using the second command. Multiple IDs can
 be selected with `-Only TC01,TC02`. Paths supplied with `-BatchFile` are relative
 to the current directory (or absolute).
 
-- Normal recording prints the case title, ID tag and configured URL (plus legacy
-  preconditions/expected result only when supplied).
-  Press Enter to record, `s` to skip, or `q` to stop; unvisited cases stay planned.
-  `-NoPrompt` suppresses this pause, not the interactive browser recording itself.
-- Saved session initialization happens once before recording; its validity is
-  rechecked before every case. Each recording saves the session for the next case.
+- Normal recording uses the persistent boundary workflow above. `q` is available
+  only at the initial launch pause; use `done` inside the session. There is no
+  per-case `s` command; use `-Only` to select cases before launching.
+- Saved session validity is checked before the one child launch. The same browser
+  remains open throughout; storage is saved at graceful shutdown.
 - `-DryRun` validates, prints the plan and writes only a planned manifest inside
   the sprint directory. It does not create `.work`, Code.ts, Code.cs or combined
   reports, update the latest-batch pointer, initialize the session or open a browser.
   Existing output files are not deleted by a dry run; use a fresh name for planning.
-- `-GenerateOnly` runs table rewriting and final C# generation for existing
+- **Legacy batches without boundaries.json:** `-GenerateOnly` runs table rewriting and final C# generation for existing
   recordings, without prompts, session initialization, browser or watcher.
   Live observation is forcibly disabled, even without `-SkipLiveObservation`.
   Input is `.work/<TestCaseId>/Code.ts`, not the merged sprint file. Previously saved
   per-case observations can still be consumed. Missing recordings
   are skipped; recordings without an `await page.` action fail. It cannot be
   combined with `-SkipCSharpGeneration`.
-- To regenerate C# without rewriting recorded TypeScript, also use
+- For legacy regeneration without rewriting recorded TypeScript, also use
   `-SkipTableLocatorPostProcess`. Existing DOM/table evidence remains available.
 - C# generation now checks actual emitted action order (`actionFidelity` in each
   case report), including popup/download boundaries. Omitted, duplicated,
@@ -193,12 +314,13 @@ to the current directory (or absolute).
   replaced in place. Reuse `-BatchName` to resume a batch. Without `-Only`,
   a fresh plan is written for every row in the CSV. Dry-run replans selected entries;
   use a separate batch name if you want to preserve their prior statuses.
-- Re-recording a selected case replaces its old TypeScript and DOM/table metadata.
+- Re-recording a selected case backs up and replaces its old TypeScript and DOM/table metadata.
   Failed generation may leave an earlier internal C# file; the manifest status is
-  authoritative, and failed/skipped/planned cases are excluded from the merged code.
+  authoritative, and failed/skipped/planned cases are excluded from merged C#.
+  Persistent-session TypeScript retains recorded blocked cases.
   Raw recordings are retained on generation failure. A failure on one case does not
   remove successful cases from the sprint outputs.
-- After every processed case (including failure/skip), and at the end, the merger
+- For legacy no-boundary regeneration, after every processed case (including failure/skip), and at the end, the merger
   rebuilds all four shared artifacts. Structurally valid cases, including review
   cases, with both outputs and a valid report are included in Code.ts/Code.cs. The report still includes every
   manifest case and its status/diagnostics. Empty merged files mean no eligible cases.
@@ -214,11 +336,13 @@ CodegenAI/
     latest-batch.txt                 # Recordings/Sprint12 (relative to CodegenAI)
     Sprint12/
       manifest.json
+      boundaries.json               # session history + final block positions
       Code.ts                       # one header; TC01, TC02, ... test blocks
       Code.cs                       # shared usings/namespace; one class per case
       CSharpGenerationReport.json   # per-case sections, including failed cases
       TableLocatorMetadata.json     # tagged entries and merged-file line numbers
       .work/                        # INTERNAL: not Phase 2 inputs
+        session/<run-id>/            # raw.ts, boundary snapshots, recovery backups
         TC01/
           Code.ts
           Code.cs
@@ -229,8 +353,9 @@ CodegenAI/
           ...same internal artifacts...
 ```
 
-Each recording watcher uses `.csharp-live-sync.stop` inside its case folder and
-removes it during cleanup. Disabled pipeline stages do not create their artifacts.
+Persistent batches have no live C# watcher; generation follows session completion.
+Legacy single-recording watchers use `.csharp-live-sync.stop` and remove it during
+cleanup. Disabled pipeline stages do not create their artifacts.
 All CodegenAI C# drafts are excluded from framework compilation. The recording
 directory, including `.work`, is excluded from resources/items and git as well.
 Case class names avoid collisions within a batch, not between copies of the same

@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const ts = require("typescript");
+const { extractOriginalLocator } = require("./SharedLocators.cjs");
 const { LocatorValidator, RuleStatus } = require("../Intelligence/LocatorValidator.cjs");
 const { LocatorRepair } = require("../Intelligence/LocatorRepair.cjs");
 const { FailureTriage } = require("../Intelligence/FailureTriage.cjs");
@@ -1393,7 +1394,7 @@ function markTllStatements(lines, action, options) {
 
 function buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap, tllSourceLines) {
   const expressionToProperty = new Map();
-  const usedNames = new Map();
+  const usedNames = new Set();
   const actionBindings = new Map();
   const generatedLocators = [];
 
@@ -1418,31 +1419,37 @@ function buildGeneratedLocatorRegistry(actions, frameworkContext, actorFieldMap,
       continue;
     }
 
-    if (expressionToProperty.has(locatorExpression)) {
-      const binding = expressionToProperty.get(locatorExpression);
+    // Never collapse raw TS distinctions just because conversion emits the same
+    // C#. Missing provenance is deliberately unique and cannot enable sharing.
+    const provenance = extractOriginalLocator(action.raw);
+    const registryKey = JSON.stringify([locatorExpression, provenance?.originalExpression ?? action.sourceLine]);
+    if (expressionToProperty.has(registryKey)) {
+      const binding = expressionToProperty.get(registryKey);
       if (!binding.tllSourceLine && tllSourceLines.has(action.sourceLine)) binding.tllSourceLine = action.sourceLine;
+      binding.actionSourceLines.push(action.sourceLine);
+      if (tllSourceLines.has(action.sourceLine)) binding.tllSourceLines.push(action.sourceLine);
       actionBindings.set(action.sourceLine, binding);
       continue;
     }
 
     const baseName = applyPositionSuffix(locatorPropertyBaseName(action.locator), action.locator.position);
     let propertyName = baseName;
-    if (usedNames.has(propertyName)) {
-      const nextIndex = usedNames.get(propertyName) + 1;
-      usedNames.set(propertyName, nextIndex);
-      propertyName = `${propertyName}${nextIndex}`;
-    } else {
-      usedNames.set(propertyName, 1);
-    }
+    let suffix = 2;
+    while (usedNames.has(propertyName)) propertyName = `${baseName}${suffix++}`;
+    usedNames.add(propertyName);
 
     const binding = {
       kind: "generated",
       propertyName,
       expression: propertyName,
       locatorExpression,
+      originalExpression: provenance?.originalExpression ?? null,
+      actor: provenance?.actor ?? null,
+      actionSourceLines: [action.sourceLine],
+      tllSourceLines: tllSourceLines.has(action.sourceLine) ? [action.sourceLine] : [],
       tllSourceLine: tllSourceLines.has(action.sourceLine) ? action.sourceLine : null
     };
-    expressionToProperty.set(locatorExpression, binding);
+    expressionToProperty.set(registryKey, binding);
     actionBindings.set(action.sourceLine, binding);
     generatedLocators.push(binding);
   }
@@ -2521,6 +2528,8 @@ function generateCSharpCode(options) {
       unsupportedActions: [],
       frameworkMatches: [],
       generatedLocatorProperties: 0,
+      locatorProvenanceVersion: 1,
+      generatedLocators: [],
       sourceMap: [],
       dataContract: dataContractValidation.dataContract,
       methodQualityGate: buildDefaultMethodQualityGateResult(),
@@ -2545,6 +2554,8 @@ function generateCSharpCode(options) {
         actionCount: 0,
         ...(Object.keys(caseMetadata).length ? { unsupportedActionCount: 0 } : {}),
         generatedLocatorProperties: 0,
+        locatorProvenanceVersion: 1,
+        generatedLocators: [],
         frameworkMatches: [],
         sourceMap: [],
         dataContract: blockedResult.dataContract,
@@ -2720,6 +2731,8 @@ function generateCSharpCode(options) {
     unsupportedActions,
     frameworkMatches: builtCode.frameworkMatches,
     generatedLocatorProperties: Array.isArray(builtCode.generatedLocators) ? builtCode.generatedLocators.length : 0,
+    locatorProvenanceVersion: 1,
+    generatedLocators: builtCode.generatedLocators,
     sourceMap: builtCode.sourceMap,
     actionFidelity: builtCode.actionFidelity,
     dataContract: dataContractValidation.dataContract,
@@ -2763,6 +2776,8 @@ function generateCSharpCode(options) {
       actionCount: result.actions.length,
       ...(Object.keys(caseMetadata).length ? { unsupportedActionCount: result.unsupportedActions.length } : {}),
       generatedLocatorProperties: result.generatedLocatorProperties,
+      locatorProvenanceVersion: result.locatorProvenanceVersion,
+      generatedLocators: result.generatedLocators,
       frameworkMatches: result.frameworkMatches,
       sourceMap: result.sourceMap,
       actionFidelity: result.actionFidelity,

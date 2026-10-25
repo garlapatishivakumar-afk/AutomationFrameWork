@@ -59,7 +59,7 @@ function runAllTests() {
     assert.strictEqual(merged.report.codeGenerationBlocked, false);
     assert.strictEqual(merged.report.reviewRequired, true);
     assert.strictEqual(merged.report.cases[0].included, true);
-    assert.match(merged.codeCs, /REVIEW REQUIRED:[^\n]+\n\s+public sealed class CodegenFlowTC01/);
+    assert.match(merged.codeCs, /REVIEW REQUIRED:[^\n]+\n\s+public sealed class TestCaseTC01/);
     assert.strictEqual((merged.codeCs.match(/REVIEW REQUIRED/g) || []).length, 1);
     assert.match(merged.codeTs, /test\('TC01 - Create order'/);
     assert.ok(!merged.codeTs.includes("REVIEW REQUIRED"));

@@ -81,7 +81,7 @@ test("download trigger markers survive grouping and sprint merge hash validation
   const merged = buildSprint("Synthetic", [{ entry: { id: "TC01", title: "Synthetic", status: "generated" },
     codeTs: fs.readFileSync(options.codeFilePath, "utf8"), codeCs: result.code,
     report: JSON.parse(fs.readFileSync(options.reportFilePath, "utf8")), metadata }]);
-  assert.match(merged.codeCs, /await Export\.ClickAsync\(\); \/\/ \[TLL TC01:L4\]/);
+  assert.match(merged.codeCs, /await _locators.Export\.ClickAsync\(\); \/\/ \[TLL TC01:L4\]/);
   assert.doesNotMatch(merged.codeTs, /\[TLL/);
 }));
 

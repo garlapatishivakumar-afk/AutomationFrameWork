@@ -53,7 +53,10 @@ function testMergeAndMetadataLines() {
   assert.deepStrictEqual(titles, cases.map((item) => `${item.entry.id} - ${item.entry.title}`));
   assert.strictEqual((result.codeCs.match(/^namespace /gm) || []).length, 1);
   assert.strictEqual((result.codeCs.match(/^using System;/gm) || []).length, 1);
-  assert.strictEqual((result.codeCs.match(/public sealed class/g) || []).length, 3);
+  assert.strictEqual((result.codeCs.match(/public sealed class/g) || []).length, 4);
+  assert.strictEqual((result.codeCs.match(/public sealed class TestCase/g) || []).length, 3);
+  assert.deepStrictEqual(result.report.cases.map((entry) => entry.className), ["TestCaseTC01", "TestCaseTC02", "TestCaseTC03"]);
+  assert.deepStrictEqual(result.report.cases.map((entry) => entry.internalClassName), ["CodegenFlowTC01", "CodegenFlowTC02", "CodegenFlowTC03"]);
   assert.strictEqual((result.codeCs.match(/\/\/ Test case:/g) || []).length, 3);
   assert.strictEqual(result.report.cases.length, 3);
   assert.strictEqual(result.report.codeGenerationBlocked, false);
@@ -81,7 +84,7 @@ function testFailureIsolation() {
   missing.codeCs = null;
   const result = buildSprint("Demo", [good, failed, skipped, missing]);
   assert.strictEqual((result.codeTs.match(/^test\(/gm) || []).length, 1);
-  assert.ok(!result.codeCs.includes("class CodegenFlowTC02"));
+  assert.ok(!result.codeCs.includes("class TestCaseTC02"));
   assert.strictEqual(result.report.codeGenerationBlocked, true);
   assert.strictEqual(result.report.cases.length, 4);
   assert.strictEqual(result.report.cases[1].included, false);
