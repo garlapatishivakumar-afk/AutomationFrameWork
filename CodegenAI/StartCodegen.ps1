@@ -11,6 +11,7 @@ param(
 	[string]$BatchFile,
 	[string]$BatchName = (Get-Date -Format 'yyyyMMdd-HHmmss'),
 	[string[]]$Only,
+	[switch]$Generate,
 	[switch]$GenerateOnly,
 	[switch]$Sync,
 	[switch]$StrictLocators,
@@ -38,16 +39,29 @@ $maxAgeDays = 4
 $liveCSharpJob = $null
 $sessionRecorderScript = Join-Path $PSScriptRoot 'AIRecorder\Generator\SessionRecorder.cjs'
 $sprintSyncScript = Join-Path $PSScriptRoot 'AIRecorder\Generator\SprintSync.cjs'
+$batchGeneratorScript = Join-Path $PSScriptRoot 'AIRecorder\Generator\BatchGenerator.cjs'
 $sessionBatch = $false
 
 # Source-driven offline sync must precede URL/auth/CSV resolution and replanning.
 # Legacy batches without boundaries retain the existing GenerateOnly behavior.
 if ($Sync -and -not $PSBoundParameters.ContainsKey('BatchName')) { throw '-Sync requires -BatchName.' }
+if ($Generate -and -not $PSBoundParameters.ContainsKey('BatchName')) { throw '-Generate requires -BatchName.' }
 $hasSessionBoundaries = $false
 if ($PSBoundParameters.ContainsKey('BatchName') -and $BatchName -match '^[A-Za-z0-9_-]+$') {
 	$hasSessionBoundaries = Test-Path -LiteralPath (Join-Path $PSScriptRoot "Recordings\$BatchName\boundaries.json")
 }
-if ($Sync -or ($GenerateOnly -and $hasSessionBoundaries)) {
+if ($Generate -or ($hasSessionBoundaries -and ($Sync -or $GenerateOnly))) {
+	if (-not $hasSessionBoundaries) { throw '-Generate requires an existing batch with boundaries.json; legacy generation uses -GenerateOnly.' }
+	if ($BatchName -notmatch '^[A-Za-z0-9_-]+$' -or $BatchName -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$') { throw 'Invalid BatchName.' }
+	if ($DryRun -or $SkipCSharpGeneration) { throw '-Generate cannot be combined with -DryRun or -SkipCSharpGeneration.' }
+	if ($PSBoundParameters.ContainsKey('Only')) { throw '-Only is not supported for generation; -Generate covers all tests in Code.ts.' }
+	if ($Sync -or $GenerateOnly) { Write-Host '[Migration] New-style -Sync/-GenerateOnly now use STAGE2A AST generation. Use -Generate -BatchName; all tests are processed.' }
+	$generationArgs = @($batchGeneratorScript, '--manifest-file', (Join-Path $PSScriptRoot "Recordings\$BatchName\manifest.json"))
+	if ($StrictLocators) { $generationArgs += '--strict-locators' }
+	& node @generationArgs
+	exit $LASTEXITCODE
+}
+if ($Sync) {
 	if ($BatchName -notmatch '^[A-Za-z0-9_-]+$' -or $BatchName -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$') { throw 'Invalid BatchName.' }
 	if ($DryRun -or $SkipCSharpGeneration) { throw '-Sync cannot be combined with -DryRun or -SkipCSharpGeneration.' }
 	if ($Only) { Write-Host '[SprintSync] Syncing the complete combined source, including unselected cases, to keep global line mappings consistent.' }

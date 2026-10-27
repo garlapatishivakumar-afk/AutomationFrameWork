@@ -18,7 +18,20 @@ incomplete replay are verified.
 Read FrameworkPrompt.md, FrameworkContext.md, all four shared inputs in
 CodegenAI/Recordings/<Batch>/, and the DealsCompletionStatus reference files.
 Scan current Features, bindings, pages, locators and helpers for actual reuse.
-Read Code.ts only for unsupportedActions, never as the default input.
+Read Code.ts only for unsupportedActions or a STAGE2A refused case, never as the
+default input for generated cases. For every refused case, read its complete named
+TS block (stable ID prefix, not old saved line numbers alone) alongside its current
+per-case diagnostics and source range in CSharpGenerationReport.json. Report the
+unsupported/invalid statement and the surrounding intended flow; do not infer a
+partial C# section or silently exclude the case from the plan. GEN001/GEN002,
+REC001/REC002 and ID001 are blockers, not permission to invent missing behavior.
+For scalar text/equality refusals, propose locator filter hasText plus a locator
+assertion only when the recorded intent supports it. GEN003 requires explicit
+branch/assertion review. OBS001 means prior runtime evidence is unverified: TLL
+origin tags, a successful compile, and an included draft do not prove execution.
+If generation exited 1, check source identity before trusting the retained old
+report. Exit 2 means only eligible cases were published; include refused cases in
+the Pass 1 table and wait for approval before implementing alternatives.
 If Batch/Feature is unset or inputs are missing, report it; never substitute silently.
 Output ONE table covering ALL manifest cases: ID/tag and scenario title; recorded
 flow; steps/methods/locators reused vs new; Excel workbook/sheet/columns/sample data;

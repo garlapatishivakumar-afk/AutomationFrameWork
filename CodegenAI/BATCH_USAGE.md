@@ -70,17 +70,85 @@ through SprintSync: that would replace the just-produced validator outcomes.
 Use explicit offline sync after later source edits. Multi-file publication is not
 a filesystem transaction; recovery backups are retained before publication.
 
-### Offline sync from the authoritative combined source
+### STAGE2A offline generation from the authoritative combined source
 
-`-Sync -BatchName Sprint12` needs no CSV, application URL resolution, authentication
-or browser. It invokes the existing offline SprintSync CLI before any replan.
-`-GenerateOnly -BatchName Sprint12` also routes here when boundaries.json exists,
-even if `-BatchFile` is supplied. It reads combined Code.ts, **not stale work
-snippets**, and never runs live observation or table rewriting. `-StrictLocators`
-is forwarded; `-SkipCSharpGeneration` is incompatible. Sync always covers the full
-combined source for consistent global mappings, even with `-Only`. Per-case
-validation is recomputed under SprintSync's existing evidence/review rules; sync
-may refuse a blocked case rather than partially publish. Capture history remains.
+Use `-Generate -BatchName Sprint12` for an existing batch with boundaries.json.
+No CSV, authentication, browser, observer, repair or table rewrite is run. The new
+BatchGenerator/BatchAst path reads **every test in combined Code.ts**, not stale
+work snippets, and does **not** call SprintSync. This does not change recording:
+TS-only recording and a staged-recording adapter are deferred to STAGE2B.
+
+- New-style `-GenerateOnly` and `-Sync` are aliases with a migration message.
+  `-Only` is rejected for these generation commands: all discovered tests are
+  processed. `-DryRun` and `-SkipCSharpGeneration` are incompatible.
+- Legacy batches without boundaries keep their existing `-GenerateOnly`/`-Sync`
+  behavior. `-Generate` requires boundaries and never falls back to recording.
+- Stable literal names are `test('ID - title', async ({ page }) => { ... })`.
+  ID prefixes must match the manifest exactly. Changed title text is permitted
+  and reported; it does not rename the manifest. Unknown, duplicate, colliding
+  or missing required IDs block publication. Planned cases without source stay
+  planned; every discovered test is processed regardless of manifest status.
+- One C# class and one ReplayAsync method per included test preserve lexical
+  scope. This path does not use the legacy shared-property/segmented layout.
+  URL literals must match appsettings Urls entries; drafts call
+  Config.Urls.TryGetApplication with the matching key, never embed navigation
+  URL literals. Ensure those keys are available in the runtime configuration.
+
+Supported AST language: const locator variables; locator chains including row
+scopes, filter hasText and relative has locators, first/last/nth, frames; single
+awaited isVisible/isChecked/isDisabled/isEnabled/isEditable if/else predicates
+(optionally negated); and literal-title async test.step blocks. test.step becomes
+a lexical C# block, **not** a reporting integration. Existing no-options literal
+click/dblclick/hover/check/uncheck/focus/waitFor/fill/press/selectOption/setInputFiles,
+goto/waitForSelector, keyboard/mouse actions, popup/download promises are supported.
+Unknown signatures/options are refused rather than silently dropped.
+Only ordinary test blocks and named Playwright test/expect imports are accepted
+at top level. Additional executable setup (including test.use), hooks, describe
+wrappers and helpers block publication; they are not silently omitted or adapted
+into session setup. The caller supplies the IPage and configuration to the draft.
+
+Awaited expect(locator), optionally `.not`, supports toBeVisible, toBeHidden,
+toBeEnabled, toBeDisabled, toBeEditable, toBeChecked, toHaveText, toContainText,
+toHaveValue, toHaveAttribute and toHaveCount; expect(page) supports toHaveURL.
+Arguments must be literals (strings or count numbers); regexes, arrays, assertion
+options, dynamic expressions and template strings are outside this subset.
+
+| Diagnostic | Disposition |
+| --- | --- |
+| GEN001 | Refuse the whole test: unsupported executable syntax/signature. Scalar innerText/equality, loops, helpers, try/catch and evaluate are out. Prefer locator.filter({ hasText: ... }) plus a locator assertion for scalar text logic. |
+| GEN002 | Refuse an independently isolatable invalid-syntax test; uncertain/cross-test boundaries block publication. |
+| REC001 | Refuse a test without an initial guaranteed awaited page.goto before browser interaction. Navigation in another test/conditional is not setup. |
+| REC002 | Refuse executable `; ->` annotations. Strings/comments containing arrows are data, not annotations. |
+| ID001 | Block publication for invalid/unknown/duplicate/missing test identity. |
+| GEN003 | Review: an if has neither else nor an assertion within its branch. |
+| OBS001 | Prior runtime claims invalidated/not transferred for changed or unproven AST flows. No repair or replay is performed. |
+
+Existing deterministic locator rules are reused unchanged, component-by-component.
+Default tiered locator failures remain review; `-StrictLocators` refuses those
+cases. Structural/compiler failures are never relaxed. Runtime uniqueness for a
+whole chain is unverified; source maps include global lines and character offsets.
+TLL tags transfer only when a saved case body, selector and unique statement line
+match exactly. Tags mean **origin only**, not successful runtime validation.
+Ambiguous/edited mappings are omitted with an explicit report limitation. Existing
+observation/metadata files remain untouched; they are not current runtime evidence.
+
+Publication stages Code.cs and CSharpGenerationReport.json beside the batch,
+requires `compileGeneratedCSharp.success === true`, rechecks source/configuration,
+identity, evidence and output snapshots, and retains timestamp/UUID `.bak` copies
+of **both** previous artifacts. Manual C# edits are backed up, not rejected.
+An exclusive generation lock prevents competing generators; active recording
+boundaries block generation. Replacement is atomic per file, with rollback on
+caught multi-file failure, **not crash-atomic across both files**. Keep backups for
+crash recovery; inspect stale locks before removing them. External editors do not
+honor the lock, so stop editing during publication (there is no filesystem CAS).
+Code.ts, manifest, boundaries and .work evidence remain byte-identical.
+
+Exit codes: **0** all discovered tests generated; **2** at least one test refused
+and the rest compiled/published; **1** none generated or publication blocked. A
+refused case has diagnostics/ranges in the report but **no partial C# section**,
+placeholder exception or fabricated assertion. If none can publish or a gate
+fails, old output/report are retained; CLI diagnostics describe the failed run.
+Do not treat the retained report as a report for subsequently edited source.
 
 For `-Only` re-recording, unselected named blocks are preserved from combined
 Code.ts, not reconstructed from old work files. If their working evidence no
@@ -220,7 +288,7 @@ hashes and generation/fidelity contracts remain unchanged. The combined report's
 
 ### Combined locator layout
 
-Normal session publication, offline SprintSync and direct SprintMerger calls all
+Legacy session publication, legacy SprintSync and direct SprintMerger calls all
 emit one namespace-top `public sealed class Locators`. Every generated locator
 property is on a single line, preserving shared, case-ID and case-popup ordering.
 The Locators class has no comments, headings, property TLL tags or banner above it.
@@ -265,9 +333,9 @@ not be a Windows device name. Its default is `yyyyMMdd-HHmmss`.
 ```powershell
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -Only TC03
-.\StartCodegen.ps1 -Sync -BatchName Sprint12
-.\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -GenerateOnly -SkipLiveObservation
-.\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Sprint12 -GenerateOnly -StrictLocators
+.\StartCodegen.ps1 -Generate -BatchName Sprint12
+.\StartCodegen.ps1 -Generate -BatchName Sprint12 -StrictLocators
+.\StartCodegen.ps1 -Sync -BatchName Sprint12 # migration alias when boundaries exist
 .\StartCodegen.ps1 -BatchFile .\testcases.csv -BatchName Demo -DryRun
 .\StartCodegen.ps1                       # single recording, tiered review policy
 ```
@@ -294,7 +362,7 @@ to the current directory (or absolute).
   combined with `-SkipCSharpGeneration`.
 - For legacy regeneration without rewriting recorded TypeScript, also use
   `-SkipTableLocatorPostProcess`. Existing DOM/table evidence remains available.
-- C# generation now checks actual emitted action order (`actionFidelity` in each
+- Legacy/recording-time C# generation checks actual emitted action order (`actionFidelity` in each
   case report), including popup/download boundaries. Omitted, duplicated,
   reordered supported actions block publication. Unsupported actions that leave
   compilable C# require review by default and throw NotSupportedException if executed;
@@ -316,7 +384,7 @@ to the current directory (or absolute).
   repair the saved evidence or prove the business flow works; a fresh complete
   observation is needed for that. Observation replays actions against the target
   application, so use suitable test data to avoid duplicate business operations.
-- `-Only` merges selected entries into an existing manifest and does not touch
+- Recording/legacy `-Only` merges selected entries into an existing manifest and does not touch
   unselected working files. Shared outputs are rebuilt in CSV order with the case
   replaced in place. Reuse `-BatchName` to resume a batch. Without `-Only`,
   a fresh plan is written for every row in the CSV. Dry-run replans selected entries;
@@ -336,6 +404,10 @@ to the current directory (or absolute).
   valid cases are still published. Do not append several tests to one internal file.
 
 ## Output layout
+
+This is the recording/legacy layout. STAGE2A replaces only the combined C# and
+generation report, adds timestamp backups, and leaves all other artifacts alone.
+It does not rebuild the four-file legacy merger set or regenerate internal drafts.
 
 ```text
 CodegenAI/
@@ -368,17 +440,21 @@ directory, including `.work`, is excluded from resources/items and git as well.
 Case class names avoid collisions within a batch, not between copies of the same
 case in different batches. Review output before promoting it into compiled code.
 
-Code.ts takes imports and `test.use` from the first included case once. Every case
+During recording/legacy merging, Code.ts takes imports and `test.use` from the first included case once. Every case
 retains its own test callback and actions, not a concatenation of browser sessions.
 Differing additional imports are rejected; the first included case's `test.use`
 settings govern the shared file. C# using directives are deduplicated and all classes
 are kept inside the same namespace with their `// Test case:` comments.
 
-Each shared file is written to a temporary file and atomically renamed over its
+During recording/legacy merging, each shared file is written to a temporary file and atomically renamed over its
 previous version. The four-file set is not a single filesystem transaction; after a
 hard termination during publication, regenerate to synchronize all four outputs.
 
 ## Manifest
+
+The lifecycle below describes recording/legacy generation. STAGE2A reads and
+rechecks identity but never rewrites manifest statuses, titles, counts or issues;
+its current per-case disposition comes from the source-hashed generation report.
 
 Paths inside the manifest are relative to its batch directory. The file is written
 before recording and atomically replaced after every case, including skips/failures.
@@ -428,11 +504,20 @@ An empty recording is `failed: empty recording`. Action counts come from the C#
 report (`unsupportedActionCount`, or the length of its existing `unsupportedActions`
 array); transformed table counts come from metadata `transformedActions`.
 `recordedAtUtc` records successful browser recording time, not regeneration time;
-`-Only -GenerateOnly` retains an existing timestamp. Imported samples have no known
+Legacy `-Only -GenerateOnly` retains an existing timestamp. Imported samples have no known
 recording timestamp. At the end a summary is printed and any failed manifest entry
 causes exit code 1 (including retained failures outside `-Only`).
 
 ## Combined report and metadata
+
+For STAGE2A, `generator: "STAGE2A-AST"` identifies the new report. It contains
+global `sourceMap` entries, source/output hashes, real aggregate `compilation`, and
+one entry per discovered test with included/refused status, diagnostics, title
+change, locator validation, unverified evidence status and mapping limitations.
+The top-level blocked flag means **none included**, not a partial-publication
+refusal; inspect every case and the exit code. No `.work` report, manifest issue,
+or table metadata is refreshed. The schema and rebuilding rules below describe
+legacy recording/merger output, not the STAGE2A report.
 
 The shared report contains `batchId`, `generatedAtUtc`, `codeGenerationBlocked`, `reviewRequired` and
 `cases[]`. Each case has `testCaseId`, `title`, `status`, `included`, `className`,
@@ -452,8 +537,9 @@ Shared table metadata keeps an `actions[]` array and summed `analyzedActions` an
 
 All other original entry fields are preserved. Line offsets are recalculated on
 every rebuild, including when cases are replaced, excluded or their titles change.
-Never run the single-flow table engine or C# generator directly on the shared file;
-use `StartCodegen.ps1 -GenerateOnly` to process `.work` and merge the results.
+Never run the single-flow table engine or C# generator directly on the shared file.
+For batches with boundaries, use `StartCodegen.ps1 -Generate` on combined source.
+Only legacy no-boundary `-GenerateOnly` processes `.work` and merges its results.
 
 Recording with `-SkipCSharpGeneration` keeps the internal TypeScript but invalidates
 the selected case's old report; it is excluded from the paired shared outputs until
@@ -521,6 +607,13 @@ unverified locators, missing login bindings and error-page URLs first.
 
 ### Tiered generation policy and recording guards
 
+The detailed legacy policy below remains unchanged for recording-time/single-flow
+generation. STAGE2A reuses locator rules and their default-review/strict-refusal
+policy, but unsupported AST constructs always refuse the whole test, never emit
+NotSupportedException, and use exit 2 when eligible siblings publish. It backs up
+manual C# rather than rejecting draft-hash differences. Missing compiler success
+always blocks STAGE2A publication; there is no standalone compile bypass in its CLI.
+
 Default policy B separates review findings from structural failures:
 
 - **Tier 1:** crashes, unparseable TypeScript, invalid C#, undeclared awaited
@@ -560,6 +653,11 @@ evidence-backed stable locator, or a TODO assertion. It must explicitly disclose
 any planned reuse of a flagged locator and cannot call downstream replay verified.
 
 ### Case diagnostics
+
+STAGE2A prints case ID, global source line and diagnostic code. Refused-case flow
+review must read the complete TS block with those diagnostics. Existing validator
+details remain in the local report, not echoed input values. The `GenerationIssue`
+and manifest/local-line conventions below apply to the legacy generator/merger.
 
 The generator and merger print `GenerationIssue` lines with case ID, source line,
 locator expression, rule ID and message, followed by a suggested action. `LV012`

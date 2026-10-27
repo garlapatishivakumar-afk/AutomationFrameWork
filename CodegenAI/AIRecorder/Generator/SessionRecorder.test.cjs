@@ -457,6 +457,9 @@ test("PowerShell Sync and boundary GenerateOnly run before missing config/auth/C
   write(script, fs.readFileSync(path.resolve(__dirname, "../../StartCodegen.ps1"), "utf8"));
   const sync = path.join(recorder, "AIRecorder/Generator/SprintSync.cjs"), log = path.join(f.folder, "sync.json");
   write(sync, `require('fs').writeFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)));`);
+  // Boundary generation migrated to the separate AST module; recording itself
+  // and legacy Sync still retain their previous runtime implementations.
+  write(path.join(recorder, "AIRecorder/Generator/BatchGenerator.cjs"), `require('fs').writeFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)));`);
   const run = (args) => spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-TargetUrl", " ", ...args], { encoding: "utf8", timeout: 60000 });
   let result = run(["-Sync", "-BatchName", "Demo", "-StrictLocators"]);
   assert.equal(result.status, 0, result.stdout + result.stderr);
