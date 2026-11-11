@@ -1,3 +1,7 @@
+/**
+ * Integration orchestrator for planning/learning/generation workflows.
+ * Not used as the default recording entrypoint.
+ */
 import { FrameworkIntelligenceEngine } from "../Intelligence/FrameworkIntelligenceEngine";
 import { IntelligenceResult } from "../Intelligence/FrameworkIntelligenceEngine";
 import { PlannerContext } from "../Planner/PlannerContext";

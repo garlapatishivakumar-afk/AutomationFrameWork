@@ -1,3 +1,7 @@
+/**
+ * Engine-level orchestrator for typed orchestration flows.
+ * Not used as the default recording entrypoint.
+ */
 import { ArtifactProcessor } from "../ArtifactProcessor";
 import { buildBusinessFlow, BusinessStep } from "../BusinessFlowBuilder";
 import { buildPromptContext, BuiltContext } from "../ContextBuilder";

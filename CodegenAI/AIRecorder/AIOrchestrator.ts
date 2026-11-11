@@ -1,3 +1,7 @@
+/**
+ * Legacy orchestrator kept for compatibility experiments only.
+ * Active recording/generation entry point is CodegenAI/StartCodegen.ps1.
+ */
 import { buildPromptContext, BuiltContext } from "./ContextBuilder";
 import { DecisionEngine } from "./Decision/DecisionEngine";
 import { GenerationDecision } from "./Decision/DecisionModels";

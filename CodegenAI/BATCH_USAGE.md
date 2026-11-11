@@ -6,6 +6,9 @@ The files to review are the sprint's **Code.ts**, **Code.cs** and **manifest.jso
 single-recording command and paths are unchanged. Generation defaults to tiered
 review handling; add `-StrictLocators` for the previous strict failure policy.
 
+For active flow ownership and legacy-path clarification, see
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Persistent session boundaries
 
 After the initial launch prompt, record the first CSV case in the browser, then
@@ -257,12 +260,9 @@ TC02,Create inspection order with missing mandatory field
 `TestCaseId` must be unique (case-insensitive on Windows), match
 `^[A-Za-z0-9_-]+$`, and not be a reserved Windows device name. `Title` cannot
 be blank or contain newlines (Scenario names must be single-line). Quote names
-containing commas. Change the `$TargetUrl` default at the top of
-[StartCodegen.ps1](StartCodegen.ps1) to set the application link before recording,
-as in version 1.3.2. Alternatively, pass `-TargetUrl` on each run to override that
-default without editing the script. If the default is cleared (or a blank override
-is supplied), the launcher falls back to `Urls.IReport` in the root appsettings.json,
-including files with JSON comments.
+containing commas. The launcher now defaults to a blank `$TargetUrl` and resolves
+the application link from `Urls.IReport` in the root appsettings.json (including
+files with JSON comments). You can still pass `-TargetUrl` for a one-off override.
 
 An optional legacy CSV `StartUrl` still overrides the target URL for that case;
 leave it blank or omit that column to use the script's link. A persistent batch
