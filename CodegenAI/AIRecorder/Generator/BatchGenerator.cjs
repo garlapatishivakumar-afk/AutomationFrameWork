@@ -10,6 +10,52 @@ const hash = bytes => createHash("sha256").update(bytes).digest("hex");
 const crlf = text => text.replace(/\r?\n/g, "\r\n");
 const json = value => crlf(JSON.stringify(value, null, 2) + "\n");
 function fail(message) { throw new Error(message); }
+function lockInfo(file) {
+  if (!fs.existsSync(file)) return { exists: false };
+  const stat = fs.statSync(file);
+  const ageMs = Date.now() - stat.mtimeMs;
+  let payload = null;
+  try {
+    const text = fs.readFileSync(file, "utf8").trim();
+    if (text) payload = JSON.parse(text);
+  } catch {
+    payload = null;
+  }
+  return {
+    exists: true,
+    ageMs,
+    pid: Number.isInteger(payload?.pid) ? payload.pid : null,
+    createdAtUtc: typeof payload?.createdAtUtc === "string" ? payload.createdAtUtc : null
+  };
+}
+function processAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function acquireLock(lock, staleMinutes = 240) {
+  const staleMs = Math.max(1, staleMinutes) * 60 * 1000;
+  try {
+    const descriptor = fs.openSync(lock, "wx");
+    fs.writeFileSync(descriptor, JSON.stringify({ pid: process.pid, createdAtUtc: new Date().toISOString() }));
+    return descriptor;
+  } catch {
+    const info = lockInfo(lock);
+    const staleByTime = info.exists && info.ageMs > staleMs;
+    const staleByPid = info.exists && info.pid !== null && !processAlive(info.pid);
+    if (staleByTime || staleByPid) {
+      fs.rmSync(lock, { force: true });
+      const descriptor = fs.openSync(lock, "wx");
+      fs.writeFileSync(descriptor, JSON.stringify({ pid: process.pid, createdAtUtc: new Date().toISOString() }));
+      return descriptor;
+    }
+    fail("Generation is already locked; do not generate during another generation. If a prior process crashed, wait for stale timeout or inspect/remove the lock file.");
+  }
+}
 function unlinked(file) {
   for (let p = file; ; p = path.dirname(p)) {
     if (fs.existsSync(p) && fs.lstatSync(p).isSymbolicLink()) fail("Linked generation paths are not supported.");
@@ -116,9 +162,7 @@ function generateBatch(manifestPath, options = {}) {
   const folder = path.dirname(manifestPath);
   unlinked(folder);
   const lock = path.join(folder, ".stage2a-generate.lock");
-  let descriptor;
-  try { descriptor = fs.openSync(lock, "wx"); }
-  catch { fail("Generation is already locked; do not generate during another generation. A stale lock requires manual inspection."); }
+  const descriptor = acquireLock(lock, options.lockStaleMinutes || 240);
   let staging;
   try {
     const snapshots = new Map();

@@ -8,6 +8,8 @@ review handling; add `-StrictLocators` for the previous strict failure policy.
 
 For active flow ownership and legacy-path clarification, see
 [ARCHITECTURE.md](ARCHITECTURE.md).
+For default vs specialized prompt selection, see
+[AIRecorder/PROMPTS.md](AIRecorder/PROMPTS.md).
 
 ## Persistent session boundaries
 
@@ -140,9 +142,11 @@ requires `compileGeneratedCSharp.success === true`, rechecks source/configuratio
 identity, evidence and output snapshots, and retains timestamp/UUID `.bak` copies
 of **both** previous artifacts. Manual C# edits are backed up, not rejected.
 An exclusive generation lock prevents competing generators; active recording
-boundaries block generation. Replacement is atomic per file, with rollback on
-caught multi-file failure, **not crash-atomic across both files**. Keep backups for
-crash recovery; inspect stale locks before removing them. External editors do not
+boundaries block generation. STAGE2A auto-recovers stale locks when the lock is
+older than the stale timeout or the lock PID no longer exists. Replacement is
+atomic per file, with rollback on caught multi-file failure, **not crash-atomic
+across both files**. Keep backups for crash recovery; inspect locks before
+manually removing them. External editors do not
 honor the lock, so stop editing during publication (there is no filesystem CAS).
 Code.ts, manifest, boundaries and .work evidence remain byte-identical.
 

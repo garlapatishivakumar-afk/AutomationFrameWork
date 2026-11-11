@@ -29,3 +29,9 @@ CodegenAI/AIRecorder/auth/session.json
 /CodegenAI/AIRecorder/CSharpGenerationReport.json
 /CodegenAI/AIRecorder/LiveObservations.json
 /CodegenAI/AIRecorder/TableLocatorMetadata.json
+
+# Codegen lock/temp/backup artifacts
+CodegenAI/Recordings/**/.stage2a-generate.lock
+CodegenAI/Recordings/**/.stage2a-*/
+CodegenAI/Recordings/**/*.bak
+CodegenAI/**/.csharp-live-sync.stop

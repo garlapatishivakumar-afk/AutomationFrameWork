@@ -1,3 +1,6 @@
+> Non-default prompt: use only for targeted feature drafting.
+> For routine sprint generation, use the default set in `PROMPTS.md`.
+
 Read:
 
 1. ALM Test Case

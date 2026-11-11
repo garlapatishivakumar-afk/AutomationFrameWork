@@ -366,6 +366,10 @@ if (-not $BatchFile) {
 	}
 	if (-not (Test-Path $sessionScript)) { throw "Session helper not found: $sessionScript" }
 	. $sessionScript
+	$singleSessionState = Get-CodegenSessionState -Path $sessionPath -MaxAgeDays $maxAgeDays
+	if ($singleSessionState.Exists -and -not $singleSessionState.Valid) {
+		Write-Warning "Saved browser session is $($singleSessionState.Reason) (ageHours=$($singleSessionState.AgeHours)); starting with a fresh login session."
+	}
 	Initialize-CodegenSession -SessionPath $sessionPath -MaxAgeDays $maxAgeDays
 	try {
 		Invoke-CodegenRecording -CodeFile $outputFile -CsFile $csharpOutputFile -ReportFile $csharpReportFile `
@@ -504,6 +508,27 @@ function Publish-SprintArtifacts {
 	}
 }
 
+function Show-PublishGateSummary {
+	param(
+		[string]$BatchFolderPath
+	)
+
+	$sharedReportPath = Join-Path $BatchFolderPath 'CSharpGenerationReport.json'
+	if (-not (Test-Path -LiteralPath $sharedReportPath)) { return }
+
+	try {
+		$sharedReport = Get-Content -LiteralPath $sharedReportPath -Raw | ConvertFrom-Json
+		$caseReports = @($sharedReport.cases)
+		$includedCount = @($caseReports | Where-Object { $_.included -eq $true }).Count
+		$refusedCount = @($caseReports | Where-Object { $_.included -ne $true }).Count
+		$reviewCount = @($caseReports | Where-Object { $_.reviewRequired -eq $true }).Count
+		$compileOk = ($null -ne $sharedReport.compilation -and $sharedReport.compilation.success -eq $true)
+		Write-Host "Publish gates: compileOk=$compileOk, blocked=$([bool]$sharedReport.codeGenerationBlocked), reviewRequiredCases=$reviewCount, included=$includedCount, refused=$refusedCount"
+	} catch {
+		Write-Warning 'Could not parse shared sprint report for publish gate summary.'
+	}
+}
+
 $previousManifestFile = $null
 if (-not $DryRun -and -not $GenerateOnly -and (Test-Path -LiteralPath $manifestPath)) {
 	# Preserve the old plan before selected entries/titles are reset, as well as
@@ -554,6 +579,10 @@ if (-not $DryRun) {
 if (-not $DryRun -and -not $GenerateOnly) {
 	if (-not (Test-Path $sessionScript)) { throw "Session helper not found: $sessionScript" }
 	. $sessionScript
+	$batchSessionState = Get-CodegenSessionState -Path $sessionPath -MaxAgeDays $maxAgeDays
+	if ($batchSessionState.Exists -and -not $batchSessionState.Valid) {
+		Write-Warning "Saved browser session is $($batchSessionState.Reason) (ageHours=$($batchSessionState.AgeHours)); starting with a fresh login session."
+	}
 	Initialize-CodegenSession -SessionPath $sessionPath -MaxAgeDays $maxAgeDays
 }
 if ($GenerateOnly) {
@@ -569,7 +598,10 @@ if (-not $DryRun -and -not $GenerateOnly) {
 	$sessionArgs = @($sessionRecorderScript, '--manifest-file', $manifestPath,
 		'--url', ([string]@($manifest.testCases | Where-Object { $_.id -eq $selectedRows[0].TestCaseId })[0].startUrl),
 		'--save-storage', $sessionPath, '--test-id-attribute', $TestIdAttribute)
-	if (Test-CodegenSessionValid -Path $sessionPath -MaxAgeDays $maxAgeDays) { $sessionArgs += @('--load-storage', $sessionPath) }
+	if (Test-CodegenSessionValid -Path $sessionPath -MaxAgeDays $maxAgeDays) {
+		Write-Host "Reusing saved browser session from $sessionPath"
+		$sessionArgs += @('--load-storage', $sessionPath)
+	}
 	if ($previousManifestFile) { $sessionArgs += @('--previous-manifest', $previousManifestFile) }
 	foreach ($row in $selectedRows) { $sessionArgs += "--case-id=$($row.TestCaseId)" }
 	# Do not pipe terminal input to the child codegen. SessionRecorder owns Enter
@@ -659,6 +691,7 @@ if ($sessionBatch) {
 	if ($LASTEXITCODE -ne 0) { $sprintMergeFailed = $true }
 	$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 }
+Show-PublishGateSummary -BatchFolderPath $batchFolder
 (Protect-ManifestValue $manifest).testCases | Select-Object id, @{Name='REVIEW';Expression={[bool]$_.reviewRequired}}, status, @{Name='actions';Expression={$_.actionCount}}, @{Name='unsupported';Expression={$_.unsupportedActionCount}}, title | Format-Table -AutoSize | Out-String -Width 240 | Write-Host
 if (-not $DryRun) { Invoke-CodegenNode -Arguments @($sprintMergerScript, '--review-summary', $manifestPath) }
 Write-Host "Sprint TypeScript: $(Join-Path $batchFolder 'Code.ts')"

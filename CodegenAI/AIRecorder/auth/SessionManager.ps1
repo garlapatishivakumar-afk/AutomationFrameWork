@@ -17,6 +17,51 @@ function Test-CodegenSessionValid {
 	return ((Get-Date) - $fileInfo.LastWriteTimeUtc) -le $maxAge
 }
 
+function Get-CodegenSessionState {
+	param(
+		[string]$Path,
+		[int]$MaxAgeDays
+	)
+
+	if (-not (Test-Path $Path)) {
+		return [pscustomobject]@{
+			Exists = $false
+			Valid = $false
+			Reason = 'missing'
+			AgeHours = $null
+		}
+	}
+
+	$fileInfo = Get-Item $Path
+	if ($fileInfo.Length -le 0) {
+		return [pscustomobject]@{
+			Exists = $true
+			Valid = $false
+			Reason = 'empty'
+			AgeHours = 0
+		}
+	}
+
+	$age = (Get-Date) - $fileInfo.LastWriteTimeUtc
+	$maxAge = [TimeSpan]::FromDays($MaxAgeDays)
+
+	if ($age -gt $maxAge) {
+		return [pscustomobject]@{
+			Exists = $true
+			Valid = $false
+			Reason = 'expired'
+			AgeHours = [math]::Round($age.TotalHours, 1)
+		}
+	}
+
+	return [pscustomobject]@{
+		Exists = $true
+		Valid = $true
+		Reason = 'valid'
+		AgeHours = [math]::Round($age.TotalHours, 1)
+	}
+}
+
 function Initialize-CodegenSession {
 	param(
 		[string]$SessionPath,

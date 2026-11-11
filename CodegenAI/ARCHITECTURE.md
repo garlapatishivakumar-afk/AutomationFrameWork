@@ -50,6 +50,8 @@ Use these as follows to avoid overlap:
 - `ExecutePrompt.md`: execution-specific guidance
 - Other prompt files: specialized and optional, not default starting point
 
+See `CodegenAI/AIRecorder/PROMPTS.md` for the authoritative prompt ownership map.
+
 ## URL configuration policy
 
 Default behavior is config-driven:
